@@ -1,6 +1,7 @@
 import { normalizePhone } from "./schema";
 import { SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
+import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
 
 function makeSubmissionId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -80,7 +81,7 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   const keys: (keyof LeadDraft)[] = [
     "nombre", "email", "codigoPostal", "inicio", "numAsegurados", "coberturaDental",
     "motivo", "fumador", "fechaNacimiento", "sexo", "producto",
-    "seguroActualImporte", "seguroActualPeriodo",
+    "seguroActualImporte", "seguroActualPeriodo", "diaLlamada", "turnoLlamada",
   ];
   for (const k of keys) {
     const dv = draft[k];
@@ -157,6 +158,8 @@ export async function upsertLead(
     seguroActualImporte: draft.seguroActualImporte ?? null,
     seguroActualPeriodo: draft.seguroActualPeriodo ?? "",
     seguroActualServicios: draft.seguroActualServicios ?? [],
+    diaLlamada: draft.diaLlamada ?? "",
+    turnoLlamada: draft.turnoLlamada ?? "",
     aceptaPrivacidad: !!draft.aceptaPrivacidad, autorizaContacto: !!draft.autorizaContacto, aceptaComercial: !!draft.aceptaComercial,
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
@@ -263,4 +266,20 @@ export async function deleteProduct(id: string): Promise<boolean> {
   if (next.length === all.length) return false;
   await jset(PRODUCTS_KEY, next);
   return true;
+}
+
+/* ---------------------------- Banner de campaña ---------------------------- */
+
+const CAMPAIGN_KEY = "campaign:home";
+
+export async function getCampaignBanner(): Promise<CampaignBanner> {
+  const stored = await jget<CampaignBanner>(CAMPAIGN_KEY);
+  return stored ?? DEFAULT_CAMPAIGN_BANNER;
+}
+
+export async function saveCampaignBanner(patch: Partial<CampaignBanner>): Promise<CampaignBanner> {
+  const current = await getCampaignBanner();
+  const next: CampaignBanner = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  await jset(CAMPAIGN_KEY, next);
+  return next;
 }

@@ -92,6 +92,10 @@ export const COBERTURAS = {
   },
 };
 
+/* --------------------- Preferencia de horario de llamada ------------------ */
+export const DIAS_LLAMADA = ["Cualquier día", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+export const TURNOS_LLAMADA = ["Cualquier turno", "Mañana", "Tarde"];
+
 export const SELLING_POINTS = [
   "Sin coste y sin compromiso.",
   "Un asesor compara por ti entre las mejores compañías.",

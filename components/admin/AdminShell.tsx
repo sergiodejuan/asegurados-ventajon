@@ -16,9 +16,10 @@ export function useAdminToken() {
 const TABS = [
   { href: "/admin", label: "Leads", key: "leads" },
   { href: "/admin/productos", label: "Productos", key: "productos" },
+  { href: "/admin/campana", label: "Campaña", key: "campana" },
 ] as const;
 
-export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "productos" }) {
+export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "productos" | "campana" }) {
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);

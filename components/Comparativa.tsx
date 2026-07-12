@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "./Header";
 import { NextSteps } from "./NextSteps";
+import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
 import { BRAND_NAME } from "@/lib/brand";
 import type { Product } from "@/lib/catalog";
@@ -80,6 +81,7 @@ export function Comparativa() {
 
   const age = ageFromDob(quote?.fechaNacimiento);
   const waText = buildWhatsAppText({ producto, quote });
+  const widgetWaText = buildWhatsAppText({ producto, quote, origen: "comparativa" });
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
 
   return (
@@ -231,6 +233,7 @@ export function Comparativa() {
 
         <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>
+      <WhatsAppHelpWidget message="¿Necesitas ayuda para elegir?" waHref={whatsAppUrl(widgetWaText)} />
     </>
   );
 }

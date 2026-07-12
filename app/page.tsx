@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { CoverageTabs } from "@/components/CoverageTabs";
-import { AvailabilityBadge } from "@/components/AvailabilityBadge";
+import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
@@ -69,9 +69,6 @@ export default function Home() {
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
               Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
             </p>
-            <div className="mt-3 md:col-start-1 md:row-start-4">
-              <AvailabilityBadge />
-            </div>
           </div>
         </section>
 
@@ -110,6 +107,8 @@ export default function Home() {
             ))}
           </ul>
         </section>
+
+        <CampaignBanner />
 
         {/* VENTAJAS (carrusel en mobile, grid en escritorio) */}
         <section aria-labelledby="ventajas" className="mt-14 md:mt-24">

@@ -75,7 +75,7 @@ export function vidaPrice(base: { precio: number }, profile: Pick<QuoteProfile, 
   return { precio: base.precio + smokerExtra };
 }
 
-export function buildWhatsAppText(opts: { producto: string; compania?: string; quote?: QuoteProfile | null }) {
+export function buildWhatsAppText(opts: { producto: string; compania?: string; quote?: QuoteProfile | null; origen?: string }) {
   const lines = ["Hola, vengo de la comparativa de Asegurados Ventajon."];
   if (opts.compania) lines.push(`Me interesa la opción de ${opts.compania}.`);
   lines.push(`Producto: ${opts.producto === "vida" ? "Seguro de vida" : "Seguro de salud"}.`);
@@ -83,11 +83,30 @@ export function buildWhatsAppText(opts: { producto: string; compania?: string; q
   if (opts.quote?.codigoPostal) lines.push(`Código postal: ${opts.quote.codigoPostal}.`);
   if (opts.quote?.numAsegurados) lines.push(`Personas a asegurar: ${opts.quote.numAsegurados}.`);
   if (opts.quote?.fechaNacimiento) lines.push(`Fecha de nacimiento: ${opts.quote.fechaNacimiento}.`);
+  if (opts.origen) lines.push(`Origen: ${opts.origen}.`);
   return lines.join(" ");
 }
 
 export function whatsAppUrl(text: string) {
   return `${WHATSAPP_URL}?text=${encodeURIComponent(text)}`;
+}
+
+// Resultado de una solicitud de llamada, para personalizar la página de
+// agradecimiento (nombre + preferencia horaria) sin tener que volver a pedirlo.
+export type CallResult = { nombre?: string; diaLlamada?: string; turnoLlamada?: string };
+const CALL_RESULT_KEY = "ventajon:callResult";
+
+export function saveCallResult(v: CallResult) {
+  try { sessionStorage.setItem(CALL_RESULT_KEY, JSON.stringify(v)); } catch { /* sessionStorage no disponible */ }
+}
+
+export function loadCallResult(): CallResult | null {
+  try {
+    const raw = sessionStorage.getItem(CALL_RESULT_KEY);
+    return raw ? (JSON.parse(raw) as CallResult) : null;
+  } catch {
+    return null;
+  }
 }
 
 export { slugifyCompania as slugify } from "./catalog";

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Header } from "./Header";
 import { CallRequestForm } from "./CallRequestForm";
+import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
 import type { Product } from "@/lib/catalog";
 import {
@@ -48,6 +49,7 @@ export function CompanyDetail() {
   if (!entry) return null;
 
   const waText = buildWhatsAppText({ producto, compania: entry.compania, quote });
+  const widgetWaText = buildWhatsAppText({ producto, compania: entry.compania, quote, origen: `ficha ${entry.compania}` });
   const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
   const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
 
@@ -159,6 +161,7 @@ export function CompanyDetail() {
           </div>
         </div>
       </main>
+      <WhatsAppHelpWidget message={`¿Necesitas ayuda con tu opción con ${entry.compania}?`} waHref={whatsAppUrl(widgetWaText)} />
     </>
   );
 }

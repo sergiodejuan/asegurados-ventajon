@@ -1,7 +1,6 @@
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { StickyMobileCta } from "./StickyMobileCta";
-import { AvailabilityBadge } from "./AvailabilityBadge";
 import { Testimonials } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
@@ -51,9 +50,6 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
               Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
             </p>
-            <div className="mt-3 md:col-start-1 md:row-start-4">
-              <AvailabilityBadge />
-            </div>
           </div>
         </section>
 

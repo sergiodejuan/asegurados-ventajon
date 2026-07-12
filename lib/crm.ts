@@ -75,6 +75,9 @@ export type Lead = {
   seguroActualImporte: number | null;
   seguroActualPeriodo: string; // 'mes' | 'año'
   seguroActualServicios: string[];
+  // Preferencia de horario para la llamada (formulario "quiero que me llamen")
+  diaLlamada: string;
+  turnoLlamada: string;
   // Consentimientos (estado actual + auditoría completa)
   aceptaPrivacidad: boolean;
   autorizaContacto: boolean;

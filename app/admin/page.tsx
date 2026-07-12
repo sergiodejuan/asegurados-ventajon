@@ -19,6 +19,7 @@ type Lead = {
   motivo: string; fumador: boolean | null;
   fechaNacimiento: string; sexo: string; yaTieneSeguro: boolean | null;
   seguroActualImporte: number | null; seguroActualPeriodo: string; seguroActualServicios: string[];
+  diaLlamada: string; turnoLlamada: string;
   aceptaPrivacidad: boolean; autorizaContacto: boolean; aceptaComercial: boolean;
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
@@ -31,6 +32,7 @@ const SUBMISSION_FIELD_LABELS: Record<string, string> = {
   fumador: "Fumador", fechaNacimiento: "Fecha de nacimiento", sexo: "Sexo", yaTieneSeguro: "Ya tenía seguro",
   seguroActualImporte: "Pagaba antes", seguroActualPeriodo: "Periodicidad", seguroActualServicios: "Servicios actuales",
   compania: "Compañía de interés", producto: "Producto",
+  diaLlamada: "Día preferido", turnoLlamada: "Turno preferido",
 };
 
 function formatSubmissionValue(v: unknown): string {
@@ -193,6 +195,8 @@ function LeadsCrm() {
             {l.motivo && <div><dt className="text-slate2">Motivo (vida)</dt><dd className="font-medium text-ink">{l.motivo}</dd></div>}
             {l.fumador != null && <div><dt className="text-slate2">Fumador</dt><dd className="font-medium text-ink">{l.fumador ? "Sí" : "No"}</dd></div>}
             {l.seguroActualImporte != null && <div><dt className="text-slate2">Paga ahora</dt><dd className="font-medium text-ink tnums">{l.seguroActualImporte} € / {l.seguroActualPeriodo || "mes"}</dd></div>}
+            {l.diaLlamada && <div><dt className="text-slate2">Día preferido</dt><dd className="font-medium text-ink">{l.diaLlamada}</dd></div>}
+            {l.turnoLlamada && <div><dt className="text-slate2">Turno preferido</dt><dd className="font-medium text-ink">{l.turnoLlamada}</dd></div>}
             {(l.seguroActualServicios?.length ?? 0) > 0 && <div className="col-span-2"><dt className="text-slate2">Servicios actuales</dt><dd className="font-medium text-ink">{l.seguroActualServicios.join(", ")}</dd></div>}
             {l.utm?.source && <div><dt className="text-slate2">utm_source</dt><dd className="font-medium text-ink">{l.utm.source}</dd></div>}
             {l.utm?.campaign && <div><dt className="text-slate2">utm_campaign</dt><dd className="font-medium text-ink">{l.utm.campaign}</dd></div>}

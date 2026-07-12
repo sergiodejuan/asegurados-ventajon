@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
-import { BRAND_NAME } from "@/lib/brand";
-import { loadQuote, type QuoteProfile } from "@/lib/quote";
+import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
+import { loadQuote, saveCallResult, type QuoteProfile } from "@/lib/quote";
 import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -25,6 +25,8 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [codigoPostal, setCp] = useState("");
+  const [diaLlamada, setDiaLlamada] = useState<string>(DIAS_LLAMADA[0]);
+  const [turnoLlamada, setTurnoLlamada] = useState<string>(TURNOS_LLAMADA[0]);
   const [priv, setPriv] = useState(false);
   const [contacto, setContacto] = useState(false);
   const [comercial, setComercial] = useState(false);
@@ -67,6 +69,8 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
           codigoPostal: quote.codigoPostal ?? "",
           producto,
           compania,
+          diaLlamada,
+          turnoLlamada,
           aceptaPrivacidad: true,
           autorizaContacto: true,
           aceptaComercial: !!quote.consentAt?.comercialAt,
@@ -75,7 +79,11 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
           utm: { ...utm, referrer },
         }),
       });
-      if (res.ok) { router.push("/gracias"); return; }
+      if (res.ok) {
+        saveCallResult({ nombre: quote.nombre, diaLlamada, turnoLlamada });
+        router.push("/gracias");
+        return;
+      }
       setQuickError("No hemos podido enviar tu solicitud. Inténtalo de nuevo.");
     } catch {
       setQuickError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
@@ -93,6 +101,8 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
       codigoPostal,
       producto,
       compania,
+      diaLlamada,
+      turnoLlamada,
       aceptaPrivacidad: priv,
       autorizaContacto: contacto,
       aceptaComercial: comercial,
@@ -119,6 +129,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
         body: JSON.stringify(parsed.data),
       });
       if (res.ok) {
+        saveCallResult({ nombre, diaLlamada, turnoLlamada });
         router.push("/gracias");
         return;
       }
@@ -146,6 +157,10 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
           Vamos a llamarte al <span className="font-semibold tnums text-ink">{quote.telefono}</span>
           {compania ? ` para hablar de tu opción con ${compania}` : ""}. Ya tenemos tu autorización de contacto, no hace falta que la repitas.
         </p>
+        <div className="mt-4">
+          <CallTimePreference dia={diaLlamada} onDia={setDiaLlamada} turno={turnoLlamada} onTurno={setTurnoLlamada} />
+        </div>
+
         {quickError && (
           <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">
             {quickError}
@@ -247,6 +262,10 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
         {errors.codigoPostal && <p id="c-cp-err" role="alert" className="mt-1.5 text-[13px] font-medium text-brand-red">{errors.codigoPostal}</p>}
       </div>
 
+      <div className="mt-5">
+        <CallTimePreference dia={diaLlamada} onDia={setDiaLlamada} turno={turnoLlamada} onTurno={setTurnoLlamada} />
+      </div>
+
       <div className="mt-5 flex flex-col gap-3">
         <label htmlFor="c-aceptaPrivacidad" className="flex cursor-pointer items-start gap-3">
           <input id="c-aceptaPrivacidad" type="checkbox" checked={priv} onChange={(e) => { setPriv(e.target.checked); setConsentTimes((c) => ({ ...c, privacidadAt: e.target.checked ? new Date().toISOString() : undefined })); }}
@@ -292,5 +311,37 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
         {submitting ? "Enviando…" : "Que me llamen gratis"}
       </button>
     </form>
+  );
+}
+
+function CallTimePreference({
+  dia, onDia, turno, onTurno,
+}: {
+  dia: string; onDia: (v: string) => void; turno: string; onTurno: (v: string) => void;
+}) {
+  return (
+    <div>
+      <p className="text-[13px] font-semibold text-ink">¿Cuándo prefieres que te llamemos? <span className="font-normal text-slate2">(opcional)</span></p>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Mejor día para llamar">
+        {DIAS_LLAMADA.map((d) => (
+          <button
+            key={d} type="button" aria-pressed={dia === d} onClick={() => onDia(d)}
+            className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${dia === d ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Turno para llamar">
+        {TURNOS_LLAMADA.map((t) => (
+          <button
+            key={t} type="button" aria-pressed={turno === t} onClick={() => onTurno(t)}
+            className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${turno === t ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
