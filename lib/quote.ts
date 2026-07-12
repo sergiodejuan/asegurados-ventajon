@@ -21,6 +21,10 @@ export type QuoteProfile = {
   telefono?: string;
   email?: string;
   consentAt?: { privacidadAt?: string; contactoAt?: string; comercialAt?: string };
+  // Última preferencia de horario solicitada para este presupuesto (si el
+  // cliente la reprogramó desde su área de cliente).
+  diaLlamada?: string;
+  turnoLlamada?: string;
 };
 
 const STORAGE_KEY = "ventajon:quote";

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const { id, deduped } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal, producto: d.producto,
-      diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada,
+      diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada, presupuestoId: d.presupuestoId,
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
       utm: d.utm,
     },

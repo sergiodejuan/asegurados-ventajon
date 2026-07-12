@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { ChevronDown } from "@/components/icons";
+import { quoteNumber } from "@/lib/quote";
 
 type Activity = { at: string; type: string; note: string };
 type ConsentRecord = {
@@ -10,7 +12,7 @@ type ConsentRecord = {
   contacto: { granted: boolean; at?: string };
   comercial: { granted: boolean; at?: string };
 };
-type LeadSubmission = { id: string; at: string; source: string; producto: string; data: Record<string, unknown> };
+type LeadSubmission = { id: string; at: string; source: string; producto: string; data: Record<string, unknown>; precioAprox?: number | null };
 type Lead = {
   id: string; createdAt: string; updatedAt: string;
   source: string; sources: string[]; producto: string; status: string; nextStep: string;
@@ -19,7 +21,7 @@ type Lead = {
   motivo: string; fumador: boolean | null;
   fechaNacimiento: string; sexo: string; yaTieneSeguro: boolean | null;
   seguroActualImporte: number | null; seguroActualPeriodo: string; seguroActualServicios: string[];
-  diaLlamada: string; turnoLlamada: string;
+  diaLlamada: string; turnoLlamada: string; presupuestoId: string;
   aceptaPrivacidad: boolean; autorizaContacto: boolean; aceptaComercial: boolean;
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
@@ -183,108 +185,100 @@ function LeadsCrm() {
   /* ------------------------------- Ficha ---------------------------------- */
   if (selected) {
     const l = selected;
+    const latestConsent = l.consents?.[0];
+    const numPresupuestos = (l.submissions ?? []).filter((s) => s.source === "tarificador-salud" || s.source === "tarificador-vida").length;
+
     return (
-      <main className="mx-auto max-w-2xl px-5 py-6">
+      <main className="mx-auto max-w-6xl px-5 py-6">
         <button onClick={() => setSelected(null)} className="text-[14px] font-semibold text-navy">← Volver al listado</button>
 
-        <div className="mt-4 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-[22px] font-extrabold text-navy">{l.nombre || "Sin nombre"}</h1>
-              <p className="mt-0.5 text-[14px] text-slate2 tnums">{l.telefono} · {l.email || "sin email"}</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr] lg:items-start">
+          {/* IZQUIERDA (30%): ficha del cliente */}
+          <div className="flex flex-col gap-4">
+            <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-[19px] font-extrabold leading-tight text-navy">{l.nombre || "Sin nombre"}</h1>
+                <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
+                  {statusLabels[l.status] ?? l.status}
+                </span>
+              </div>
+              <p className="mt-1 text-[14px] tnums text-slate2">{l.telefono || "sin teléfono"}</p>
+              <p className="text-[14px] text-slate2">{l.email || "sin email"}</p>
+
+              <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Fuente(s)</dt><dd className="text-right font-medium text-ink">{l.sources.map((s) => sources[s] ?? s).join(", ")}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Producto</dt><dd className="text-right font-medium capitalize text-ink">{l.producto || "—"}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Código postal</dt><dd className="text-right font-medium tnums text-ink">{l.codigoPostal || "—"}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Alta</dt><dd className="text-right font-medium text-ink">{fmt(l.createdAt)}</dd></div>
+                {l.fechaNacimiento && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Nacimiento</dt><dd className="text-right font-medium text-ink">{l.fechaNacimiento} ({l.sexo})</dd></div>}
+                {l.numAsegurados != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Asegurados</dt><dd className="text-right font-medium text-ink">{l.numAsegurados}</dd></div>}
+                {l.coberturaDental != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Dental</dt><dd className="text-right font-medium text-ink">{l.coberturaDental ? "Sí" : "No"}</dd></div>}
+                {l.yaTieneSeguro != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Ya tiene seguro</dt><dd className="text-right font-medium text-ink">{l.yaTieneSeguro ? "Sí" : "No"}</dd></div>}
+                {l.motivo && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Motivo (vida)</dt><dd className="text-right font-medium text-ink">{l.motivo}</dd></div>}
+                {l.fumador != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Fumador</dt><dd className="text-right font-medium text-ink">{l.fumador ? "Sí" : "No"}</dd></div>}
+                {l.seguroActualImporte != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Paga ahora</dt><dd className="text-right font-medium tnums text-ink">{l.seguroActualImporte} € / {l.seguroActualPeriodo || "mes"}</dd></div>}
+                {l.diaLlamada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Día preferido</dt><dd className="text-right font-medium text-ink">{l.diaLlamada}</dd></div>}
+                {l.turnoLlamada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Turno preferido</dt><dd className="text-right font-medium text-ink">{l.turnoLlamada}</dd></div>}
+                {l.presupuestoId && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Último presupuesto</dt><dd className="text-right font-medium tnums text-ink">#{quoteNumber(l.presupuestoId)}</dd></div>}
+                {(l.seguroActualServicios?.length ?? 0) > 0 && <div><dt className="text-slate2">Servicios actuales</dt><dd className="mt-0.5 font-medium text-ink">{l.seguroActualServicios.join(", ")}</dd></div>}
+                {l.utm?.source && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_source</dt><dd className="text-right font-medium text-ink">{l.utm.source}</dd></div>}
+                {l.utm?.campaign && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_campaign</dt><dd className="text-right font-medium text-ink">{l.utm.campaign}</dd></div>}
+              </dl>
+
+              <div className="mt-5 border-t border-hair pt-4">
+                <p className="text-[12px] font-semibold text-ink">Último consentimiento</p>
+                {latestConsent ? (
+                  <div className="mt-1.5 text-[12px] leading-relaxed text-slate2">
+                    <p>{fmt(latestConsent.at)} · {sources[latestConsent.source] ?? latestConsent.source}</p>
+                    <p className="mt-1">
+                      Privacidad: <b className="text-ink">{latestConsent.privacidad?.granted ? "sí" : "no"}</b>
+                      {" · "}Contacto: <b className="text-ink">{latestConsent.contacto?.granted ? "sí" : "no"}</b>
+                      {" · "}Comercial: <b className="text-ink">{latestConsent.comercial?.granted ? "sí" : "no"}</b>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-[12px] text-slate2">Sin registro de consentimiento.</p>
+                )}
+              </div>
             </div>
-            <span className={`rounded-pill px-3 py-1 text-[12px] font-bold ${STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
-              {statusLabels[l.status] ?? l.status}
-            </span>
+
+            <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+              <label className="block text-[13px] font-semibold text-ink">Estado</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {statuses.map((s) => (
+                  <button key={s} onClick={() => patch(l.id, { status: s })}
+                    className={`rounded-pill px-3 py-1.5 text-[13px] font-semibold transition-colors ${l.status === s ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
+                    {statusLabels[s] ?? s}
+                  </button>
+                ))}
+              </div>
+
+              <label htmlFor="next" className="mt-5 block text-[13px] font-semibold text-ink">Próximo paso</label>
+              <input id="next" defaultValue={l.nextStep} placeholder="p.ej. Llamar mañana 10:00…"
+                className="mt-2 w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]"
+                onKeyDown={(e) => { if (e.key === "Enter") patch(l.id, { nextStep: (e.target as HTMLInputElement).value }); }} />
+              <p className="mt-1 text-[12px] text-slate2">Pulsa Enter para guardar.</p>
+            </div>
           </div>
 
-          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-[14px]">
-            <div><dt className="text-slate2">Fuente(s)</dt><dd className="font-medium text-ink">{l.sources.map((s) => sources[s] ?? s).join(", ")}</dd></div>
-            <div><dt className="text-slate2">Producto</dt><dd className="font-medium text-ink">{l.producto || "—"}</dd></div>
-            <div><dt className="text-slate2">Código postal</dt><dd className="font-medium text-ink tnums">{l.codigoPostal || "—"}</dd></div>
-            <div><dt className="text-slate2">Alta</dt><dd className="font-medium text-ink">{fmt(l.createdAt)}</dd></div>
-            {l.fechaNacimiento && <div><dt className="text-slate2">Nacimiento</dt><dd className="font-medium text-ink">{l.fechaNacimiento} ({l.sexo})</dd></div>}
-            {l.numAsegurados != null && <div><dt className="text-slate2">Asegurados</dt><dd className="font-medium text-ink">{l.numAsegurados}</dd></div>}
-            {l.coberturaDental != null && <div><dt className="text-slate2">Dental</dt><dd className="font-medium text-ink">{l.coberturaDental ? "Sí" : "No"}</dd></div>}
-            {l.yaTieneSeguro != null && <div><dt className="text-slate2">Ya tiene seguro</dt><dd className="font-medium text-ink">{l.yaTieneSeguro ? "Sí" : "No"}</dd></div>}
-            {l.motivo && <div><dt className="text-slate2">Motivo (vida)</dt><dd className="font-medium text-ink">{l.motivo}</dd></div>}
-            {l.fumador != null && <div><dt className="text-slate2">Fumador</dt><dd className="font-medium text-ink">{l.fumador ? "Sí" : "No"}</dd></div>}
-            {l.seguroActualImporte != null && <div><dt className="text-slate2">Paga ahora</dt><dd className="font-medium text-ink tnums">{l.seguroActualImporte} € / {l.seguroActualPeriodo || "mes"}</dd></div>}
-            {l.diaLlamada && <div><dt className="text-slate2">Día preferido</dt><dd className="font-medium text-ink">{l.diaLlamada}</dd></div>}
-            {l.turnoLlamada && <div><dt className="text-slate2">Turno preferido</dt><dd className="font-medium text-ink">{l.turnoLlamada}</dd></div>}
-            {(l.seguroActualServicios?.length ?? 0) > 0 && <div className="col-span-2"><dt className="text-slate2">Servicios actuales</dt><dd className="font-medium text-ink">{l.seguroActualServicios.join(", ")}</dd></div>}
-            {l.utm?.source && <div><dt className="text-slate2">utm_source</dt><dd className="font-medium text-ink">{l.utm.source}</dd></div>}
-            {l.utm?.campaign && <div><dt className="text-slate2">utm_campaign</dt><dd className="font-medium text-ink">{l.utm.campaign}</dd></div>}
-          </dl>
+          {/* DERECHA (70%): paneles colapsables */}
+          <div className="flex flex-col gap-4">
+            <CollapsiblePanel title="Actividad">
+              <ActivityPanel activity={l.activity} />
+            </CollapsiblePanel>
 
-          <p className="mt-4 text-[12px] text-slate2">
-            Consentimientos — privacidad: {l.aceptaPrivacidad ? "sí" : "no"} · contacto: {l.autorizaContacto ? "sí" : "no"} · comercial: {l.aceptaComercial ? "sí" : "no"}
-          </p>
-        </div>
+            <CollapsiblePanel title="Contactos con el cliente">
+              <ContactLogPanel activity={l.activity} onLog={(channel) => patch(l.id, { contact: { channel } })} />
+            </CollapsiblePanel>
 
-        {/* Gestión */}
-        <div className="mt-4 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <label className="block text-[13px] font-semibold text-ink">Estado</label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {statuses.map((s) => (
-              <button key={s} onClick={() => patch(l.id, { status: s })}
-                className={`rounded-pill px-3 py-1.5 text-[13px] font-semibold transition-colors ${l.status === s ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
-                {statusLabels[s] ?? s}
-              </button>
-            ))}
+            <CollapsiblePanel title="Notas">
+              <NotesPanel activity={l.activity} onSave={(txt) => patch(l.id, { note: txt })} />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel title={`Presupuestos (${numPresupuestos})`}>
+              <PresupuestosPanel submissions={l.submissions ?? []} />
+            </CollapsiblePanel>
           </div>
-
-          <label htmlFor="next" className="mt-5 block text-[13px] font-semibold text-ink">Próximo paso</label>
-          <div className="mt-2 flex gap-2">
-            <input id="next" defaultValue={l.nextStep} placeholder="p.ej. Llamar mañana 10:00…"
-              className="flex-1 rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]"
-              onKeyDown={(e) => { if (e.key === "Enter") patch(l.id, { nextStep: (e.target as HTMLInputElement).value }); }} />
-          </div>
-          <p className="mt-1 text-[12px] text-slate2">Pulsa Enter para guardar.</p>
-
-          <label htmlFor="note" className="mt-5 block text-[13px] font-semibold text-ink">Añadir nota</label>
-          <NoteBox onSave={(txt) => patch(l.id, { note: txt })} />
-        </div>
-
-        {/* Auditoría de consentimientos */}
-        <div className="mt-4 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <h2 className="text-[15px] font-bold text-navy">Consentimientos (auditoría)</h2>
-          {(!l.consents || l.consents.length === 0) && (
-            <p className="mt-2 text-[13px] text-slate2">Sin registros (leads anteriores a esta versión).</p>
-          )}
-          <ol className="mt-3 flex flex-col gap-4">
-            {(l.consents ?? []).map((c, i) => (
-              <li key={i} className="rounded-card border border-hair p-4">
-                <p className="text-[13px] font-semibold text-ink">{fmt(c.at)} · {sources[c.source] ?? c.source}</p>
-                <ul className="mt-2 flex flex-col gap-1 text-[13px] text-slate2">
-                  <li>Privacidad: <b className="text-ink">{c.privacidad?.granted ? "sí" : "no"}</b>{c.privacidad?.at ? ` · ${fmt(c.privacidad.at)}` : ""}</li>
-                  <li>Contacto: <b className="text-ink">{c.contacto?.granted ? "sí" : "no"}</b>{c.contacto?.at ? ` · ${fmt(c.contacto.at)}` : ""}</li>
-                  <li>Comercial: <b className="text-ink">{c.comercial?.granted ? "sí" : "no"}</b>{c.comercial?.at ? ` · ${fmt(c.comercial.at)}` : ""}</li>
-                </ul>
-                <p className="mt-2 text-[12px] text-slate2">IP: <span className="tnums">{c.ip || "—"}</span> · Página: {c.page || "—"}</p>
-                <p className="mt-1 break-words text-[12px] text-slate2">Dispositivo: {c.userAgent || "—"}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        {/* Tarificaciones y presupuestos */}
-        <SubmissionsPanel submissions={l.submissions ?? []} sources={sources} />
-
-        {/* Actividad */}
-        <div className="mt-4 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <h2 className="text-[15px] font-bold text-navy">Actividad</h2>
-          <ol className="mt-4 flex flex-col gap-4">
-            {l.activity.map((a, i) => (
-              <li key={i} className="flex gap-3">
-                <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
-                <div>
-                  <p className="text-[14px] text-ink">{a.note}</p>
-                  <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
         </div>
       </main>
     );
@@ -426,65 +420,154 @@ function FilterTab({ label, active, onClick, small }: { label: string; active: b
   );
 }
 
-function SubmissionsPanel({ submissions, sources }: { submissions: LeadSubmission[]; sources: Record<string, string> }) {
-  const [filterProducto, setFilterProducto] = useState("all");
-  const [sortAsc, setSortAsc] = useState(false);
+function CollapsiblePanel({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-[24px] border border-hair bg-white shadow-card">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 p-6 text-left">
+        <h2 className="text-[15px] font-bold text-navy">{title}</h2>
+        <span aria-hidden="true" className={`shrink-0 text-navy transition-transform ${open ? "rotate-180" : ""}`}>
+          <ChevronDown width={18} height={18} />
+        </span>
+      </button>
+      {open && <div className="border-t border-hair px-6 pb-6 pt-4">{children}</div>}
+    </div>
+  );
+}
 
-  const productos = useMemo(
-    () => Array.from(new Set(submissions.map((s) => s.producto).filter(Boolean))).sort(),
+function ActivityPanel({ activity }: { activity: Activity[] }) {
+  const entries = activity.filter((a) => a.type !== "note" && a.type !== "contact");
+  if (entries.length === 0) return <p className="text-[13px] text-slate2">Sin actividad registrada.</p>;
+  return (
+    <ol className="flex flex-col gap-4">
+      {entries.map((a, i) => (
+        <li key={i} className="flex gap-3">
+          <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
+          <div>
+            <p className="text-[14px] text-ink">{a.note}</p>
+            <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const CONTACT_CHANNELS = [
+  { key: "llamada", label: "Llamada realizada" },
+  { key: "whatsapp", label: "WhatsApp enviado" },
+  { key: "email", label: "Email enviado" },
+];
+
+function ContactLogPanel({ activity, onLog }: { activity: Activity[]; onLog: (channel: string) => void }) {
+  const entries = activity.filter((a) => a.type === "contact");
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {CONTACT_CHANNELS.map((c) => (
+          <button key={c.key} onClick={() => onLog(c.key)}
+            className="rounded-pill border border-hair bg-white px-3 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-mist">
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {entries.length === 0 ? (
+        <p className="mt-3 text-[13px] text-slate2">Sin contactos registrados todavía.</p>
+      ) : (
+        <ol className="mt-4 flex flex-col gap-3">
+          {entries.map((a, i) => (
+            <li key={i} className="flex gap-3">
+              <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-navy" />
+              <div>
+                <p className="text-[14px] text-ink">{a.note}</p>
+                <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function NotesPanel({ activity, onSave }: { activity: Activity[]; onSave: (txt: string) => void }) {
+  const entries = activity.filter((a) => a.type === "note");
+  return (
+    <div>
+      <NoteBox onSave={onSave} />
+      {entries.length === 0 ? (
+        <p className="mt-3 text-[13px] text-slate2">Sin notas todavía.</p>
+      ) : (
+        <ol className="mt-4 flex flex-col gap-3">
+          {entries.map((a, i) => (
+            <li key={i} className="flex gap-3">
+              <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
+              <div>
+                <p className="text-[14px] text-ink">{a.note}</p>
+                <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const presupuestos = useMemo(
+    () => submissions
+      .filter((s) => s.source === "tarificador-salud" || s.source === "tarificador-vida")
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),
     [submissions]
   );
 
-  const visible = useMemo(() => {
-    let list = filterProducto === "all" ? submissions : submissions.filter((s) => s.producto === filterProducto);
-    list = [...list].sort((a, b) => (sortAsc ? 1 : -1) * (Date.parse(a.at) - Date.parse(b.at)) * -1);
-    return list;
-  }, [submissions, filterProducto, sortAsc]);
+  if (presupuestos.length === 0) return <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>;
 
   return (
-    <div className="mt-4 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold text-navy">Tarificaciones y presupuestos ({submissions.length})</h2>
-        <button onClick={() => setSortAsc((s) => !s)} className="text-[12px] font-semibold text-navy underline">
-          {sortAsc ? "Más antiguas primero" : "Más recientes primero"}
-        </button>
-      </div>
-
-      {productos.length > 1 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <FilterTab label="Todos" active={filterProducto === "all"} onClick={() => setFilterProducto("all")} small />
-          {productos.map((p) => (
-            <FilterTab key={p} label={p} active={filterProducto === p} onClick={() => setFilterProducto(p)} small />
-          ))}
-        </div>
-      )}
-
-      {visible.length === 0 && <p className="mt-3 text-[13px] text-slate2">Sin tarificaciones registradas.</p>}
-
-      <ol className="mt-3 flex flex-col gap-3">
-        {visible.map((s) => {
-          const fields = Object.entries(s.data).filter(([k, v]) => SUBMISSION_FIELD_LABELS[k] && v !== "" && v !== null && v !== undefined);
-          return (
-            <li key={s.id} className="rounded-card border border-hair p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[13px] font-semibold text-ink">{fmt(s.at)} · {sources[s.source] ?? s.source}</p>
-                {s.producto && <span className="rounded-pill bg-navy/10 px-2 py-0.5 text-[11px] font-bold capitalize text-navy">{s.producto}</span>}
+    <ol className="flex flex-col gap-2">
+      {presupuestos.map((s) => {
+        const open = expandedId === s.id;
+        const fields = Object.entries(s.data).filter(([k, v]) => SUBMISSION_FIELD_LABELS[k] && v !== "" && v !== null && v !== undefined);
+        return (
+          <li key={s.id} className="rounded-card border border-hair">
+            <button type="button" onClick={() => setExpandedId(open ? null : s.id)} className="flex w-full items-center justify-between gap-3 p-3.5 text-left">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold tnums text-ink">#{quoteNumber(s.id)} <span className="font-normal capitalize text-slate2">· {s.producto}</span></p>
+                <p className="text-[12px] text-slate2">{fmt(s.at)}</p>
               </div>
-              {fields.length > 0 && (
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
-                  {fields.map(([k, v]) => (
-                    <div key={k} className="contents">
-                      <dt className="text-slate2">{SUBMISSION_FIELD_LABELS[k] ?? k}</dt>
-                      <dd className="font-medium text-ink">{formatSubmissionValue(v)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {s.precioAprox != null && <span className="text-[13px] font-bold tnums text-navy">≈ {s.precioAprox.toFixed(2)} €/mes</span>}
+                <span aria-hidden="true" className={`text-navy transition-transform ${open ? "rotate-180" : ""}`}>
+                  <ChevronDown width={16} height={16} />
+                </span>
+              </div>
+            </button>
+            {open && (
+              <div className="border-t border-hair p-3.5">
+                {fields.length > 0 ? (
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+                    {fields.map(([k, v]) => (
+                      <div key={k} className="contents">
+                        <dt className="text-slate2">{SUBMISSION_FIELD_LABELS[k] ?? k}</dt>
+                        <dd className="font-medium text-ink">{formatSubmissionValue(v)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : <p className="text-[12px] text-slate2">Sin detalles adicionales.</p>}
+                {s.precioAprox != null && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate2">
+                    Precio orientativo según la compañía recomendada del catálogo; no es una cotización en firme.
+                  </p>
+                )}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

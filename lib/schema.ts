@@ -119,6 +119,7 @@ export const callRequestSchema = z.object({
   compania: z.string().max(60).optional(),
   diaLlamada: z.string().max(20).optional(),
   turnoLlamada: z.string().max(20).optional(),
+  presupuestoId: z.string().max(60).optional(),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
   aceptaComercial: z.boolean().default(false),

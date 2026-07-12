@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { Check, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import {
@@ -25,6 +26,7 @@ export function AreaClienteContent() {
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
   const lookupRef = useRef<{ telefono?: string; email?: string }>({});
 
   useEffect(() => {
@@ -54,11 +56,6 @@ export function AreaClienteContent() {
   function continueQuote(q: QuoteProfile) {
     saveQuote(q);
     router.push(`/comparativa?producto=${q.producto}`);
-  }
-
-  function rescheduleCall(q: QuoteProfile) {
-    saveQuote(q);
-    router.push(`/quiero-que-me-llamen?producto=${q.producto}`);
   }
 
   function handleRemove(id: string) {
@@ -186,14 +183,22 @@ export function AreaClienteContent() {
                       {q.fumador != null && <><dt className="text-slate2">Fumador</dt><dd className="text-right font-semibold text-ink">{q.fumador ? "Sí" : "No"}</dd></>}
                     </dl>
 
+                    {(q.diaLlamada || q.turnoLlamada) && (
+                      <p className="mt-3 inline-flex items-center gap-1.5 rounded-pill border border-hair bg-mist px-3 py-1.5 text-[12px] font-semibold text-ink">
+                        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                        Llamada programada{q.diaLlamada && q.diaLlamada !== DIAS_LLAMADA[0] ? ` el ${q.diaLlamada}` : ""}
+                        {q.turnoLlamada && q.turnoLlamada !== TURNOS_LLAMADA[0] ? ` en el turno de ${q.turnoLlamada.toLowerCase()}` : ""}
+                      </p>
+                    )}
+
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button type="button" onClick={() => continueQuote(q)}
                         className="rounded-card bg-brand-red px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
                         Ver comparativa
                       </button>
-                      <button type="button" onClick={() => rescheduleCall(q)}
+                      <button type="button" onClick={() => setRescheduleQuote(q)}
                         className="rounded-card border border-hair px-4 py-2.5 text-[13px] font-semibold text-navy transition-colors hover:bg-mist">
-                        Solicitar / reprogramar llamada
+                        {q.diaLlamada || q.turnoLlamada ? "Reprogramar llamada" : "Solicitar llamada"}
                       </button>
                       <a href={whatsAppUrl(waText)} target="_blank" rel="noopener noreferrer"
                         className="rounded-card border border-hair px-4 py-2.5 text-[13px] font-semibold text-navy transition-colors hover:bg-mist">
@@ -206,6 +211,16 @@ export function AreaClienteContent() {
             </ul>
           )}
         </section>
+
+        {rescheduleQuote && (
+          <RescheduleCallModal
+            quote={rescheduleQuote}
+            onClose={() => setRescheduleQuote(null)}
+            onUpdated={(updated) => {
+              setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+            }}
+          />
+        )}
 
         <ul className="mt-8 flex flex-col gap-2">
           {["Guardado solo en este navegador: si cambias de dispositivo, no verás este historial.", "Puedes borrar un presupuesto cuando quieras, sin que afecte a tu solicitud ya enviada."].map((c) => (

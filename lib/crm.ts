@@ -19,7 +19,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 
 export type Activity = {
   at: string;
-  type: "alta" | "form" | "status" | "nextstep" | "note";
+  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact";
   note: string;
   meta?: Record<string, unknown>;
 };
@@ -78,6 +78,9 @@ export type Lead = {
   // Preferencia de horario para la llamada (formulario "quiero que me llamen")
   diaLlamada: string;
   turnoLlamada: string;
+  // Presupuesto (tarificador) al que se vincula la solicitud, si procede
+  // (p.ej. una reprogramación de llamada lanzada desde el área de cliente).
+  presupuestoId: string;
   // Consentimientos (estado actual + auditoría completa)
   aceptaPrivacidad: boolean;
   autorizaContacto: boolean;

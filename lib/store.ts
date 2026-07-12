@@ -91,6 +91,10 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
       (lead as Record<string, unknown>)[k] = dv as unknown;
     }
   }
+  // presupuestoId: a diferencia de los campos de arriba, se actualiza siempre
+  // al último presupuesto referenciado (p.ej. una reprogramación de llamada),
+  // no solo si la ficha estaba vacía.
+  if (draft.presupuestoId) lead.presupuestoId = draft.presupuestoId;
   // Servicios (array): si el nuevo trae datos y la ficha estaba vacía, se completa.
   if (draft.seguroActualServicios?.length && !lead.seguroActualServicios?.length) {
     lead.seguroActualServicios = draft.seguroActualServicios;
@@ -124,7 +128,9 @@ export async function upsertLead(
       fillEmpty(lead, draft);
       lead.updatedAt = now;
       if (!lead.sources.includes(source)) lead.sources.push(source);
-      if (consent) lead.consents = [consent, ...(lead.consents ?? [])];
+      // Solo se conserva el registro de consentimiento más reciente (evita una
+      // auditoría que crece sin límite); el resto de la traza queda en "activity".
+      if (consent) lead.consents = [consent];
       lead.activity.unshift({
         at: now, type: "form",
         note: `Nueva solicitud desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`,
@@ -160,6 +166,7 @@ export async function upsertLead(
     seguroActualServicios: draft.seguroActualServicios ?? [],
     diaLlamada: draft.diaLlamada ?? "",
     turnoLlamada: draft.turnoLlamada ?? "",
+    presupuestoId: draft.presupuestoId ?? "",
     aceptaPrivacidad: !!draft.aceptaPrivacidad, autorizaContacto: !!draft.autorizaContacto, aceptaComercial: !!draft.aceptaComercial,
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
@@ -255,9 +262,15 @@ export async function getLead(id: string): Promise<Lead | null> {
   return jget<Lead>(`lead:${id}`);
 }
 
+const CONTACT_CHANNEL_LABELS: Record<string, string> = {
+  llamada: "Llamada realizada",
+  whatsapp: "WhatsApp enviado",
+  email: "Email enviado",
+};
+
 export async function updateLead(
   id: string,
-  patch: { status?: Status; nextStep?: string; note?: string }
+  patch: { status?: Status; nextStep?: string; note?: string; contact?: { channel: string; note?: string } }
 ): Promise<Lead | null> {
   const lead = await jget<Lead>(`lead:${id}`);
   if (!lead) return null;
@@ -272,6 +285,11 @@ export async function updateLead(
   }
   if (patch.note && patch.note.trim()) {
     lead.activity.unshift({ at: now, type: "note", note: patch.note.trim() });
+  }
+  if (patch.contact?.channel) {
+    const label = CONTACT_CHANNEL_LABELS[patch.contact.channel] ?? patch.contact.channel;
+    const note = patch.contact.note?.trim() ? `${label}: ${patch.contact.note.trim()}` : label;
+    lead.activity.unshift({ at: now, type: "contact", note, meta: { channel: patch.contact.channel } });
   }
   lead.updatedAt = now;
   await jset(`lead:${id}`, lead);
