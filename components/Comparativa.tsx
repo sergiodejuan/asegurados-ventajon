@@ -1,10 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "./Header";
 import { NextSteps } from "./NextSteps";
 import { Check } from "./icons";
 import { BRAND_NAME, COMPARATIVA_SALUD, COMPARATIVA_VIDA } from "@/lib/brand";
+import {
+  loadQuote, updateQuote, saludPrice, vidaPrice, quoteNumber, ageFromDob,
+  buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
+} from "@/lib/quote";
 
 function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -13,8 +18,60 @@ function euros(n: number) {
 export function Comparativa() {
   const searchParams = useSearchParams();
   const producto = searchParams.get("producto") === "vida" ? "vida" : "salud";
-  const nRaw = Number(searchParams.get("n"));
-  const n = Number.isFinite(nRaw) && nRaw >= 1 && nRaw <= 9 ? nRaw : 1;
+
+  const [quote, setQuote] = useState<QuoteProfile | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [cp, setCp] = useState("");
+  const [n, setN] = useState(1);
+  const [dental, setDental] = useState(false);
+  const [fumador, setFumador] = useState(false);
+
+  useEffect(() => {
+    const q = loadQuote();
+    setQuote(q);
+    setLoaded(true);
+    if (q) {
+      setCp(q.codigoPostal ?? "");
+      setN(q.numAsegurados ?? 1);
+      setDental(!!q.coberturaDental);
+      setFumador(!!q.fumador);
+    }
+  }, []);
+
+  function saveEdits() {
+    const next = updateQuote({
+      codigoPostal: cp,
+      numAsegurados: Math.max(1, Math.min(9, n)),
+      coberturaDental: dental,
+      fumador,
+    });
+    if (next) setQuote(next);
+    setEditing(false);
+  }
+
+  if (loaded && !quote) {
+    return (
+      <>
+        <Header />
+        <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
+          <p className="text-[16px] leading-relaxed text-slate2">
+            No encontramos los datos de tu comparativa. Vuelve a calcular tu precio para verla.
+          </p>
+          <a
+            href={producto === "vida" ? "/tarificador-vida" : "/tarificador"}
+            className="mt-5 inline-flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+          >
+            Calcula tu precio
+          </a>
+        </main>
+      </>
+    );
+  }
+
+  const age = ageFromDob(quote?.fechaNacimiento);
+  const list = producto === "vida" ? COMPARATIVA_VIDA : COMPARATIVA_SALUD;
+  const waText = buildWhatsAppText({ producto, quote });
 
   return (
     <>
@@ -26,48 +83,158 @@ export function Comparativa() {
         <h1 className="mt-6 text-[28px] font-extrabold leading-tight text-navy">
           Ya tenemos tu comparativa
         </h1>
+        {quote && (
+          <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>
+        )}
         <p className="mt-3 text-[16px] leading-relaxed text-slate2">
-          {producto === "vida"
-            ? "Así de orientativo se mueve el precio de un seguro de vida entre las compañías con las que trabajamos."
-            : `Así de orientativo se mueve el precio de un seguro de salud para ${n === 1 ? "1 persona" : `${n} personas`} entre las compañías con las que trabajamos.`}
+          Así de orientativo se mueve el precio entre las compañías con las que trabajamos.
           {" "}Un asesor de {BRAND_NAME} te llama para confirmar tu propuesta final, sin compromiso.
         </p>
+
+        {/* Recap + edición de datos */}
+        {quote && (
+          <div className="mt-5 rounded-card border border-hair bg-white p-5 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[14px] font-bold text-navy">Tus datos</p>
+              <button
+                type="button"
+                onClick={() => setEditing((e) => !e)}
+                className="text-[13px] font-semibold text-navy underline"
+              >
+                {editing ? "Cancelar" : "Editar y recalcular"}
+              </button>
+            </div>
+
+            {!editing ? (
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                <dt className="text-slate2">Código postal</dt>
+                <dd className="text-right font-semibold tnums text-ink">{quote.codigoPostal || "—"}</dd>
+                {producto === "salud" ? (
+                  <>
+                    <dt className="text-slate2">Personas a asegurar</dt>
+                    <dd className="text-right font-semibold tnums text-ink">{quote.numAsegurados ?? 1}</dd>
+                    <dt className="text-slate2">Cobertura dental</dt>
+                    <dd className="text-right font-semibold text-ink">{quote.coberturaDental ? "Sí" : "No"}</dd>
+                  </>
+                ) : (
+                  <dt className="text-slate2">Fumador</dt>
+                )}
+                {producto === "vida" && <dd className="text-right font-semibold text-ink">{quote.fumador ? "Sí" : "No"}</dd>}
+                {age !== null && (
+                  <>
+                    <dt className="text-slate2">Edad</dt>
+                    <dd className="text-right font-semibold tnums text-ink">{age} años</dd>
+                  </>
+                )}
+              </dl>
+            ) : (
+              <div className="mt-3 flex flex-col gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-semibold text-ink">Código postal</span>
+                  <input
+                    inputMode="numeric" maxLength={5} value={cp}
+                    onChange={(e) => setCp(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                    className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink"
+                  />
+                </label>
+                {producto === "salud" && (
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block text-[13px] font-semibold text-ink">Personas a asegurar</span>
+                      <input
+                        type="number" min={1} max={9} value={n}
+                        onChange={(e) => setN(Number(e.target.value) || 1)}
+                        className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink"
+                      />
+                    </label>
+                    <label className="flex cursor-pointer items-center justify-between rounded-card border border-hair px-4 py-3">
+                      <span className="text-[13px] font-semibold text-ink">Cobertura dental</span>
+                      <input type="checkbox" checked={dental} onChange={(e) => setDental(e.target.checked)} className="h-5 w-5 accent-navy" />
+                    </label>
+                  </>
+                )}
+                {producto === "vida" && (
+                  <label className="flex cursor-pointer items-center justify-between rounded-card border border-hair px-4 py-3">
+                    <span className="text-[13px] font-semibold text-ink">Fumador</span>
+                    <input type="checkbox" checked={fumador} onChange={(e) => setFumador(e.target.checked)} className="h-5 w-5 accent-navy" />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  onClick={saveEdits}
+                  className="mt-1 flex items-center justify-center rounded-card bg-navy px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep"
+                >
+                  Recalcular precios
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-5 rounded-card border border-hair bg-mist p-4">
           <p className="text-[13px] font-bold text-navy">Precios orientativos</p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
             Son precios de ejemplo, no una cotización en firme: el precio final depende de tu perfil
-            (edad, coberturas, código postal…) y te lo confirma tu asesor sin compromiso.
+            y te lo confirma tu asesor sin compromiso.
           </p>
         </div>
 
         <ul className="mt-5 flex flex-col gap-3">
           {producto === "vida"
-            ? COMPARATIVA_VIDA.map((c) => (
-                <li key={c.compania} className="flex items-center justify-between gap-3 rounded-card border border-hair bg-white p-4 shadow-soft">
-                  <p className="text-[16px] font-bold text-ink">{c.compania}</p>
-                  <p className="text-right text-[14px] text-slate2">
-                    Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(c.precio)} €</span>/mes
-                  </p>
-                </li>
-              ))
-            : COMPARATIVA_SALUD.map((c) => (
-                <li key={c.compania} className="rounded-card border border-hair bg-white p-4 shadow-soft">
-                  <p className="text-[16px] font-bold text-ink">{c.compania}</p>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                    <span>Con copago</span>
-                    <span className="text-[15px] font-extrabold tnums text-navy">{euros(c.conCopago * n)} €/mes</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                    <span>Sin copago</span>
-                    <span className="text-[15px] font-extrabold tnums text-navy">{euros(c.sinCopago * n)} €/mes</span>
-                  </div>
-                </li>
-              ))}
+            ? COMPARATIVA_VIDA.map((c) => {
+                const price = vidaPrice(c, { fumador: quote?.fumador });
+                return (
+                  <li key={c.compania} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[16px] font-bold text-ink">{c.compania}</p>
+                      <p className="text-right text-[14px] text-slate2">
+                        Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
+                      </p>
+                    </div>
+                    <CompanyActions producto={producto} compania={c.compania} />
+                  </li>
+                );
+              })
+            : COMPARATIVA_SALUD.map((c) => {
+                const price = saludPrice(c, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
+                return (
+                  <li key={c.compania} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                    <p className="text-[16px] font-bold text-ink">{c.compania}</p>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
+                      <span>Con copago</span>
+                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
+                      <span>Sin copago</span>
+                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
+                    </div>
+                    <CompanyActions producto={producto} compania={c.compania} />
+                  </li>
+                );
+              })}
         </ul>
 
-        <NextSteps />
+        <NextSteps whatsappHref={whatsAppUrl(waText)} />
       </main>
     </>
+  );
+}
+
+function CompanyActions({ producto, compania }: { producto: string; compania: string }) {
+  return (
+    <div className="mt-3 flex gap-2">
+      <a
+        href={`/comparativa/${slugify(compania)}?producto=${producto}`}
+        className="flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+      >
+        Más información
+      </a>
+      <a
+        href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}`}
+        className="flex-1 rounded-card bg-brand-red px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+      >
+        Que me llamen
+      </a>
+    </div>
   );
 }

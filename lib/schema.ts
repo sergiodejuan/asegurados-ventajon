@@ -116,6 +116,7 @@ export const callRequestSchema = z.object({
   telefono: phoneField,
   codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
   producto: z.string().max(40).optional().default("salud"),
+  compania: z.string().max(60).optional(),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
   aceptaComercial: z.boolean().default(false),

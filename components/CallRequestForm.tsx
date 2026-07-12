@@ -8,7 +8,7 @@ import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
 
-export function CallRequestForm() {
+export function CallRequestForm({ showHeading = true }: { showHeading?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [nombre, setNombre] = useState("");
@@ -28,6 +28,7 @@ export function CallRequestForm() {
   }, []);
 
   const producto = searchParams.get("producto") ?? "salud";
+  const compania = searchParams.get("compania") ?? undefined;
   const utm = useMemo(
     () => ({
       source: searchParams.get("utm_source") ?? undefined,
@@ -47,6 +48,7 @@ export function CallRequestForm() {
       telefono,
       codigoPostal,
       producto,
+      compania,
       aceptaPrivacidad: priv,
       autorizaContacto: contacto,
       aceptaComercial: comercial,
@@ -93,10 +95,16 @@ export function CallRequestForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
-      <h1 className="text-[26px] font-extrabold leading-tight text-navy">Te llamamos gratis</h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-slate2">
-        Déjanos tu teléfono y un asesor te llama para comparar tu seguro de salud. Sin coste.
-      </p>
+      {showHeading && (
+        <>
+          <h1 className="text-[26px] font-extrabold leading-tight text-navy">Te llamamos gratis</h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-slate2">
+            {compania
+              ? `Déjanos tu teléfono y un asesor te llama para hablar de tu opción con ${compania}. Sin coste.`
+              : "Déjanos tu teléfono y un asesor te llama para comparar tu seguro de salud. Sin coste."}
+          </p>
+        </>
+      )}
 
       {/* Honeypot */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">

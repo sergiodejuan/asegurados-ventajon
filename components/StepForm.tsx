@@ -7,6 +7,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
+import { saveQuote } from "@/lib/quote";
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -103,8 +104,21 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
     try {
       const res = await fetch(config.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) {
-        const n = variant === "salud" ? Number(data.numAsegurados) || 1 : 1;
-        router.push(`/comparativa?producto=${variant}&n=${n}`);
+        const body = (await res.json().catch(() => null)) as { id?: string } | null;
+        saveQuote({
+          id: body?.id ?? `local-${Date.now()}`,
+          producto: variant,
+          createdAt: new Date().toISOString(),
+          codigoPostal: String(data.codigoPostal ?? ""),
+          numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1 : undefined,
+          coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
+          fechaNacimiento: payload.fechaNacimiento,
+          sexo: data.sexo as "hombre" | "mujer" | undefined,
+          motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
+          fumador: variant === "vida" ? !!data.fumador : undefined,
+          inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
+        });
+        router.push(`/comparativa?producto=${variant}`);
         return;
       }
       const body = (await res.json().catch(() => null)) as { errors?: Record<string, string[]> } | null;

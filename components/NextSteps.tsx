@@ -3,7 +3,7 @@ import { CONTACT_HOURS, WHATSAPP_URL } from "@/lib/brand";
 
 // Bloque reutilizado tras el envío de un formulario: números de llamada +
 // guardar contacto (buena práctica anti-spam), próximos pasos y salida por WhatsApp.
-export function NextSteps() {
+export function NextSteps({ whatsappHref = WHATSAPP_URL }: { whatsappHref?: string }) {
   return (
     <>
       <SaveCaller />
@@ -19,7 +19,7 @@ export function NextSteps() {
       </div>
 
       <a
-        href={WHATSAPP_URL}
+        href={whatsappHref}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-6 flex w-full items-center justify-center rounded-card border border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
