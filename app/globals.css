@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-mist text-ink font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Evita el delay de doble-tap en móvil en elementos interactivos */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Foco visible coherente en toda la app (WIG: nunca outline-none sin reemplazo) */
+  :focus-visible {
+    @apply outline-none ring-2 ring-navy ring-offset-2 ring-offset-white;
+    border-radius: 6px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: #1b2b6b;
+    color: #fff;
+  }
+}
+
+@layer utilities {
+  .tnums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Padding para notches en layouts a sangre */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Respeta prefers-reduced-motion en toda la app */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
