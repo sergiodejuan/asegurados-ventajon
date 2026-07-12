@@ -80,6 +80,7 @@ export function Comparativa() {
 
   const age = ageFromDob(quote?.fechaNacimiento);
   const waText = buildWhatsAppText({ producto, quote });
+  const firstName = quote?.nombre?.trim().split(/\s+/)[0];
 
   return (
     <>
@@ -89,7 +90,7 @@ export function Comparativa() {
           <Check width={30} height={30} />
         </div>
         <h1 className="mt-6 text-[28px] font-extrabold leading-tight text-navy">
-          Ya tenemos tu comparativa
+          {firstName ? `${firstName}, ya tenemos tu comparativa` : "Ya tenemos tu comparativa"}
         </h1>
         {quote && (
           <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>

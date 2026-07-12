@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { CoverageTabs } from "@/components/CoverageTabs";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import {
@@ -146,7 +147,9 @@ export default function Home() {
         </section>
       </main>
 
+      <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
+      <StickyMobileCta label="Calcula tu precio" href="/tarificador" secondaryLabel="Que te llamen" secondaryHref="/quiero-que-me-llamen" />
     </>
   );
 }

@@ -10,6 +10,11 @@ import { DatePicker } from "./DatePicker";
 import { saveQuote } from "@/lib/quote";
 
 type FieldErrors = Partial<Record<string, string>>;
+type SavedProgress = { stepIndex: number; data: FormData };
+
+function progressKey(variant: string) {
+  return `ventajon:progress:${variant}`;
+}
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
@@ -25,6 +30,8 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
   const [referrer, setReferrer] = useState("");
+  const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
 
   const topRef = useRef<HTMLDivElement>(null);
   const ddRef = useRef<HTMLInputElement>(null);
@@ -32,6 +39,39 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   const aaaaRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (typeof document !== "undefined") setReferrer(document.referrer || ""); }, []);
+
+  // Recuperación de abandono: si hay un cálculo a medias en esta sesión, se
+  // ofrece continuar en vez de perderlo. No se toca `data`/`stepIndex` hasta
+  // que el usuario decide, para no pisar el progreso guardado antes de tiempo.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(progressKey(variant));
+      if (raw) {
+        const saved = JSON.parse(raw) as SavedProgress;
+        if (saved && typeof saved.stepIndex === "number" && saved.stepIndex > 0) setResumeData(saved);
+      }
+    } catch { /* sessionStorage no disponible */ }
+    setResumeChecked(true);
+  }, [variant]);
+
+  useEffect(() => {
+    if (!resumeChecked || resumeData) return;
+    try {
+      if (stepIndex > 0) sessionStorage.setItem(progressKey(variant), JSON.stringify({ stepIndex, data }));
+      else sessionStorage.removeItem(progressKey(variant));
+    } catch { /* sessionStorage no disponible */ }
+  }, [stepIndex, data, resumeChecked, resumeData, variant]);
+
+  function resumeProgress() {
+    if (!resumeData) return;
+    setData(resumeData.data);
+    setStepIndex(resumeData.stepIndex);
+    setResumeData(null);
+  }
+  function discardProgress() {
+    try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
+    setResumeData(null);
+  }
 
   const utm = useMemo(() => ({
     source: searchParams.get("utm_source") ?? undefined,
@@ -122,6 +162,7 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
           email: String(data.email ?? ""),
           consentAt: consentTimes,
         });
+        try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
         router.push(`/comparativa?producto=${variant}`);
         return;
       }
@@ -280,7 +321,7 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
         );
       case "contact":
         return (
-          <Shell title={step.title} helper="Déjanos tus datos y un asesor compara por ti entre las mejores compañías. Sin coste y sin compromiso.">
+          <Shell title={step.title} helper="Déjanos tus datos para ver tu comparativa de precios al momento. Un asesor te confirma tu propuesta cuando elijas tu opción.">
             <form noValidate onSubmit={(ev) => { ev.preventDefault(); submit(); }}>
               <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
                 <label htmlFor="f-company">No rellenar</label>
@@ -301,8 +342,8 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
                 </Consent>
               </div>
               {submitError && <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>}
-              <PrimaryButton loading={submitting}>{submitting ? "Enviando…" : "Que me asesore un experto"}</PrimaryButton>
-              <p className="mt-3 text-center text-[12px] leading-relaxed text-slate2">No mostramos precios cerrados: cada seguro depende de tu perfil. Un asesor te da tu propuesta personalizada.</p>
+              <PrimaryButton loading={submitting}>{submitting ? "Enviando…" : "Ver precios"}</PrimaryButton>
+              <p className="mt-3 text-center text-[12px] leading-relaxed text-slate2">Verás una comparativa orientativa al momento. Un asesor te confirma el precio final cuando elijas tu opción.</p>
             </form>
           </Shell>
         );
@@ -310,6 +351,35 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   }
 
   const progress = (Math.min(idx + 1, total) / total) * 100;
+
+  if (resumeChecked && resumeData) {
+    return (
+      <section aria-label="Tarificador" className="rounded-[24px] border border-hair bg-white p-5 shadow-card sm:p-6">
+        <div className="motion-safe:animate-fade-up">
+          <h2 className="text-[22px] font-bold leading-snug text-navy">¿Sigues ahí?</h2>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-slate2">
+            Tienes un cálculo empezado. Puedes continuar donde lo dejaste o empezar de nuevo.
+          </p>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={resumeProgress}
+              className="flex-1 rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+            >
+              Continuar donde lo dejé
+            </button>
+            <button
+              type="button"
+              onClick={discardProgress}
+              className="flex-1 rounded-card border border-hair px-5 py-4 text-[16px] font-semibold text-navy transition-colors hover:bg-mist"
+            >
+              Empezar de nuevo
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-label="Tarificador" className="rounded-[24px] border border-hair bg-white p-5 shadow-card sm:p-6">

@@ -1,5 +1,7 @@
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { StickyMobileCta } from "./StickyMobileCta";
+import { AvailabilityBadge } from "./AvailabilityBadge";
 import { Check, ChevronDown, IconByName, Star } from "./icons";
 import { BRAND_NAME, ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES, TESTIMONIALS_PLACEHOLDER_NOTE, type ProductPage } from "@/lib/productPages";
@@ -53,6 +55,9 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
               Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
             </p>
+            <div className="mt-3 md:col-start-1 md:row-start-4">
+              <AvailabilityBadge />
+            </div>
           </div>
         </section>
 
@@ -189,7 +194,9 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
           </ul>
         </section>
       </main>
+      <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
+      <StickyMobileCta label={page.cta.label} href={page.cta.href} secondaryLabel={page.ctaSecondary.label} secondaryHref={page.ctaSecondary.href} />
     </>
   );
 }
