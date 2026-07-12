@@ -13,7 +13,7 @@ export default function Gracias() {
   return (
     <>
       <Header />
-      <main id="contenido" className="mx-auto max-w-app px-5 py-14">
+      <main id="contenido" className="mx-auto max-w-app px-5 py-14 md:max-w-xl md:py-20">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-white">
           <Check width={30} height={30} />
         </div>

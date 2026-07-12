@@ -11,7 +11,7 @@ export default function Legal() {
   return (
     <>
       <Header />
-      <main id="contenido" className="mx-auto max-w-app px-5 py-12">
+      <main id="contenido" className="mx-auto max-w-app px-5 py-12 md:max-w-2xl md:py-16">
         <h1 className="text-[26px] font-extrabold text-navy">Información legal</h1>
 
         <div className="mt-4 rounded-card border border-brand-red/30 bg-brand-red/5 p-4">
