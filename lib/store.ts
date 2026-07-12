@@ -175,6 +175,69 @@ export async function upsertLead(
   return { id: newId, deduped: false };
 }
 
+/* ------------------ Área de cliente (sin registro) ------------------------- */
+// Permite al propio cliente actualizar su ficha (datos de contacto y
+// preferencia horaria) desde /area-cliente, localizándola por el teléfono o
+// email que ya tenía guardados en su navegador. Si no se encuentra ficha, no
+// se crea una nueva (evita altas fantasma desde un endpoint sin autenticar).
+
+export async function updateLeadContactByLookup(
+  lookup: { telefono?: string; email?: string },
+  patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string }
+): Promise<Lead | null> {
+  const lookupPhone = lookup.telefono ? normalizePhone(lookup.telefono) : "";
+  const lookupEmail = lookup.email ? lookup.email.trim().toLowerCase() : "";
+
+  let id: string | null = null;
+  if (lookupPhone) id = await jget<string>(`idx:phone:${lookupPhone}`);
+  if (!id && lookupEmail) id = await jget<string>(`idx:email:${lookupEmail}`);
+  if (!id) return null;
+
+  const lead = await jget<Lead>(`lead:${id}`);
+  if (!lead) return null;
+
+  const now = new Date().toISOString();
+  const changes: string[] = [];
+
+  if (patch.nombre !== undefined && patch.nombre.trim() && patch.nombre.trim() !== lead.nombre) {
+    lead.nombre = patch.nombre.trim();
+    changes.push("nombre");
+  }
+  if (patch.telefono !== undefined) {
+    const newPhone = normalizePhone(patch.telefono);
+    if (newPhone && newPhone !== lead.telefono) {
+      await jset(`idx:phone:${newPhone}`, id);
+      lead.telefono = newPhone;
+      changes.push("teléfono");
+    }
+  }
+  if (patch.email !== undefined) {
+    const newEmail = patch.email.trim().toLowerCase();
+    if (newEmail && newEmail !== lead.email) {
+      await jset(`idx:email:${newEmail}`, id);
+      lead.email = newEmail;
+      changes.push("email");
+    }
+  }
+  if (patch.diaLlamada !== undefined && patch.diaLlamada !== lead.diaLlamada) {
+    lead.diaLlamada = patch.diaLlamada;
+    changes.push("día preferido");
+  }
+  if (patch.turnoLlamada !== undefined && patch.turnoLlamada !== lead.turnoLlamada) {
+    lead.turnoLlamada = patch.turnoLlamada;
+    changes.push("turno preferido");
+  }
+
+  if (changes.length) {
+    lead.activity.unshift({ at: now, type: "note", note: `Cliente actualizó desde su área: ${changes.join(", ")}.` });
+    lead.updatedAt = now;
+    await jset(`lead:${id}`, lead);
+    await zadd("leads:index", Date.parse(now), id);
+  }
+
+  return lead;
+}
+
 /* ------------------------------ Consultas --------------------------------- */
 
 export async function listLeads(source?: string): Promise<Lead[]> {

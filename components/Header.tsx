@@ -39,6 +39,7 @@ const BREADCRUMB_MAP: Record<string, Crumb[]> = {
   "/comparativa": [{ label: "Tu comparativa" }],
   "/quienes-somos": [{ label: "Quiénes somos" }],
   "/actualidad": [{ label: "Actualidad" }],
+  "/area-cliente": [{ label: "Área de cliente" }],
 };
 
 function fallbackBreadcrumb(pathname: string): Crumb[] {

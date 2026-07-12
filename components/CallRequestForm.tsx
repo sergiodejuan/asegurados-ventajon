@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
+import { PRODUCT_PAGES } from "@/lib/productPages";
 import { loadQuote, saveCallResult, type QuoteProfile } from "@/lib/quote";
+import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -27,6 +29,8 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
   const [codigoPostal, setCp] = useState("");
   const [diaLlamada, setDiaLlamada] = useState<string>(DIAS_LLAMADA[0]);
   const [turnoLlamada, setTurnoLlamada] = useState<string>(TURNOS_LLAMADA[0]);
+  const [genericProducto, setGenericProducto] = useState<string>("salud");
+  const [clientFirstName, setClientFirstName] = useState<string | undefined>(undefined);
   const [priv, setPriv] = useState(false);
   const [contacto, setContacto] = useState(false);
   const [comercial, setComercial] = useState(false);
@@ -36,14 +40,23 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [referrer, setReferrer] = useState("");
 
+  const hasProductoParam = searchParams.has("producto");
+
   useEffect(() => {
     if (typeof document !== "undefined") setReferrer(document.referrer || "");
-    setQuote(loadQuote());
+    const q = loadQuote();
+    setQuote(q);
     setQuoteChecked(true);
+    if (!hasProductoParam) {
+      const profile = loadClientProfile();
+      if (profile?.nombre) setClientFirstName(profile.nombre.trim().split(/\s+/)[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const producto = searchParams.get("producto") ?? "salud";
+  const producto = hasProductoParam ? (searchParams.get("producto") ?? "salud") : (quote?.producto ?? genericProducto);
   const compania = searchParams.get("compania") ?? undefined;
+  const headingText = clientFirstName ? `${clientFirstName}, te llamamos gratis` : "Te llamamos gratis";
   const utm = useMemo(
     () => ({
       source: searchParams.get("utm_source") ?? undefined,
@@ -81,6 +94,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
       });
       if (res.ok) {
         saveCallResult({ nombre: quote.nombre, diaLlamada, turnoLlamada });
+        saveClientProfile({ nombre: quote.nombre, telefono: quote.telefono, diaLlamada, turnoLlamada });
         router.push("/gracias");
         return;
       }
@@ -130,6 +144,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
       });
       if (res.ok) {
         saveCallResult({ nombre, diaLlamada, turnoLlamada });
+        saveClientProfile({ nombre, telefono, diaLlamada, turnoLlamada });
         router.push("/gracias");
         return;
       }
@@ -152,7 +167,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
   if (quoteChecked && hasContactAndConsent(quote) && !useOther) {
     return (
       <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
-        {showHeading && <h1 className="text-[26px] font-extrabold leading-tight text-navy">Te llamamos gratis</h1>}
+        {showHeading && <h1 className="text-[26px] font-extrabold leading-tight text-navy">{headingText}</h1>}
         <p className="mt-2 text-[15px] leading-relaxed text-slate2">
           Vamos a llamarte al <span className="font-semibold tnums text-ink">{quote.telefono}</span>
           {compania ? ` para hablar de tu opción con ${compania}` : ""}. Ya tenemos tu autorización de contacto, no hace falta que la repitas.
@@ -191,13 +206,32 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
     <form onSubmit={onSubmit} noValidate className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
       {showHeading && (
         <>
-          <h1 className="text-[26px] font-extrabold leading-tight text-navy">Te llamamos gratis</h1>
+          <h1 className="text-[26px] font-extrabold leading-tight text-navy">{headingText}</h1>
           <p className="mt-2 text-[15px] leading-relaxed text-slate2">
             {compania
               ? `Déjanos tu teléfono y un asesor te llama para hablar de tu opción con ${compania}. Sin coste.`
-              : "Déjanos tu teléfono y un asesor te llama para comparar tu seguro de salud. Sin coste."}
+              : hasProductoParam
+                ? "Déjanos tu teléfono y un asesor te llama para comparar tu seguro. Sin coste."
+                : "Déjanos tu teléfono y un asesor te llama para ayudarte a elegir el seguro que necesites. Sin coste."}
           </p>
         </>
+      )}
+
+      {!hasProductoParam && (
+        <div className="mt-4">
+          <p className="mb-2 text-[13px] font-semibold text-ink">¿Con qué seguro necesitas ayuda?</p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tipo de seguro">
+            {PRODUCT_PAGES.map((p) => (
+              <button
+                key={p.slug} type="button" aria-pressed={genericProducto === p.slug}
+                onClick={() => setGenericProducto(p.slug)}
+                className={`rounded-pill border px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors ${genericProducto === p.slug ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
+              >
+                {p.badge.replace("Seguro de ", "")}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Honeypot */}

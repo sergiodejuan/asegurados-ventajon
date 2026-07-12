@@ -9,6 +9,7 @@ import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
 import { saveQuote } from "@/lib/quote";
+import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -149,7 +150,7 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
       const res = await fetch(config.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) {
         const body = (await res.json().catch(() => null)) as { id?: string } | null;
-        saveQuote({
+        const quoteProfile = {
           id: body?.id ?? `local-${Date.now()}`,
           producto: variant,
           createdAt: new Date().toISOString(),
@@ -165,7 +166,10 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
           telefono: normalizePhone(String(data.telefono ?? "")),
           email: String(data.email ?? ""),
           consentAt: consentTimes,
-        });
+        };
+        saveQuote(quoteProfile);
+        addClientQuote(quoteProfile);
+        saveClientProfile({ nombre: quoteProfile.nombre, telefono: quoteProfile.telefono, email: quoteProfile.email });
         try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
         pendingUrlRef.current = `/comparativa?producto=${variant}`;
         setFinalizing(true);

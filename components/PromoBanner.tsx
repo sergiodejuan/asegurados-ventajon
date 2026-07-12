@@ -7,7 +7,9 @@ import { Modal } from "./Modal";
 
 // Banner de reclamo tipo referencia (recuadro mint + claim + "ver condiciones").
 // ⚠️ Sin % ni precios: el texto se edita en lib/brand.ts (PROMO) tras validación de Gabriel.
-export function PromoBanner() {
+// headline/sub opcionales: para contextos multiproducto (p.ej. "quiero que me
+// llamen" genérico) donde el claim de salud de PROMO no encaja.
+export function PromoBanner({ headline, sub }: { headline?: string; sub?: string } = {}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -15,8 +17,8 @@ export function PromoBanner() {
       <span className="inline-flex items-center rounded-pill bg-white/70 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-mint-deep">
         {PROMO.badge}
       </span>
-      <p className="mt-2 text-[18px] font-extrabold leading-tight text-navy-deep">{PROMO.headline}</p>
-      <p className="mt-1 text-[13px] leading-snug text-navy-deep/80">{PROMO.sub}</p>
+      <p className="mt-2 text-[18px] font-extrabold leading-tight text-navy-deep">{headline ?? PROMO.headline}</p>
+      <p className="mt-1 text-[13px] leading-snug text-navy-deep/80">{sub ?? PROMO.sub}</p>
       <button
         type="button"
         onClick={() => setOpen(true)}

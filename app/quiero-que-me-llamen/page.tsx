@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 };
 
 // Página de conversión: SIN cabecera, SIN navegación, SIN footer con enlaces de salida.
-export default function QuieroQueMeLlamen() {
+export default function QuieroQueMeLlamen({ searchParams }: { searchParams?: { producto?: string; compania?: string } }) {
+  const isGeneric = !searchParams?.producto;
+
   return (
     <main className="safe-top min-h-screen bg-mist">
       <div className="mx-auto max-w-app px-5 py-8 md:max-w-5xl md:py-16 lg:max-w-6xl">
@@ -22,7 +24,12 @@ export default function QuieroQueMeLlamen() {
 
         <div className="md:grid md:grid-cols-[1fr_1.1fr] md:items-start md:gap-14">
           <div className="md:order-2">
-            <div className="mb-5"><PromoBanner /></div>
+            <div className="mb-5">
+              <PromoBanner
+                headline={isGeneric ? "Elige tu seguro, te llamamos gratis" : undefined}
+                sub={isGeneric ? "Comparamos entre las mejores compañías para el seguro que necesites, sin coste ni compromiso." : undefined}
+              />
+            </div>
 
             <Suspense fallback={<div className="h-[520px] rounded-[24px] border border-hair bg-white shadow-card" />}>
               <CallRequestForm />

@@ -44,6 +44,13 @@ export function GraciasContent() {
       ))}
 
       <NextSteps />
+
+      <a
+        href="/area-cliente"
+        className="mt-4 flex w-full items-center justify-center rounded-card border border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
+      >
+        Gestionar mis presupuestos y mis datos
+      </a>
     </>
   );
 }

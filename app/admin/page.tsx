@@ -95,6 +95,21 @@ function LeadsCrm() {
 
   useEffect(() => { load(token); }, [token, load]);
 
+  async function openLead(id: string) {
+    // Se pide la ficha fresca (no la del listado, que puede estar desactualizada
+    // si el propio cliente ha cambiado sus datos desde /area-cliente).
+    try {
+      const res = await fetch(`/api/admin/leads/${id}`, { headers: { "x-admin-token": token } });
+      const body = await res.json();
+      if (res.ok && body.ok) {
+        setSelected(body.lead);
+        setLeads((prev) => prev.map((l) => (l.id === body.lead.id ? body.lead : l)));
+        return;
+      }
+    } catch { /* si falla, se cae al fallback de abajo */ }
+    setSelected(leads.find((l) => l.id === id) ?? null);
+  }
+
   async function patch(id: string, payload: Record<string, unknown>) {
     const res = await fetch(`/api/admin/leads/${id}`, {
       method: "PATCH",
@@ -346,7 +361,7 @@ function LeadsCrm() {
                 <ul className="mt-2 flex flex-col gap-2">
                   {col.map((l) => (
                     <li key={l.id}>
-                      <button onClick={() => setSelected(l)} className="w-full rounded-lg border border-hair bg-mist px-3 py-2 text-left transition-colors hover:bg-hair/60">
+                      <button onClick={() => openLead(l.id)} className="w-full rounded-lg border border-hair bg-mist px-3 py-2 text-left transition-colors hover:bg-hair/60">
                         <p className="truncate text-[12px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
                         <p className="truncate text-[11px] text-slate2 tnums">{l.telefono}</p>
                       </button>
@@ -363,7 +378,7 @@ function LeadsCrm() {
           {visible.length === 0 && <li className="rounded-card border border-hair bg-white p-5 text-center text-[14px] text-slate2">No hay leads con estos filtros.</li>}
           {visible.map((l) => (
             <li key={l.id}>
-              <button onClick={() => setSelected(l)} className="flex w-full items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
+              <button onClick={() => openLead(l.id)} className="flex w-full items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
                   <p className="truncate text-[13px] text-slate2 tnums">
