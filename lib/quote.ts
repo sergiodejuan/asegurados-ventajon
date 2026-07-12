@@ -15,6 +15,12 @@ export type QuoteProfile = {
   motivo?: string; // vida
   fumador?: boolean; // vida
   inicio?: string;
+  // Contacto + consentimiento ya dados en el tarificador: si están presentes,
+  // "quiero que me llamen" no debe volver a pedirlos.
+  nombre?: string;
+  telefono?: string;
+  email?: string;
+  consentAt?: { privacidadAt?: string; contactoAt?: string; comercialAt?: string };
 };
 
 const STORAGE_KEY = "ventajon:quote";
@@ -84,11 +90,4 @@ export function whatsAppUrl(text: string) {
   return `${WHATSAPP_URL}?text=${encodeURIComponent(text)}`;
 }
 
-export function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(new RegExp("[" + String.fromCharCode(0x0300) + "-" + String.fromCharCode(0x036f) + "]", "g"), "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+export { slugifyCompania as slugify } from "./catalog";

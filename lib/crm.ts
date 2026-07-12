@@ -36,6 +36,17 @@ export type ConsentRecord = {
   comercial: { granted: boolean; at?: string };
 };
 
+// Una entrada por cada envío de formulario (tarificador o "quiero que me
+// llamen"), aunque el lead ya existiera — para ver el histórico completo de
+// tarificaciones/presupuestos de un lead, no solo su ficha fusionada.
+export type LeadSubmission = {
+  id: string;
+  at: string;
+  source: string;
+  producto: string;
+  data: Record<string, unknown>;
+};
+
 export type Lead = {
   id: string;
   createdAt: string;
@@ -72,8 +83,10 @@ export type Lead = {
   // Atribución
   utm: Record<string, string | undefined>;
   activity: Activity[];
+  // Histórico de tarificaciones / presupuestos (uno por envío de formulario).
+  submissions: LeadSubmission[];
 };
 
 export type LeadDraft = Partial<
-  Omit<Lead, "id" | "createdAt" | "updatedAt" | "status" | "activity" | "sources" | "consents">
+  Omit<Lead, "id" | "createdAt" | "updatedAt" | "status" | "activity" | "sources" | "consents" | "submissions">
 >;

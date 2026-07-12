@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Header } from "./Header";
 import { CallRequestForm } from "./CallRequestForm";
 import { Check } from "./icons";
-import { BRAND_NAME, COBERTURAS, COMPARATIVA_SALUD, COMPARATIVA_VIDA, SERVICIOS_VIDA } from "@/lib/brand";
+import type { Product } from "@/lib/catalog";
 import {
   loadQuote, saludPrice, vidaPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
@@ -19,13 +19,22 @@ export function CompanyDetail() {
   const searchParams = useSearchParams();
   const producto = searchParams.get("producto") === "vida" ? "vida" : "salud";
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => { setQuote(loadQuote()); }, []);
 
-  const list = producto === "vida" ? COMPARATIVA_VIDA : COMPARATIVA_SALUD;
-  const entry = list.find((c) => slugify(c.compania) === params.compania);
+  useEffect(() => {
+    fetch(`/api/products?producto=${producto}`)
+      .then((r) => r.json())
+      .then((body) => { if (body.ok) setProducts(body.products); })
+      .finally(() => setLoaded(true));
+  }, [producto]);
 
-  if (!entry) {
+  const entry = products.find((c) => slugify(c.compania) === params.compania);
+
+  if (loaded && !entry) {
     return (
       <>
         <Header />
@@ -36,15 +45,44 @@ export function CompanyDetail() {
       </>
     );
   }
+  if (!entry) return null;
 
-  const bullets = producto === "vida" ? SERVICIOS_VIDA : [...COBERTURAS.sin.bullets, ...COBERTURAS.con.bullets];
   const waText = buildWhatsAppText({ producto, compania: entry.compania, quote });
+  const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
+  const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
+
+  async function downloadPdf() {
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/presupuesto/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          producto, compania: entry!.compania, quote,
+          precio: producto === "vida" ? { precio: precioVida.precio } : { conCopago: precioSalud.conCopago, sinCopago: precioSalud.sinCopago },
+          servicios: entry!.servicios, condiciones: entry!.condiciones,
+        }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `presupuesto-${quote ? quoteNumber(quote.id) : "asegurados-ventajon"}-${slugify(entry!.compania)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <>
       <Header />
       <main id="contenido" className="mx-auto max-w-app px-5 py-10 md:max-w-2xl md:py-16">
-        <a href="/comparativa" className="text-[13px] font-semibold text-navy underline print:hidden">← Volver a la comparativa</a>
+        <a href="/comparativa" className="text-[13px] font-semibold text-navy underline">← Volver a la comparativa</a>
 
         <p className="mt-4 text-[12px] font-bold uppercase tracking-wide text-brand-red">
           {producto === "vida" ? "Seguro de vida" : "Seguro de salud"}
@@ -54,22 +92,18 @@ export function CompanyDetail() {
 
         {producto === "vida" ? (
           <p className="mt-5 text-[32px] font-extrabold tnums text-navy">
-            Desde {euros(vidaPrice(entry as { precio: number }, { fumador: quote?.fumador }).precio)} €
+            Desde {euros(precioVida.precio)} €
             <span className="text-[16px] font-medium text-slate2">/mes</span>
           </p>
         ) : (
           <div className="mt-5 flex gap-8">
             <div>
               <p className="text-[13px] text-slate2">Con copago</p>
-              <p className="text-[24px] font-extrabold tnums text-navy">
-                {euros(saludPrice(entry as { conCopago: number; sinCopago: number }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental }).conCopago)} €/mes
-              </p>
+              <p className="text-[24px] font-extrabold tnums text-navy">{euros(precioSalud.conCopago)} €/mes</p>
             </div>
             <div>
               <p className="text-[13px] text-slate2">Sin copago</p>
-              <p className="text-[24px] font-extrabold tnums text-navy">
-                {euros(saludPrice(entry as { conCopago: number; sinCopago: number }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental }).sinCopago)} €/mes
-              </p>
+              <p className="text-[24px] font-extrabold tnums text-navy">{euros(precioSalud.sinCopago)} €/mes</p>
             </div>
           </div>
         )}
@@ -78,7 +112,7 @@ export function CompanyDetail() {
         </p>
 
         <ul className="mt-6 flex flex-col gap-2.5">
-          {bullets.map((b) => (
+          {entry.servicios.map((b) => (
             <li key={b} className="flex items-start gap-2.5">
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
                 <Check width={13} height={13} />
@@ -88,13 +122,22 @@ export function CompanyDetail() {
           ))}
         </ul>
 
-        <div className="mt-6 flex flex-col gap-3 print:hidden">
+        {entry.condiciones && (
+          <div className="mt-5 rounded-card border border-hair bg-mist p-4">
+            <p className="text-[12px] font-bold text-navy">Condiciones</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-slate2">{entry.condiciones}</p>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-col gap-3">
           <button
             type="button"
-            onClick={() => window.print()}
-            className="flex items-center justify-center rounded-card border border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
+            onClick={downloadPdf}
+            disabled={!quote || downloading}
+            title={!quote ? "Calcula tu precio primero para generar tu presupuesto en PDF." : undefined}
+            className="flex items-center justify-center rounded-card border border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:border-hair disabled:text-slate2/60 disabled:hover:bg-transparent"
           >
-            Descargar presupuesto en PDF
+            {downloading ? "Generando…" : "Descargar presupuesto en PDF"}
           </button>
           <a
             href={whatsAppUrl(waText)}
@@ -106,26 +149,7 @@ export function CompanyDetail() {
           </a>
         </div>
 
-        {/* Resumen imprimible: oculto en pantalla, visible solo al generar el PDF */}
-        <div className="hidden print:block">
-          <hr className="my-6 border-hair" />
-          <p className="text-[13px] font-bold text-navy">{BRAND_NAME} · Presupuesto orientativo</p>
-          {quote && (
-            <dl className="mt-2 grid grid-cols-2 gap-y-1 text-[12px]">
-              <dt className="text-slate2">Presupuesto nº</dt><dd>{quoteNumber(quote.id)}</dd>
-              <dt className="text-slate2">Código postal</dt><dd>{quote.codigoPostal || "—"}</dd>
-              {producto === "salud" && <><dt className="text-slate2">Personas a asegurar</dt><dd>{quote.numAsegurados ?? 1}</dd></>}
-              {producto === "salud" && <><dt className="text-slate2">Cobertura dental</dt><dd>{quote.coberturaDental ? "Sí" : "No"}</dd></>}
-              {producto === "vida" && <><dt className="text-slate2">Fumador</dt><dd>{quote.fumador ? "Sí" : "No"}</dd></>}
-            </dl>
-          )}
-          <p className="mt-3 text-[11px] leading-relaxed text-slate2">
-            Precio orientativo, no una cotización en firme. Sujeto a confirmación por un asesor de {BRAND_NAME} según el
-            perfil final de la persona a asegurar.
-          </p>
-        </div>
-
-        <div className="mt-10 print:hidden">
+        <div className="mt-10">
           <h2 className="text-[18px] font-bold text-navy">¿Quieres que te llamemos sobre esta opción?</h2>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
             Déjanos tu teléfono y un asesor te llama para confirmar tu presupuesto con {entry.compania}.

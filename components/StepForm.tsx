@@ -117,6 +117,10 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
           motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
           fumador: variant === "vida" ? !!data.fumador : undefined,
           inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
+          nombre: String(data.nombre ?? ""),
+          telefono: normalizePhone(String(data.telefono ?? "")),
+          email: String(data.email ?? ""),
+          consentAt: consentTimes,
         });
         router.push(`/comparativa?producto=${variant}`);
         return;

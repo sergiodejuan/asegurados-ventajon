@@ -1,0 +1,184 @@
+import { NextResponse } from "next/server";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import QRCode from "qrcode";
+import { BRAND_NAME } from "@/lib/brand";
+import { buildWhatsAppText, whatsAppUrl, quoteNumber, ageFromDob, type QuoteProfile } from "@/lib/quote";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type PdfRequest = {
+  producto: "salud" | "vida";
+  compania: string;
+  quote: Partial<QuoteProfile> | null;
+  precio: { conCopago?: number; sinCopago?: number; precio?: number };
+  servicios: string[];
+  condiciones: string;
+};
+
+const NAVY = rgb(0x1b / 255, 0x2b / 255, 0x6b / 255);
+const RED = rgb(0xc8 / 255, 0x31 / 255, 0x2a / 255);
+const SLATE = rgb(0x5a / 255, 0x64 / 255, 0x73 / 255);
+const INK = rgb(0x1c / 255, 0x23 / 255, 0x33 / 255);
+const WHITE = rgb(1, 1, 1);
+const HAIR = rgb(0xe4 / 255, 0xe8 / 255, 0xf0 / 255);
+
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const w of words) {
+    const test = current ? `${current} ${w}` : w;
+    if (current && font.widthOfTextAtSize(test, size) > maxWidth) {
+      lines.push(current);
+      current = w;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function euros(n: number) {
+  return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export async function POST(request: Request) {
+  let body: PdfRequest;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  if (!body.compania || (body.producto !== "salud" && body.producto !== "vida")) {
+    return NextResponse.json({ ok: false, error: "Datos incompletos." }, { status: 400 });
+  }
+
+  const quote = body.quote ?? null;
+  const presupuestoId = quote?.id ? quoteNumber(quote.id) : quoteNumber(`${Date.now()}`);
+  const fecha = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const age = ageFromDob(quote?.fechaNacimiento);
+
+  const waText = buildWhatsAppText({ producto: body.producto, compania: body.compania, quote: quote as QuoteProfile | null });
+  const qrPng = await QRCode.toBuffer(whatsAppUrl(waText), { type: "png", width: 320, margin: 1, color: { dark: "#1B2B6B", light: "#FFFFFF" } });
+
+  const doc = await PDFDocument.create();
+  doc.setTitle(`Presupuesto ${presupuestoId} — ${BRAND_NAME}`);
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const qrImage = await doc.embedPng(qrPng);
+
+  const marginX = 48;
+  const width = 595;
+
+  // Header
+  page.drawRectangle({ x: 0, y: 792, width, height: 50, color: NAVY });
+  page.drawText(BRAND_NAME.toUpperCase(), { x: marginX, y: 811, size: 14, font: bold, color: WHITE });
+  const presupuestoLabel = "PRESUPUESTO ORIENTATIVO";
+  page.drawText(presupuestoLabel, {
+    x: width - marginX - bold.widthOfTextAtSize(presupuestoLabel, 11), y: 813, size: 11, font: bold, color: WHITE,
+  });
+
+  let y = 768;
+  page.drawText(`Presupuesto nº ${presupuestoId}`, { x: marginX, y, size: 10, font: bold, color: SLATE });
+  const fechaLabel = `Fecha: ${fecha}`;
+  page.drawText(fechaLabel, { x: width - marginX - font.widthOfTextAtSize(fechaLabel, 10), y, size: 10, font, color: SLATE });
+
+  // Datos del cliente
+  y -= 30;
+  page.drawText("Datos del cliente", { x: marginX, y, size: 13, font: bold, color: NAVY });
+  y -= 8;
+  page.drawLine({ start: { x: marginX, y }, end: { x: width - marginX, y }, thickness: 1, color: HAIR });
+  y -= 20;
+
+  const clientRows: [string, string][] = [
+    ["Nombre", quote?.nombre || "—"],
+    ["Teléfono", quote?.telefono || "—"],
+    ["Email", quote?.email || "—"],
+    ["Código postal", quote?.codigoPostal || "—"],
+  ];
+  if (body.producto === "salud") {
+    clientRows.push(["Personas a asegurar", String(quote?.numAsegurados ?? 1)]);
+    clientRows.push(["Cobertura dental", quote?.coberturaDental ? "Sí" : "No"]);
+  } else {
+    clientRows.push(["Motivo", quote?.motivo || "—"]);
+    clientRows.push(["Fumador", quote?.fumador ? "Sí" : "No"]);
+  }
+  if (age !== null) clientRows.push(["Edad", `${age} años`]);
+
+  const colWidth = (width - marginX * 2) / 2;
+  const rowHeight = 32;
+  clientRows.forEach(([label, value], i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = marginX + col * colWidth;
+    const ry = y - row * rowHeight;
+    page.drawText(label, { x, y: ry, size: 9, font, color: SLATE });
+    page.drawText(value, { x, y: ry - 15, size: 11, font: bold, color: INK });
+  });
+  y -= Math.ceil(clientRows.length / 2) * rowHeight + 20;
+
+  // Oferta
+  page.drawText(`Tu oferta con ${body.compania}`, { x: marginX, y, size: 13, font: bold, color: NAVY });
+  y -= 8;
+  page.drawLine({ start: { x: marginX, y }, end: { x: width - marginX, y }, thickness: 1, color: HAIR });
+  y -= 28;
+
+  if (body.producto === "salud") {
+    page.drawText("Con copago", { x: marginX, y, size: 9, font, color: SLATE });
+    page.drawText(`${euros(body.precio.conCopago ?? 0)} €/mes`, { x: marginX, y: y - 18, size: 18, font: bold, color: NAVY });
+    page.drawText("Sin copago", { x: marginX + colWidth, y, size: 9, font, color: SLATE });
+    page.drawText(`${euros(body.precio.sinCopago ?? 0)} €/mes`, { x: marginX + colWidth, y: y - 18, size: 18, font: bold, color: NAVY });
+    y -= 46;
+  } else {
+    page.drawText("Precio orientativo", { x: marginX, y, size: 9, font, color: SLATE });
+    page.drawText(`Desde ${euros(body.precio.precio ?? 0)} €/mes`, { x: marginX, y: y - 18, size: 18, font: bold, color: NAVY });
+    y -= 46;
+  }
+
+  page.drawText("Servicios incluidos", { x: marginX, y, size: 11, font: bold, color: INK });
+  y -= 18;
+  for (const s of body.servicios.slice(0, 8)) {
+    page.drawCircle({ x: marginX + 2, y: y + 3, size: 1.6, color: RED });
+    page.drawText(s, { x: marginX + 12, y, size: 10, font, color: INK });
+    y -= 16;
+  }
+
+  if (body.condiciones) {
+    y -= 8;
+    page.drawText("Condiciones", { x: marginX, y, size: 11, font: bold, color: INK });
+    y -= 16;
+    for (const line of wrapText(body.condiciones, font, 9.5, width - marginX * 2)) {
+      page.drawText(line, { x: marginX, y, size: 9.5, font, color: SLATE });
+      y -= 13;
+    }
+  }
+
+  // QR
+  const qrSize = 96;
+  const qrY = 120;
+  page.drawImage(qrImage, { x: width - marginX - qrSize, y: qrY, width: qrSize, height: qrSize });
+  const qrCaption = wrapText("Escanea para seguir por WhatsApp con este presupuesto", font, 8.5, 120);
+  qrCaption.forEach((line, i) => {
+    page.drawText(line, { x: width - marginX - qrSize, y: qrY - 14 - i * 11, size: 8.5, font, color: SLATE });
+  });
+
+  // Footer disclaimer
+  const disclaimer = wrapText(
+    `Precio orientativo, no una cotización en firme. El precio final depende del perfil de la persona a asegurar y de la ` +
+    `compañía elegida, y lo confirma un asesor de ${BRAND_NAME} sin compromiso. ${BRAND_NAME} es una correduría de seguros.`,
+    font, 8, width - marginX * 2 - 140
+  );
+  disclaimer.forEach((line, i) => {
+    page.drawText(line, { x: marginX, y: qrY + qrSize - 14 - i * 11, size: 8, font, color: SLATE });
+  });
+
+  const bytes = await doc.save();
+  return new NextResponse(Buffer.from(bytes), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="presupuesto-${presupuestoId}.pdf"`,
+    },
+  });
+}

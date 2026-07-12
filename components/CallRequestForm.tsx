@@ -4,13 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
+import { loadQuote, type QuoteProfile } from "@/lib/quote";
 import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
 
+function hasContactAndConsent(q: QuoteProfile | null): q is QuoteProfile & { telefono: string } {
+  return !!(q?.telefono && q?.consentAt?.privacidadAt && q?.consentAt?.contactoAt);
+}
+
 export function CallRequestForm({ showHeading = true }: { showHeading?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [quote, setQuote] = useState<QuoteProfile | null>(null);
+  const [quoteChecked, setQuoteChecked] = useState(false);
+  const [useOther, setUseOther] = useState(false);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [codigoPostal, setCp] = useState("");
@@ -25,6 +36,8 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
 
   useEffect(() => {
     if (typeof document !== "undefined") setReferrer(document.referrer || "");
+    setQuote(loadQuote());
+    setQuoteChecked(true);
   }, []);
 
   const producto = searchParams.get("producto") ?? "salud";
@@ -39,6 +52,37 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
     }),
     [searchParams]
   );
+
+  async function confirmQuick() {
+    if (!quote) return;
+    setQuickError(null);
+    setQuickSubmitting(true);
+    try {
+      const res = await fetch("/api/call-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: quote.nombre ?? "",
+          telefono: quote.telefono,
+          codigoPostal: quote.codigoPostal ?? "",
+          producto,
+          compania,
+          aceptaPrivacidad: true,
+          autorizaContacto: true,
+          aceptaComercial: !!quote.consentAt?.comercialAt,
+          company: "",
+          consent: quote.consentAt,
+          utm: { ...utm, referrer },
+        }),
+      });
+      if (res.ok) { router.push("/gracias"); return; }
+      setQuickError("No hemos podido enviar tu solicitud. Inténtalo de nuevo.");
+    } catch {
+      setQuickError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+    } finally {
+      setQuickSubmitting(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +135,41 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Ya tenemos teléfono + consentimiento del tarificador: no hace falta volver a pedirlos.
+  if (quoteChecked && hasContactAndConsent(quote) && !useOther) {
+    return (
+      <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+        {showHeading && <h1 className="text-[26px] font-extrabold leading-tight text-navy">Te llamamos gratis</h1>}
+        <p className="mt-2 text-[15px] leading-relaxed text-slate2">
+          Vamos a llamarte al <span className="font-semibold tnums text-ink">{quote.telefono}</span>
+          {compania ? ` para hablar de tu opción con ${compania}` : ""}. Ya tenemos tu autorización de contacto, no hace falta que la repitas.
+        </p>
+        {quickError && (
+          <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">
+            {quickError}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={confirmQuick}
+          disabled={quickSubmitting}
+          aria-busy={quickSubmitting || undefined}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40"
+        >
+          {quickSubmitting && <Spinner />}
+          {quickSubmitting ? "Enviando…" : "Sí, quiero que me llamen"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setUseOther(true)}
+          className="mt-3 block w-full text-center text-[13px] font-medium text-slate2 underline"
+        >
+          Usar otro número de contacto
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -1,5 +1,12 @@
 import { normalizePhone } from "./schema";
-import { SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type Status } from "./crm";
+import { SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status } from "./crm";
+import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
+
+function makeSubmissionId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 /**
  * Almacén de leads tipo CRM.
@@ -122,6 +129,8 @@ export async function upsertLead(
         note: `Nueva solicitud desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`,
         meta: { source },
       });
+      const submission: LeadSubmission = { id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> };
+      lead.submissions = [submission, ...(lead.submissions ?? [])];
       await jset(`lead:${id}`, lead);
       if (phone) await jset(`idx:phone:${phone}`, id);
       if (email) await jset(`idx:email:${email}`, id);
@@ -152,6 +161,7 @@ export async function upsertLead(
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
+    submissions: [{ id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> }],
   };
 
   await jset(`lead:${newId}`, lead);
@@ -201,4 +211,56 @@ export async function updateLead(
   await jset(`lead:${id}`, lead);
   await zadd("leads:index", Date.parse(now), id);
   return lead;
+}
+
+/* ---------------------------- Catálogo (productos) ------------------------- */
+// Ofertas por compañía × producto que alimentan la página de comparativa.
+// Se guardan como un único documento JSON (catálogo pequeño, no necesita índice).
+
+const PRODUCTS_KEY = "products:all";
+
+async function readProducts(): Promise<Product[]> {
+  const stored = await jget<Product[]>(PRODUCTS_KEY);
+  if (stored && stored.length) return stored;
+  await jset(PRODUCTS_KEY, DEFAULT_PRODUCTS);
+  return DEFAULT_PRODUCTS;
+}
+
+export async function listProducts(producto?: string, onlyActive = false): Promise<Product[]> {
+  let all = await readProducts();
+  if (producto) all = all.filter((p) => p.producto === producto);
+  if (onlyActive) all = all.filter((p) => p.activo);
+  return sortProducts(all);
+}
+
+export async function getProduct(id: string): Promise<Product | null> {
+  const all = await readProducts();
+  return all.find((p) => p.id === id) ?? null;
+}
+
+export async function saveProduct(id: string, patch: ProductDraft): Promise<Product | null> {
+  const all = await readProducts();
+  const idx = all.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(PRODUCTS_KEY, all);
+  return all[idx];
+}
+
+export async function createProduct(product: Omit<Product, "updatedAt">): Promise<Product> {
+  const all = await readProducts();
+  const withTimestamp: Product = { ...product, updatedAt: new Date().toISOString() };
+  const idx = all.findIndex((p) => p.id === product.id);
+  if (idx >= 0) all[idx] = withTimestamp;
+  else all.push(withTimestamp);
+  await jset(PRODUCTS_KEY, all);
+  return withTimestamp;
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  const all = await readProducts();
+  const next = all.filter((p) => p.id !== id);
+  if (next.length === all.length) return false;
+  await jset(PRODUCTS_KEY, next);
+  return true;
 }

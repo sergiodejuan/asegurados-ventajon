@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Header } from "./Header";
 import { NextSteps } from "./NextSteps";
 import { Check } from "./icons";
-import { BRAND_NAME, COMPARATIVA_SALUD, COMPARATIVA_VIDA } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brand";
+import type { Product } from "@/lib/catalog";
 import {
   loadQuote, updateQuote, saludPrice, vidaPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
@@ -21,6 +22,7 @@ export function Comparativa() {
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState(false);
   const [cp, setCp] = useState("");
   const [n, setN] = useState(1);
@@ -38,6 +40,13 @@ export function Comparativa() {
       setFumador(!!q.fumador);
     }
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/products?producto=${producto}`)
+      .then((r) => r.json())
+      .then((body) => { if (body.ok) setProducts(body.products); })
+      .catch(() => {});
+  }, [producto]);
 
   function saveEdits() {
     const next = updateQuote({
@@ -70,7 +79,6 @@ export function Comparativa() {
   }
 
   const age = ageFromDob(quote?.fechaNacimiento);
-  const list = producto === "vida" ? COMPARATIVA_VIDA : COMPARATIVA_SALUD;
   const waText = buildWhatsAppText({ producto, quote });
 
   return (
@@ -181,12 +189,15 @@ export function Comparativa() {
 
         <ul className="mt-5 flex flex-col gap-3">
           {producto === "vida"
-            ? COMPARATIVA_VIDA.map((c) => {
-                const price = vidaPrice(c, { fumador: quote?.fumador });
+            ? products.map((c) => {
+                const price = vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
                 return (
-                  <li key={c.compania} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                  <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[16px] font-bold text-ink">{c.compania}</p>
+                      <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
+                        {c.compania}
+                        {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
+                      </p>
                       <p className="text-right text-[14px] text-slate2">
                         Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
                       </p>
@@ -195,11 +206,14 @@ export function Comparativa() {
                   </li>
                 );
               })
-            : COMPARATIVA_SALUD.map((c) => {
-                const price = saludPrice(c, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
+            : products.map((c) => {
+                const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
                 return (
-                  <li key={c.compania} className="rounded-card border border-hair bg-white p-4 shadow-soft">
-                    <p className="text-[16px] font-bold text-ink">{c.compania}</p>
+                  <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+                    <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
+                      {c.compania}
+                      {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
+                    </p>
                     <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
                       <span>Con copago</span>
                       <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
@@ -214,7 +228,7 @@ export function Comparativa() {
               })}
         </ul>
 
-        <NextSteps whatsappHref={whatsAppUrl(waText)} />
+        <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>
     </>
   );

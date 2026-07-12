@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { listLeads } from "@/lib/store";
+import { adminAuthFail } from "@/lib/adminAuth";
 import type { Lead } from "@/lib/crm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function authFail(request: Request): NextResponse | null {
-  const secret = process.env.ADMIN_TOKEN;
-  if (!secret) return NextResponse.json({ ok: false, error: "Configura ADMIN_TOKEN." }, { status: 503 });
-  const t = request.headers.get("x-admin-token") || new URL(request.url).searchParams.get("token");
-  if (t !== secret) return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 401 });
-  return null;
-}
 
 function esc(v: unknown): string {
   const s = v === null || v === undefined ? "" : String(v);
@@ -61,20 +54,29 @@ const COLUMNS: { key: string; get: (l: Lead) => unknown }[] = [
 ];
 
 export async function GET(request: Request) {
-  const denied = authFail(request);
+  const denied = adminAuthFail(request);
   if (denied) return denied;
 
-  const leads = await listLeads();
+  const { searchParams } = new URL(request.url);
+  const source = searchParams.get("source");
+  const producto = searchParams.get("producto");
+  const status = searchParams.get("status");
+
+  let leads = await listLeads(source || undefined);
+  if (producto) leads = leads.filter((l) => l.producto === producto);
+  if (status) leads = leads.filter((l) => l.status === status);
+
   const header = COLUMNS.map((c) => esc(c.key)).join(",");
   const rows = leads.map((l) => COLUMNS.map((c) => esc(c.get(l))).join(","));
   const csv = "\uFEFF" + [header, ...rows].join("\r\n"); // BOM para Excel
 
   const date = new Date().toISOString().slice(0, 10);
+  const tag = [source, producto, status].filter(Boolean).join("-") || "todos";
   return new NextResponse(csv, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="leads-asegurados-${date}.csv"`,
+      "Content-Disposition": `attachment; filename="leads-asegurados-${tag}-${date}.csv"`,
     },
   });
 }

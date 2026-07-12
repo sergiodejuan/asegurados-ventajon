@@ -30,28 +30,8 @@ export const CALLER_NUMBERS = [
 export const PARTNERS = ["Mapfre", "Adeslas", "Asisa", "Zurich", "Generali"];
 export const ECOSYSTEM_MEMBERS = "350.000 socios";
 
-/* ------------------- Comparativa de precios (ILUSTRATIVA) ------------------
- * ⚠️ IMPORTANTE: precios de EJEMPLO para dar forma a la página de comparativa
- * mientras no exista una integración real con los tarificadores de cada
- * compañía. No son precios reales ni una cotización en firme — el precio
- * final lo confirma un asesor según el perfil de cada cliente.
- * Sustituir por datos reales (o por una integración) antes de publicar.
- */
-export const COMPARATIVA_SALUD = [
-  { compania: "Asisa", conCopago: 29, sinCopago: 52 },
-  { compania: "Generali", conCopago: 32, sinCopago: 55 },
-  { compania: "Mapfre", conCopago: 31, sinCopago: 56 },
-  { compania: "Zurich", conCopago: 33, sinCopago: 58 },
-  { compania: "Adeslas", conCopago: 34, sinCopago: 60 },
-];
-
-export const COMPARATIVA_VIDA = [
-  { compania: "Asisa", precio: 8 },
-  { compania: "Generali", precio: 9 },
-  { compania: "Mapfre", precio: 9 },
-  { compania: "Zurich", precio: 10 },
-  { compania: "Adeslas", precio: 11 },
-];
+// El catálogo de compañías/precios de la comparativa vive en lib/catalog.ts
+// (editable desde /admin/productos), no aquí.
 
 /* -------------------------- Banner de promoción ---------------------------
  * Estilo del reclamo de la referencia (recuadro mint + claim + "ver bases").
