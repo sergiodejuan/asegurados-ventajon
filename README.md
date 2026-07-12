@@ -60,6 +60,24 @@ Los dos formularios escriben en el mismo almacén (`lib/store.ts`):
 El panel `/admin` pide el token (o acéptalo por `?token=`), lista por fuente y abre cada ficha
 con actividad, estado editable, próximo paso y notas.
 
+## Llamada automática con Retell AI
+
+Si se configuran `RETELL_API_KEY`, `RETELL_AGENT_ID` y `RETELL_FROM_NUMBER`, al completar el
+tarificador (`/api/lead`, `/api/vida`) se dispara automáticamente una llamada saliente del agente
+de voz configurado en Retell, con el nombre, producto y código postal del lead como variables
+dinámicas (`{{nombre}}`, `{{producto}}`, `{{codigo_postal}}`, `{{company}}`). Sin esas variables,
+el tarificador funciona igual y la llamada automática queda desactivada sin más.
+
+Para que el resultado de la llamada quede registrado en la ficha del lead (panel "Contactos con
+el cliente"), configura en Retell → tu agente → *Webhook Settings* → *Agent Level Webhook URL*:
+
+```
+https://tu-dominio.vercel.app/api/retell/webhook
+```
+
+Con `RETELL_API_KEY` configurada, el webhook verifica la firma (`x-retell-signature`) antes de
+procesar cualquier evento.
+
 ## Personalización
 
 - **Nombre de marca / WhatsApp / horario / compañías / contenido**: `lib/brand.ts`.

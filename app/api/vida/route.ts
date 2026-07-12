@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { vidaSchema } from "@/lib/schema";
 import { upsertLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
+import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,17 @@ export async function POST(request: Request) {
     try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source: "tarificador-vida", ...d }) }); }
     catch (err) { console.error("[vida] webhook error", err); }
   }
+
+  if (retellConfigured() && d.autorizaContacto) {
+    const call = await triggerOutboundCall({
+      toNumber: d.telefono,
+      leadId: id,
+      source: "tarificador-vida",
+      dynamicVariables: { nombre: d.nombre, producto: "seguro de vida", codigo_postal: d.codigoPostal },
+    });
+    if (!call.ok) console.error("[vida] retell call error", call.error);
+  }
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 
