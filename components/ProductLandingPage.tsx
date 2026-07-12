@@ -2,15 +2,11 @@ import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { StickyMobileCta } from "./StickyMobileCta";
 import { AvailabilityBadge } from "./AvailabilityBadge";
-import { Check, ChevronDown, IconByName, Star } from "./icons";
-import { BRAND_NAME, ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
-import { PRODUCT_PAGES, TESTIMONIALS_PLACEHOLDER_NOTE, type ProductPage } from "@/lib/productPages";
-
-const EXAMPLE_TESTIMONIALS = [
-  { name: "Carmen R.", place: "Las Palmas de Gran Canaria", quote: "Me explicaron las opciones sin prisa y sin venderme nada de más. Se agradece." },
-  { name: "Javier M.", place: "Palma de Mallorca", quote: "Comparé con lo que ya tenía y acabé pagando menos por más cobertura." },
-  { name: "Ana T.", place: "Santa Cruz de Tenerife", quote: "Todo por teléfono, sin ir a ninguna oficina. Rápido y sin letra pequeña." },
-];
+import { Testimonials } from "./Testimonials";
+import { FaqAccordion } from "./FaqAccordion";
+import { Check, IconByName } from "./icons";
+import { ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
+import { PRODUCT_PAGES, type ProductPage } from "@/lib/productPages";
 
 export function ProductLandingPage({ page }: { page: ProductPage }) {
   const otros = PRODUCT_PAGES.filter((p) => p.slug !== page.slug);
@@ -111,40 +107,10 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
         </section>
 
         {/* TESTIMONIOS */}
-        <section aria-labelledby="testimonios" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
-          <h2 id="testimonios" className="text-[22px] font-extrabold text-navy md:text-[26px]">Lo que dicen quienes ya han comparado</h2>
-          <ul className="mt-5 grid gap-4 md:grid-cols-3">
-            {EXAMPLE_TESTIMONIALS.map((t) => (
-              <li key={t.name} className="relative rounded-card border border-hair bg-white p-5 shadow-soft">
-                <span className="absolute right-4 top-4 rounded-pill bg-mist px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate2">Ejemplo</span>
-                <div className="flex gap-0.5 text-brand-red" aria-hidden="true">
-                  {Array.from({ length: 5 }, (_, i) => <Star key={i} />)}
-                </div>
-                <p className="mt-3 text-[14px] leading-relaxed text-ink">&ldquo;{t.quote}&rdquo;</p>
-                <p className="mt-3 text-[13px] font-semibold text-navy">{t.name} <span className="font-normal text-slate2">· {t.place}</span></p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[12px] leading-relaxed text-slate2">{TESTIMONIALS_PLACEHOLDER_NOTE}</p>
-        </section>
+        <Testimonials />
 
         {/* FAQ */}
-        <section aria-labelledby="faq" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-3xl">
-          <h2 id="faq" className="text-[22px] font-extrabold text-navy md:text-[26px]">Preguntas frecuentes</h2>
-          <div className="mt-5 flex flex-col gap-2">
-            {page.faq.map((f) => (
-              <details key={f.q} className="group rounded-card border border-hair bg-white px-5 py-4 open:shadow-soft">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[15px] font-semibold text-ink marker:content-none">
-                  {f.q}
-                  <span aria-hidden="true" className="shrink-0 text-navy transition-transform group-open:rotate-180">
-                    <ChevronDown width={18} height={18} />
-                  </span>
-                </summary>
-                <p className="mt-3 text-[14px] leading-relaxed text-slate2">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
+        <FaqAccordion items={page.faq} />
 
         {/* CTA final */}
         <section className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">

@@ -2,11 +2,35 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { CoverageTabs } from "@/components/CoverageTabs";
+import { AvailabilityBadge } from "@/components/AvailabilityBadge";
+import { Testimonials } from "@/components/Testimonials";
+import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
-import {
-  PARTNERS, ECOSYSTEM_MEMBERS,
-  VENTAJAS, OTROS_PRODUCTOS,
-} from "@/lib/brand";
+import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS } from "@/lib/brand";
+import { PRODUCT_PAGES } from "@/lib/productPages";
+
+const STATS = [
+  { value: ECOSYSTEM_MEMBERS, label: "en el ecosistema Ventajon" },
+  { value: String(PARTNERS.length), label: "aseguradoras líderes comparadas" },
+  { value: "0 €", label: "coste de comparar, siempre" },
+  { value: "100 %", label: "online, sin desplazamientos" },
+];
+
+const PRODUCT_BLURBS: Record<string, string> = {
+  salud: "Con o sin copago. Calcula tu precio al instante.",
+  vida: "Protege a los tuyos y tu hipoteca.",
+  decesos: "Tranquilidad para tu familia, sin tabúes.",
+  hogar: "Tu vivienda cubierta al mejor precio.",
+  auto: "A terceros o a todo riesgo, comparado por un experto.",
+};
+
+const FAQ_GENERAL = [
+  { q: "¿Sois una aseguradora?", a: "No. Somos correduría de seguros: comparamos entre varias compañías para encontrar la que mejor se ajusta a ti, no vendemos un único producto." },
+  { q: "¿Cuánto cuesta compararse con vosotros?", a: "Nada. La comparativa y el asesoramiento son 100% gratuitos y sin compromiso de contratación." },
+  { q: "¿Qué seguros comparáis?", a: "Salud, vida, decesos, hogar y auto, entre las principales aseguradoras del país: Mapfre, Adeslas, Asisa, Zurich y Generali." },
+  { q: "¿Cómo me contactáis?", a: "Como prefieras: por teléfono, WhatsApp o completando el formulario online. Tú eliges cuándo y cómo." },
+  { q: "¿En qué zonas trabajáis?", a: "Trabajamos en toda España, con atención especialmente cercana en Canarias y Baleares." },
+];
 
 export default function Home() {
   return (
@@ -19,24 +43,24 @@ export default function Home() {
           <div className="md:grid md:grid-cols-2 md:items-center md:gap-16">
             <div className="md:col-start-1 md:row-start-1">
               <span className="inline-flex items-center rounded-pill bg-brand-red/10 px-3 py-1 text-[12px] font-bold uppercase tracking-wide text-brand-red">
-                Seguro de salud
+                Correduría de seguros
               </span>
               <h1 className="mt-4 text-[34px] font-extrabold leading-[1.05] tracking-tight text-navy md:text-[48px] lg:text-[56px]">
                 Asegurarte bien<br />es de listos
               </h1>
               <p className="mt-3 text-[16px] leading-relaxed text-slate2 md:text-[18px] md:max-w-md">
-                Comparamos tu seguro de salud entre las mejores compañías para que pagues lo justo.
-                Sin trucos, sin letra pequeña.
+                Comparamos tu seguro de salud, vida, decesos, hogar y auto entre las mejores compañías
+                para que pagues lo justo. Sin trucos, sin letra pequeña.
               </p>
             </div>
 
             {/* Imagen de marca (placeholder — sustituir por foto real aprobada) */}
             <div
               role="img"
-              aria-label="Familia bien atendida por su seguro de salud"
+              aria-label="Comparamos tu seguro entre las mejores compañías"
               className="mt-6 grid h-52 place-items-center overflow-hidden rounded-[24px] bg-gradient-to-br from-navy to-navy-deep text-white/90 md:col-start-2 md:row-span-2 md:row-start-1 md:mt-0 md:h-full md:min-h-[420px]"
             >
-              <IconByName name="shield" width={64} height={64} />
+              <IconByName name="compare" width={64} height={64} />
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
@@ -49,13 +73,55 @@ export default function Home() {
                 Te llamamos gratis
               </a>
             </div>
+            <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
+              Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
+            </p>
+            <div className="mt-3 md:col-start-1 md:row-start-4">
+              <AvailabilityBadge />
+            </div>
           </div>
+        </section>
+
+        {/* ESTADÍSTICAS DE CONFIANZA */}
+        <section aria-label="Datos de Asegurados Ventajon" className="mx-auto mt-10 max-w-app px-5 md:mt-16 md:max-w-5xl lg:max-w-6xl">
+          <div className="grid grid-cols-2 gap-3 rounded-[24px] border border-hair bg-white p-5 shadow-soft md:grid-cols-4 md:gap-6 md:p-8">
+            {STATS.map((s) => (
+              <div key={s.label} className="text-center">
+                <p className="font-display text-[26px] font-extrabold tnums text-navy md:text-[32px]">{s.value}</p>
+                <p className="mt-1 text-[12px] leading-snug text-slate2 md:text-[13px]">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ELIGE TU SEGURO (carrusel en mobile, grid en escritorio) */}
+        <section aria-labelledby="elige" className="mt-14 md:mt-24">
+          <div className="mx-auto max-w-app px-5 md:max-w-5xl lg:max-w-6xl">
+            <h2 id="elige" className="text-[24px] font-extrabold text-navy md:text-[30px]">Elige tu seguro</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-slate2 md:text-[16px]">
+              Comparamos entre las mejores compañías para cada producto. Tú eliges por dónde empezar.
+            </p>
+          </div>
+          <ul aria-label="Productos" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-3 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl lg:grid-cols-5">
+            {PRODUCT_PAGES.map((p) => (
+              <li key={p.slug} className="flex w-[230px] shrink-0 snap-start flex-col rounded-card border border-hair bg-white p-5 shadow-soft md:w-auto">
+                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-red/10 text-brand-red">
+                  <IconByName name={p.heroIcon} width={22} height={22} />
+                </span>
+                <p className="mt-4 text-[16px] font-bold text-ink">{p.badge}</p>
+                <p className="mt-1 flex-1 text-[13px] leading-relaxed text-slate2">{PRODUCT_BLURBS[p.slug]}</p>
+                <a href={p.path} className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-navy">
+                  Ver {p.badge.toLowerCase()} <ArrowRight width={14} height={14} />
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* VENTAJAS (carrusel en mobile, grid en escritorio) */}
         <section aria-labelledby="ventajas" className="mt-14 md:mt-24">
           <div className="mx-auto max-w-app px-5 md:max-w-5xl lg:max-w-6xl">
-            <h2 id="ventajas" className="text-[24px] font-extrabold text-navy md:text-[30px]">Las mejores ventajas</h2>
+            <h2 id="ventajas" className="text-[24px] font-extrabold text-navy md:text-[30px]">Por qué elegirnos</h2>
           </div>
           <ul aria-label="Ventajas" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-4 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
             {VENTAJAS.map((v) => (
@@ -70,39 +136,17 @@ export default function Home() {
           </ul>
         </section>
 
-        {/* COBERTURAS */}
+        {/* SEGURO DE SALUD, EN DETALLE (producto estrella: tarificador al instante) */}
         <section aria-labelledby="cob" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
           <div className="md:mx-auto md:max-w-2xl md:text-center">
             <h2 id="cob" className="text-[24px] font-extrabold leading-tight text-navy md:text-[30px]">
-              Tu seguro de salud con las mejores coberturas
+              Nuestro seguro de salud, en detalle
             </h2>
             <p className="mt-2 text-[15px] leading-relaxed text-slate2 md:text-[16px]">
-              Elijas la modalidad que elijas, comparamos por ti entre las mejores compañías.
+              Nuestro producto con más demanda: calcula tu precio real al instante, con o sin copago.
             </p>
           </div>
           <div className="mt-6 md:mx-auto md:max-w-2xl"><CoverageTabs /></div>
-        </section>
-
-        {/* OTROS PRODUCTOS (carrusel en mobile, grid en escritorio) */}
-        <section aria-labelledby="otros" className="mt-14 md:mt-24">
-          <div className="mx-auto max-w-app px-5 md:max-w-5xl lg:max-w-6xl">
-            <h2 id="otros" className="text-[24px] font-extrabold text-navy md:text-[30px]">Otros productos</h2>
-          </div>
-          <ul aria-label="Otros productos" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-4 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
-            {OTROS_PRODUCTOS.map((p) => (
-              <li key={p.producto} className="flex w-[240px] shrink-0 snap-start flex-col rounded-card border border-hair bg-white p-5 shadow-soft md:w-auto">
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-red/10 text-brand-red">
-                  <IconByName name={p.icon} width={22} height={22} />
-                </span>
-                <p className="mt-4 text-[17px] font-bold text-ink">{p.t}</p>
-                <p className="mt-1 flex-1 text-[14px] leading-relaxed text-slate2">{p.d}</p>
-                <a href={p.href}
-                  className="mt-4 flex items-center justify-center gap-1.5 rounded-card bg-brand-red px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
-                  Ver seguro de {p.t.toLowerCase()} <ArrowRight width={17} height={17} />
-                </a>
-              </li>
-            ))}
-          </ul>
         </section>
 
         {/* CONFIANZA + COMPAÑÍAS */}
@@ -129,6 +173,12 @@ export default function Home() {
             </ul>
           </div>
         </section>
+
+        {/* TESTIMONIOS */}
+        <Testimonials />
+
+        {/* FAQ GENERAL */}
+        <FaqAccordion heading="Preguntas frecuentes" items={FAQ_GENERAL} />
 
         {/* CTA final */}
         <section className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
