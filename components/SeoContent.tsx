@@ -72,26 +72,32 @@ const CONTENT = {
 export function SeoContent({ variant }: { variant: "salud" | "vida" }) {
   const c = CONTENT[variant];
   return (
-    <section aria-labelledby="seo-heading" className="mx-auto mt-16 max-w-app px-5 pb-14 md:max-w-2xl">
-      <h2 id="seo-heading" className="text-[20px] font-extrabold leading-tight text-navy">{c.h1}</h2>
-      <p className="mt-3 text-[14px] leading-relaxed text-slate2">{c.intro}</p>
+    <section aria-labelledby="seo-heading" className="mx-auto mt-16 max-w-app px-5 pb-14 md:mt-24 md:max-w-5xl lg:max-w-6xl">
+      <h2 id="seo-heading" className="text-[20px] font-extrabold leading-tight text-navy md:text-[24px]">{c.h1}</h2>
+      <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-slate2">{c.intro}</p>
 
-      {c.sections.map((s) => (
-        <div key={s.h2} className="mt-6">
-          <h3 className="text-[16px] font-bold text-navy">{s.h2}</h3>
-          <p className="mt-2 text-[14px] leading-relaxed text-slate2">{s.p}</p>
+      <div className="mt-6 md:grid md:grid-cols-2 md:gap-x-12">
+        <div>
+          {c.sections.map((s) => (
+            <div key={s.h2} className="mt-6 first:mt-0">
+              <h3 className="text-[16px] font-bold text-navy">{s.h2}</h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-slate2">{s.p}</p>
+            </div>
+          ))}
         </div>
-      ))}
 
-      <h3 className="mt-8 text-[16px] font-bold text-navy">Preguntas frecuentes</h3>
-      <dl className="mt-3 flex flex-col gap-4">
-        {c.faq.map((f) => (
-          <div key={f.q}>
-            <dt className="text-[14px] font-semibold text-ink">{f.q}</dt>
-            <dd className="mt-1 text-[14px] leading-relaxed text-slate2">{f.a}</dd>
-          </div>
-        ))}
-      </dl>
+        <div className="mt-6 md:mt-0">
+          <h3 className="text-[16px] font-bold text-navy">Preguntas frecuentes</h3>
+          <dl className="mt-3 flex flex-col gap-4">
+            {c.faq.map((f) => (
+              <div key={f.q}>
+                <dt className="text-[14px] font-semibold text-ink">{f.q}</dt>
+                <dd className="mt-1 text-[14px] leading-relaxed text-slate2">{f.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
     </section>
   );
 }

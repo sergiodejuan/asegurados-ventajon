@@ -6,15 +6,8 @@ import { AvailabilityBadge } from "@/components/AvailabilityBadge";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
-import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS } from "@/lib/brand";
+import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
-
-const STATS = [
-  { value: ECOSYSTEM_MEMBERS, label: "en el ecosistema Ventajon" },
-  { value: String(PARTNERS.length), label: "aseguradoras líderes comparadas" },
-  { value: "0 €", label: "coste de comparar, siempre" },
-  { value: "100 %", label: "online, sin desplazamientos" },
-];
 
 const PRODUCT_BLURBS: Record<string, string> = {
   salud: "Con o sin copago. Calcula tu precio al instante.",
@@ -85,7 +78,7 @@ export default function Home() {
         {/* ESTADÍSTICAS DE CONFIANZA */}
         <section aria-label="Datos de Asegurados Ventajon" className="mx-auto mt-10 max-w-app px-5 md:mt-16 md:max-w-5xl lg:max-w-6xl">
           <div className="grid grid-cols-2 gap-3 rounded-[24px] border border-hair bg-white p-5 shadow-soft md:grid-cols-4 md:gap-6 md:p-8">
-            {STATS.map((s) => (
+            {TRUST_STATS.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="font-display text-[26px] font-extrabold tnums text-navy md:text-[32px]">{s.value}</p>
                 <p className="mt-1 text-[12px] leading-snug text-slate2 md:text-[13px]">{s.label}</p>

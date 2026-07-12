@@ -7,6 +7,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
+import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
 import { saveQuote } from "@/lib/quote";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -18,7 +19,7 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant }: { variant: "salud" | "vida" }) {
+export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida"; onStepChange?: (idx: number) => void }) {
   const config = variant === "vida" ? VIDA_CONFIG : SALUD_CONFIG;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +33,8 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   const [referrer, setReferrer] = useState("");
   const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const pendingUrlRef = useRef<string | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
   const ddRef = useRef<HTMLInputElement>(null);
@@ -87,6 +90,7 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   const current = activeSteps[idx];
 
   useEffect(() => { topRef.current?.focus(); }, [idx]);
+  useEffect(() => { onStepChange?.(idx); }, [idx, onStepChange]);
 
   const set = (patch: FormData) => setData((d) => ({ ...d, ...patch }));
   const next = () => { setErrors({}); setStepIndex((s) => Math.min(s + 1, total)); };
@@ -163,7 +167,8 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
           consentAt: consentTimes,
         });
         try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
-        router.push(`/comparativa?producto=${variant}`);
+        pendingUrlRef.current = `/comparativa?producto=${variant}`;
+        setFinalizing(true);
         return;
       }
       const body = (await res.json().catch(() => null)) as { errors?: Record<string, string[]> } | null;
@@ -351,6 +356,16 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   }
 
   const progress = (Math.min(idx + 1, total) / total) * 100;
+
+  if (finalizing) {
+    const firstName = String(data.nombre ?? "").trim().split(/\s+/)[0] || undefined;
+    return (
+      <QuoteLoadingOverlay
+        name={firstName}
+        onDone={() => { if (pendingUrlRef.current) router.push(pendingUrlRef.current); }}
+      />
+    );
+  }
 
   if (resumeChecked && resumeData) {
     return (

@@ -30,6 +30,15 @@ export const CALLER_NUMBERS = [
 export const PARTNERS = ["Mapfre", "Adeslas", "Asisa", "Zurich", "Generali"];
 export const ECOSYSTEM_MEMBERS = "350.000 socios";
 
+// Datos de confianza reales (sin inventar cifras): reutilizados en la home y
+// en los bloques de prueba social del tarificador.
+export const TRUST_STATS = [
+  { value: ECOSYSTEM_MEMBERS, label: "en el ecosistema Ventajon" },
+  { value: String(PARTNERS.length), label: "aseguradoras líderes comparadas" },
+  { value: "0 €", label: "coste de comparar, siempre" },
+  { value: "100 %", label: "online, sin desplazamientos" },
+];
+
 // El catálogo de compañías/precios de la comparativa vive en lib/catalog.ts
 // (editable desde /admin/productos), no aquí.
 
