@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
-import { SaveCaller } from "@/components/SaveCaller";
+import { NextSteps } from "@/components/NextSteps";
 import { Check } from "@/components/icons";
-import { BRAND_NAME, CONTACT_HOURS, WHATSAPP_URL } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `Gracias — ${BRAND_NAME}`,
@@ -26,34 +26,7 @@ export default function Gracias() {
           compañías. Sin compromiso.
         </p>
 
-        {/* Números de llamada + guardar contacto (buena práctica anti-spam) */}
-        <SaveCaller />
-
-        <div className="mt-6 rounded-card border border-hair bg-white p-5 shadow-soft">
-          <p className="text-[14px] font-semibold text-ink">¿Qué pasa ahora?</p>
-          <ol className="mt-3 flex flex-col gap-2 text-[14px] text-slate2">
-            <li>1. Preparamos tu comparativa personalizada.</li>
-            <li>2. Te llamamos en horario {CONTACT_HOURS}.</li>
-            <li>3. Si no puedes atender, no te preocupes: lo intentamos otra vez o seguimos por WhatsApp.</li>
-            <li>4. Eliges tranquilo, con un asesor de tu lado.</li>
-          </ol>
-        </div>
-
-        <a
-          href={WHATSAPP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 flex w-full items-center justify-center rounded-card border border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
-        >
-          ¿Prefieres que sigamos por WhatsApp? Escríbenos
-        </a>
-
-        <a
-          href="/"
-          className="mt-4 block text-center text-[14px] font-medium text-slate2 underline"
-        >
-          Volver al inicio
-        </a>
+        <NextSteps />
       </main>
     </>
   );

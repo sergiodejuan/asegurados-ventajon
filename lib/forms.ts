@@ -1,6 +1,6 @@
 import { SERVICIOS_SALUD, SERVICIOS_VIDA } from "./brand";
 
-export type Option = { value: string; label: string };
+export type Option = { value: string; label: string; requiresDate?: boolean };
 
 export type Step =
   | { type: "choice"; key: string; field: string; title: string; helper?: string; options: Option[]; showIf?: (d: FormData) => boolean }
@@ -30,6 +30,7 @@ export const SALUD_CONFIG: FormConfig = {
       options: [
         { value: "cuanto_antes", label: "Cuanto antes" },
         { value: "proximo_mes", label: "El mes que viene" },
+        { value: "fecha_personalizada", label: "Elegir fecha", requiresDate: true },
         { value: "comparando", label: "Aún estoy comparando" },
       ],
     },

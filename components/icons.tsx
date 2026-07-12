@@ -18,6 +18,15 @@ export function ArrowRight(p: SVGProps<SVGSVGElement>) {
 export function ChevronLeft(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><path d="m15 18-6-6 6-6" /></svg>);
 }
+export function ChevronRight(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="m9 18 6-6-6-6" /></svg>);
+}
+export function Close(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>);
+}
+export function CalendarIcon(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><rect x={3} y={4} width={18} height={18} rx={2} /><path d="M16 2v4M8 2v4M3 10h18" /></svg>);
+}
 export function Check(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><path d="M20 6 9 17l-5-5" /></svg>);
 }

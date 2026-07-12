@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
-import { Check, Spinner } from "./icons";
+import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
 
 export function CallRequestForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -20,7 +21,6 @@ export function CallRequestForm() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
   const [referrer, setReferrer] = useState("");
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export function CallRequestForm() {
         body: JSON.stringify(parsed.data),
       });
       if (res.ok) {
-        setDone(true);
+        router.push("/gracias");
         return;
       }
       const body = (await res.json().catch(() => null)) as { errors?: Record<string, string[]> } | null;
@@ -89,21 +89,6 @@ export function CallRequestForm() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (done) {
-    return (
-      <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-navy text-white">
-          <Check width={28} height={28} />
-        </div>
-        <h2 className="mt-5 text-[24px] font-extrabold text-navy">Solicitud recibida</h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-slate2">
-          Un asesor de {BRAND_NAME} te llamará en tu franja horaria de atención para ayudarte a
-          elegir, comparando entre las mejores compañías. Sin compromiso.
-        </p>
-      </div>
-    );
   }
 
   return (

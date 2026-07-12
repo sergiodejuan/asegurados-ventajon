@@ -30,6 +30,29 @@ export const CALLER_NUMBERS = [
 export const PARTNERS = ["Mapfre", "Adeslas", "Asisa", "Zurich", "Generali"];
 export const ECOSYSTEM_MEMBERS = "350.000 socios";
 
+/* ------------------- Comparativa de precios (ILUSTRATIVA) ------------------
+ * ⚠️ IMPORTANTE: precios de EJEMPLO para dar forma a la página de comparativa
+ * mientras no exista una integración real con los tarificadores de cada
+ * compañía. No son precios reales ni una cotización en firme — el precio
+ * final lo confirma un asesor según el perfil de cada cliente.
+ * Sustituir por datos reales (o por una integración) antes de publicar.
+ */
+export const COMPARATIVA_SALUD = [
+  { compania: "Asisa", conCopago: 29, sinCopago: 52 },
+  { compania: "Generali", conCopago: 32, sinCopago: 55 },
+  { compania: "Mapfre", conCopago: 31, sinCopago: 56 },
+  { compania: "Zurich", conCopago: 33, sinCopago: 58 },
+  { compania: "Adeslas", conCopago: 34, sinCopago: 60 },
+];
+
+export const COMPARATIVA_VIDA = [
+  { compania: "Asisa", precio: 8 },
+  { compania: "Generali", precio: 9 },
+  { compania: "Mapfre", precio: 9 },
+  { compania: "Zurich", precio: 10 },
+  { compania: "Adeslas", precio: 11 },
+];
+
 /* -------------------------- Banner de promoción ---------------------------
  * Estilo del reclamo de la referencia (recuadro mint + claim + "ver bases").
  * ⚠️ SIN precios ni % de descuento sin validación de Gabriel. Cuando haya una
@@ -39,7 +62,15 @@ export const PROMO = {
   badge: "Comparativa gratis",
   headline: "Tu seguro de salud, elegido con cabeza",
   sub: "Comparamos entre las mejores compañías para que pagues lo justo.",
-  legalNote: "Sujeto a condiciones.", // enlace "Ver condiciones" → /legal
+  legalNote: "Sujeto a condiciones.",
+  // Contenido del modal "Ver condiciones" (no navega, se abre en la misma página).
+  // ⚠️ Texto provisional: pendiente de redacción/validación legal definitiva.
+  conditions: [
+    "La comparativa y el asesoramiento son gratuitos y sin ningún compromiso de contratación.",
+    "El precio final depende del perfil de cada persona a asegurar (edad, coberturas, código postal…) y de la compañía elegida.",
+    "Somos correduría de seguros: comparamos entre varias compañías, no vendemos un único producto.",
+    "Los datos que nos dejas se usan únicamente para preparar tu comparativa y que un asesor te contacte, conforme a nuestra política de privacidad.",
+  ],
 };
 
 /* ------------------------- Contenido de la landing ------------------------- */

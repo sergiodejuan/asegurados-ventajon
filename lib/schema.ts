@@ -66,7 +66,8 @@ const seguroActual = {
 /* ------------------------- Tarificador de salud --------------------------- */
 
 export const leadSchema = z.object({
-  inicio: z.enum(["cuanto_antes", "proximo_mes", "comparando"]),
+  inicio: z.enum(["cuanto_antes", "proximo_mes", "fecha_personalizada", "comparando"]),
+  fechaInicioPersonalizada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha no válida.").optional(),
   codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,

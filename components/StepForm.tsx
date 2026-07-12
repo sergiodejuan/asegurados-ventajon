@@ -6,6 +6,7 @@ import { normalizePhone } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
+import { DatePicker } from "./DatePicker";
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -101,7 +102,11 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
     setSubmitting(true);
     try {
       const res = await fetch(config.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (res.ok) { router.push("/gracias"); return; }
+      if (res.ok) {
+        const n = variant === "salud" ? Number(data.numAsegurados) || 1 : 1;
+        router.push(`/comparativa?producto=${variant}&n=${n}`);
+        return;
+      }
       const body = (await res.json().catch(() => null)) as { errors?: Record<string, string[]> } | null;
       if (body?.errors) {
         const mapped: FieldErrors = {};
@@ -115,18 +120,39 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   /* ------------------------------- Render ---------------------------------- */
   function renderStep(step: Step) {
     switch (step.type) {
-      case "choice":
+      case "choice": {
+        const selectedOption = step.options.find((o) => o.value === data[step.field]);
+        const showDate = !!selectedOption?.requiresDate;
         return (
           <Shell title={step.title} helper={step.helper}>
             <div className="flex flex-col gap-3">
               {step.options.map((o) => (
-                <OptionCard key={o.value} selected={data[step.field] === o.value} onClick={() => { set({ [step.field]: o.value }); next(); }}>
+                <OptionCard key={o.value} selected={data[step.field] === o.value}
+                  onClick={() => { set({ [step.field]: o.value }); if (!o.requiresDate) next(); }}>
                   {o.label}
                 </OptionCard>
               ))}
             </div>
+            {showDate && (
+              <div className="mt-4 motion-safe:animate-fade-up">
+                <DatePicker
+                  value={data.fechaInicioPersonalizada as string | undefined}
+                  minDate={new Date()}
+                  onChange={(iso) => set({ fechaInicioPersonalizada: iso })}
+                />
+                <button
+                  type="button"
+                  disabled={!data.fechaInicioPersonalizada}
+                  onClick={next}
+                  className="mt-4 flex w-full items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:cursor-not-allowed disabled:bg-slate2/40"
+                >
+                  Continuar
+                </button>
+              </div>
+            )}
           </Shell>
         );
+      }
       case "yesno":
         return (
           <Shell title={step.title} helper={step.helper}>

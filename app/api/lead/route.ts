@@ -22,10 +22,14 @@ export async function POST(request: Request) {
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 
+  const inicio = d.inicio === "fecha_personalizada" && d.fechaInicioPersonalizada
+    ? d.fechaInicioPersonalizada
+    : d.inicio;
+
   const { id, deduped } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, email: d.email, codigoPostal: d.codigoPostal,
-      inicio: d.inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
+      inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
       sexo: d.sexo, coberturaDental: d.coberturaDental, yaTieneSeguro: d.yaTieneSeguro,
       seguroActualImporte: d.seguroActualImporte, seguroActualPeriodo: d.seguroActualPeriodo,
       seguroActualServicios: d.seguroActualServicios, producto: "salud",
