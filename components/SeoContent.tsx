@@ -17,7 +17,7 @@ const CONTENT = {
       },
       {
         h2: `¿Por qué comparar con ${BRAND_NAME}?`,
-        p: `Somos correduría, no agentes de una única aseguradora: estamos de tu lado, no del de la compañía. Comparamos por ti entre las mejores del país, te explicamos en claro lo que cubre cada póliza y lo que no —sin letra pequeña— y te acompañamos con atención personalizada en Canarias y Baleares, en horario ${CONTACT_HOURS}. Formamos parte del ecosistema Ventajon, con ${ECOSYSTEM_MEMBERS}.`,
+        p: `Somos correduría, no agentes de una única aseguradora: estamos de tu lado, no del de la compañía. Comparamos por ti entre las mejores del país, te explicamos en claro lo que cubre cada póliza y lo que no —sin letra pequeña— y te acompañamos en toda España, con atención en horario ${CONTACT_HOURS} y cercanía especial en Canarias y Baleares. Formamos parte del ecosistema Ventajon, con ${ECOSYSTEM_MEMBERS}.`,
       },
     ],
     faq: [
@@ -49,7 +49,7 @@ const CONTENT = {
       },
       {
         h2: `¿Por qué comparar con ${BRAND_NAME}?`,
-        p: `Somos correduría, no agentes de una única aseguradora: comparamos por ti entre las mejores compañías del país y te explicamos en claro lo que cubre cada póliza, sin letra pequeña. Atención personalizada en Canarias y Baleares, en horario ${CONTACT_HOURS}, dentro del ecosistema Ventajon con ${ECOSYSTEM_MEMBERS}.`,
+        p: `Somos correduría, no agentes de una única aseguradora: comparamos por ti entre las mejores compañías del país y te explicamos en claro lo que cubre cada póliza, sin letra pequeña. Trabajamos en toda España, en horario ${CONTACT_HOURS} y con cercanía especial en Canarias y Baleares, dentro del ecosistema Ventajon con ${ECOSYSTEM_MEMBERS}.`,
       },
     ],
     faq: [

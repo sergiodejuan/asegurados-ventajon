@@ -19,12 +19,12 @@ export function Wordmark() {
 }
 
 const NAV_LINKS = [
-  { href: "/#cob", label: "Seguro de salud" },
-  { href: "/#otros", label: "Otros productos" },
-  { href: "/#conf", label: "Por qué nosotros" },
+  { href: "/#otros", label: "Seguros" },
+  { href: "/quienes-somos", label: "Quiénes somos" },
+  { href: "/actualidad", label: "Actualidad" },
 ];
 
-type Crumb = { label: string; href?: string };
+export type Crumb = { label: string; href?: string };
 
 // Migas de pan por ruta. Lo que no está aquí se deriva automáticamente del
 // propio pathname (ver fallbackBreadcrumb).
@@ -37,6 +37,8 @@ const BREADCRUMB_MAP: Record<string, Crumb[]> = {
   "/legal": [{ label: "Información legal" }],
   "/gracias": [{ label: "Gracias" }],
   "/comparativa": [{ label: "Tu comparativa" }],
+  "/quienes-somos": [{ label: "Quiénes somos" }],
+  "/actualidad": [{ label: "Actualidad" }],
 };
 
 function fallbackBreadcrumb(pathname: string): Crumb[] {
@@ -67,10 +69,12 @@ function useScrollProgress(enabled: boolean) {
 
 // showProgress: activa la línea de progreso de lectura en el menú isla
 // (pensada para páginas de contenido largo tipo artículo/blog).
-export function Header({ showProgress = false }: { showProgress?: boolean }) {
+// crumbs: para rutas dinámicas (p.ej. /actualidad/[slug]) que no pueden
+// resolverse por pathname exacto en BREADCRUMB_MAP.
+export function Header({ showProgress = false, crumbs: crumbsOverride }: { showProgress?: boolean; crumbs?: Crumb[] }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const crumbs = !isHome ? (BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
+  const crumbs = !isHome ? (crumbsOverride ?? BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
   const progress = useScrollProgress(showProgress && !isHome);
 
   return (

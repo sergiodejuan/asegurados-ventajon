@@ -46,7 +46,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       { icon: "shield", t: "De tu lado", d: "Somos tu asesor, no el vendedor de la compañía." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras de salud del país." },
       { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos lo que cubre y lo que no, en claro." },
-      { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+      { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
     ],
     coverage: {
       title: "Qué puede incluir tu seguro de salud",
@@ -68,7 +68,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       intro: "Contratar un seguro de salud a ciegas, con el primero que te ofrezcan, suele salir caro. Asegurados Ventajon es una correduría de seguros: comparamos tu perfil entre varias compañías y te ayudamos a elegir la póliza que de verdad se ajusta a lo que necesitas, no la que más comisión deja.",
       sections: [
         { h2: "¿Qué influye en el precio de un seguro de salud?", p: "La edad y el número de personas a asegurar son los factores que más pesan, seguidos de la cobertura elegida (dental incluido o no, cuadro médico, cobertura internacional…). Por eso una comparativa genérica dice poco: lo que importa es tu comparativa, con tus datos." },
-        { h2: "¿Por qué comparar con Asegurados Ventajon?", p: "Somos correduría, no agentes de una única aseguradora: estamos de tu lado, no del de la compañía. Te acompañamos con atención personalizada en Canarias y Baleares, dentro del ecosistema Ventajon." },
+        { h2: "¿Por qué comparar con Asegurados Ventajon?", p: "Somos correduría, no agentes de una única aseguradora: estamos de tu lado, no del de la compañía. Trabajamos en toda España, con cercanía especial en Canarias y Baleares, dentro del ecosistema Ventajon." },
       ],
     },
   },
@@ -87,7 +87,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       { icon: "shield", t: "De tu lado", d: "Comparamos por ti, no vendemos un único producto." },
       { icon: "compare", t: "Precio a tu medida", d: "Tu precio depende de tu edad y tu situación, no de una tarifa genérica." },
       { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos qué cubre cada póliza antes de que decidas." },
-      { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+      { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
     ],
     coverage: {
       title: "Qué puede incluir tu seguro de vida",
@@ -127,7 +127,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       { icon: "shield", t: "De tu lado", d: "Te acompañamos en un tema delicado, sin prisas ni presión." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores compañías de decesos del país." },
       { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos qué cubre cada póliza, con calma y en claro." },
-      { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+      { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
     ],
     coverage: {
       title: "Qué puede incluir tu seguro de decesos",
@@ -167,7 +167,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       { icon: "shield", t: "De tu lado", d: "Comparamos por ti, no vendemos un único producto." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras de hogar del país." },
       { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos qué cubre continente, contenido y responsabilidad civil." },
-      { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+      { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
     ],
     coverage: {
       title: "Qué puede incluir tu seguro de hogar",
@@ -208,7 +208,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
       { icon: "shield", t: "De tu lado", d: "Comparamos por ti, no vendemos un único producto." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras de auto del país." },
       { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos la diferencia entre terceros y todo riesgo." },
-      { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+      { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
     ],
     coverage: {
       title: "Qué puede incluir tu seguro de auto",

@@ -68,7 +68,7 @@ export const VENTAJAS = [
   { icon: "shield", t: "De tu lado", d: "Somos tu asesor, no el vendedor de la compañía." },
   { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras del país." },
   { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos lo que cubre y lo que no, en claro." },
-  { icon: "pin", t: "Cerca de ti", d: "Atención personalizada en Canarias y Baleares." },
+  { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
 ];
 
 export const COBERTURAS = {
