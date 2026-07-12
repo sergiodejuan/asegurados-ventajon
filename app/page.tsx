@@ -1,13 +1,13 @@
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { CoverageTabs } from "@/components/CoverageTabs";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import {
-  BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, CONTACT_HOURS,
+  PARTNERS, ECOSYSTEM_MEMBERS,
   VENTAJAS, OTROS_PRODUCTOS,
 } from "@/lib/brand";
 
 export default function Home() {
-  const year = new Date().getFullYear();
   return (
     <>
       <Header />
@@ -97,7 +97,7 @@ export default function Home() {
                 <p className="mt-1 flex-1 text-[14px] leading-relaxed text-slate2">{p.d}</p>
                 <a href={p.href}
                   className="mt-4 flex items-center justify-center gap-1.5 rounded-card bg-brand-red px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
-                  {p.producto === "vida" ? "Calcula tu precio" : "Que te llamen"} <ArrowRight width={17} height={17} />
+                  Ver seguro de {p.t.toLowerCase()} <ArrowRight width={17} height={17} />
                 </a>
               </li>
             ))}
@@ -146,23 +146,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="safe-bottom mt-14 border-t border-hair bg-white md:mt-24">
-        <div className="mx-auto max-w-app px-5 py-8 md:max-w-5xl md:py-10 lg:max-w-6xl">
-          <div className="md:flex md:items-start md:justify-between md:gap-10">
-            <div>
-              <p className="font-display text-[15px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
-              <p className="mt-2 text-[13px] leading-relaxed text-slate2 md:max-w-sm">Correduría de seguros. Atención {CONTACT_HOURS}.</p>
-              <p className="mt-2 text-[12px] leading-relaxed text-slate2 md:max-w-sm">[Pendiente de validación legal: identificación registral de la correduría y textos obligatorios.]</p>
-            </div>
-            <nav aria-label="Enlaces legales" className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px] md:mt-0 md:shrink-0 md:flex-col md:items-end">
-              <a href="/legal" className="font-medium text-navy underline">Política de privacidad</a>
-              <a href="/legal" className="font-medium text-navy underline">Condiciones de uso</a>
-              <a href="/legal" className="font-medium text-navy underline">Aviso legal</a>
-            </nav>
-          </div>
-          <p className="mt-6 text-[12px] text-slate2">© {year} {BRAND_NAME}</p>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

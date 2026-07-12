@@ -84,10 +84,10 @@ export const COBERTURAS = {
 };
 
 export const OTROS_PRODUCTOS = [
-  { icon: "life", t: "Vida", d: "Protege a los tuyos y tu hipoteca. Comparamos por ti.", producto: "vida", href: "/tarificador-vida" },
-  { icon: "flower", t: "Decesos", d: "Tranquilidad para tu familia, sin tabúes.", producto: "decesos", href: "/quiero-que-me-llamen?producto=decesos" },
-  { icon: "home", t: "Hogar", d: "Tu casa cubierta al mejor precio del mercado.", producto: "hogar", href: "/quiero-que-me-llamen?producto=hogar" },
-  { icon: "car", t: "Auto", d: "El coche protegido, pagando lo justo.", producto: "auto", href: "/quiero-que-me-llamen?producto=auto" },
+  { icon: "life", t: "Vida", d: "Protege a los tuyos y tu hipoteca. Comparamos por ti.", producto: "vida", href: "/seguro-de-vida" },
+  { icon: "flower", t: "Decesos", d: "Tranquilidad para tu familia, sin tabúes.", producto: "decesos", href: "/seguro-de-decesos" },
+  { icon: "home", t: "Hogar", d: "Tu casa cubierta al mejor precio del mercado.", producto: "hogar", href: "/seguro-de-hogar" },
+  { icon: "car", t: "Auto", d: "El coche protegido, pagando lo justo.", producto: "auto", href: "/seguro-de-auto" },
 ];
 
 export const SELLING_POINTS = [

@@ -27,6 +27,16 @@ export function Close(p: SVGProps<SVGSVGElement>) {
 export function CalendarIcon(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><rect x={3} y={4} width={18} height={18} rx={2} /><path d="M16 2v4M8 2v4M3 10h18" /></svg>);
 }
+export function Star(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
+      <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" />
+    </svg>
+  );
+}
+export function ChevronDown(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="m6 9 6 6 6-6" /></svg>);
+}
 export function Check(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><path d="M20 6 9 17l-5-5" /></svg>);
 }
