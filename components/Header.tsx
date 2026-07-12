@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
 import { WhatsApp } from "./icons";
 
@@ -20,10 +24,63 @@ const NAV_LINKS = [
   { href: "/#conf", label: "Por qué nosotros" },
 ];
 
-export function Header() {
+type Crumb = { label: string; href?: string };
+
+// Migas de pan por ruta. Lo que no está aquí se deriva automáticamente del
+// propio pathname (ver fallbackBreadcrumb).
+const BREADCRUMB_MAP: Record<string, Crumb[]> = {
+  "/seguro-de-salud": [{ label: "Seguros", href: "/#otros" }, { label: "Seguro de salud" }],
+  "/seguro-de-vida": [{ label: "Seguros", href: "/#otros" }, { label: "Seguro de vida" }],
+  "/seguro-de-decesos": [{ label: "Seguros", href: "/#otros" }, { label: "Seguro de decesos" }],
+  "/seguro-de-hogar": [{ label: "Seguros", href: "/#otros" }, { label: "Seguro de hogar" }],
+  "/seguro-de-auto": [{ label: "Seguros", href: "/#otros" }, { label: "Seguro de auto" }],
+  "/legal": [{ label: "Información legal" }],
+  "/gracias": [{ label: "Gracias" }],
+  "/comparativa": [{ label: "Tu comparativa" }],
+};
+
+function fallbackBreadcrumb(pathname: string): Crumb[] {
+  const segments = pathname.split("/").filter(Boolean);
+  let acc = "";
+  return segments.map((seg, i) => {
+    acc += `/${seg}`;
+    const label = seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return { label, href: i < segments.length - 1 ? acc : undefined };
+  });
+}
+
+function useScrollProgress(enabled: boolean) {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    function onScroll() {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - doc.clientHeight;
+      setProgress(max > 0 ? Math.min(100, Math.max(0, (doc.scrollTop / max) * 100)) : 0);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [enabled]);
+  return progress;
+}
+
+// showProgress: activa la línea de progreso de lectura en el menú isla
+// (pensada para páginas de contenido largo tipo artículo/blog).
+export function Header({ showProgress = false }: { showProgress?: boolean }) {
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+  const crumbs = !isHome ? (BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
+  const progress = useScrollProgress(showProgress && !isHome);
+
   return (
-    <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-app items-center justify-between px-5 md:max-w-5xl lg:h-16 lg:max-w-6xl">
+    <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md xl:mx-12">
+      {showProgress && !isHome && (
+        <div aria-hidden="true" className="hidden h-[3px] w-full bg-hair lg:block">
+          <div className="h-full bg-brand-red transition-[width] duration-150 ease-out" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      <div className="mx-auto flex h-14 max-w-app items-center justify-between px-5 md:max-w-5xl lg:h-16 lg:max-w-none lg:px-6">
         <a href="/" className="rounded-md" aria-label={`${BRAND_NAME} · Inicio`}>
           <Wordmark />
         </a>
@@ -52,6 +109,22 @@ export function Header() {
           </a>
         </div>
       </div>
+
+      {crumbs && crumbs.length > 0 && (
+        <nav aria-label="Migas de pan" className="hidden border-t border-hair px-6 py-2.5 lg:block">
+          <ol className="flex items-center gap-2 text-[13px] text-slate2">
+            <li><a href="/" className="font-medium transition-colors hover:text-navy">Inicio</a></li>
+            {crumbs.map((c, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span aria-hidden="true">/</span>
+                {c.href
+                  ? <a href={c.href} className="font-medium transition-colors hover:text-navy">{c.label}</a>
+                  : <span aria-current="page" className="font-semibold text-navy">{c.label}</span>}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
     </header>
   );
 }

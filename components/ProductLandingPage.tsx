@@ -15,7 +15,7 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
 
   return (
     <>
-      <Header />
+      <Header showProgress />
       <main id="contenido">
         {/* HERO */}
         <section className="mx-auto max-w-app px-5 pt-8 md:max-w-5xl md:pt-16 lg:max-w-6xl">
