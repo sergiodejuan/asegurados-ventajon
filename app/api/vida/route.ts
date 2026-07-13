@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { vidaSchema } from "@/lib/schema";
-import { upsertLead } from "@/lib/store";
+import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeMotivo } from "@/lib/bland";
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 
-  const { id, deduped } = await upsertLead(
+  const { id, deduped, submissionId } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, email: d.email, codigoPostal: d.codigoPostal,
       motivo: d.motivo, fechaNacimiento: d.fechaNacimiento, sexo: d.sexo, fumador: d.fumador,
@@ -38,6 +38,16 @@ export async function POST(request: Request) {
     "tarificador-vida",
     consent
   );
+
+  await createPresupuesto({
+    id: submissionId, leadId: id, source: "tarificador-vida", producto: "vida",
+    data: {
+      codigoPostal: d.codigoPostal, motivo: d.motivo, fechaNacimiento: d.fechaNacimiento, sexo: d.sexo,
+      fumador: d.fumador, yaTieneSeguro: d.yaTieneSeguro, seguroActualImporte: d.seguroActualImporte,
+      seguroActualPeriodo: d.seguroActualPeriodo, seguroActualServicios: d.seguroActualServicios,
+    },
+    nombre: d.nombre, telefono: d.telefono, email: d.email,
+  }).catch((err) => console.error("[vida] presupuesto error", err));
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {

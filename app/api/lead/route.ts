@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { leadSchema } from "@/lib/schema";
-import { upsertLead } from "@/lib/store";
+import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     ? d.fechaInicioPersonalizada
     : d.inicio;
 
-  const { id, deduped } = await upsertLead(
+  const { id, deduped, submissionId } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, email: d.email, codigoPostal: d.codigoPostal,
       inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
@@ -42,6 +42,17 @@ export async function POST(request: Request) {
     "tarificador-salud",
     consent
   );
+
+  await createPresupuesto({
+    id: submissionId, leadId: id, source: "tarificador-salud", producto: "salud",
+    data: {
+      codigoPostal: d.codigoPostal, inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
+      sexo: d.sexo, coberturaDental: d.coberturaDental, yaTieneSeguro: d.yaTieneSeguro,
+      seguroActualImporte: d.seguroActualImporte, seguroActualPeriodo: d.seguroActualPeriodo,
+      seguroActualServicios: d.seguroActualServicios,
+    },
+    nombre: d.nombre, telefono: d.telefono, email: d.email,
+  }).catch((err) => console.error("[lead] presupuesto error", err));
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {

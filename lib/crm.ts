@@ -96,3 +96,48 @@ export type Lead = {
 export type LeadDraft = Partial<
   Omit<Lead, "id" | "createdAt" | "updatedAt" | "status" | "activity" | "sources" | "consents" | "submissions">
 >;
+
+/* ------------------------------ Presupuestos -------------------------------- */
+// Cada tarificación completada (salud o vida) se guarda además como entidad
+// propia (no solo embebida en el lead), para poder clasificarla, hacerle
+// seguimiento y cerrarla de forma independiente desde /admin/presupuestos.
+
+export const PRESUPUESTO_STATUSES = [
+  "nuevo",
+  "en_seguimiento",
+  "enviado",
+  "negociando",
+  "ganado",
+  "perdido",
+] as const;
+export type PresupuestoStatus = (typeof PRESUPUESTO_STATUSES)[number];
+
+export const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
+  nuevo: "Nuevo",
+  en_seguimiento: "En seguimiento",
+  enviado: "Enviado",
+  negociando: "Negociando",
+  ganado: "Ganado",
+  perdido: "Perdido",
+};
+
+export type PresupuestoNote = { id: string; at: string; texto: string };
+
+export type Presupuesto = {
+  id: string;
+  leadId: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string;
+  source: string; // tarificador-salud | tarificador-vida
+  producto: string; // salud | vida
+  status: PresupuestoStatus;
+  data: Record<string, unknown>; // datos del tarificador (mismo shape que LeadSubmission.data)
+  precioAprox: number | null;
+  notas: PresupuestoNote[];
+  // Contacto denormalizado del lead en el momento de crear el presupuesto,
+  // para poder listar/exportar sin tener que resolver cada lead.
+  nombre: string;
+  telefono: string;
+  email: string;
+};

@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 import { ChevronDown } from "@/components/icons";
 import { quoteNumber } from "@/lib/quote";
+import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/adminFormat";
+import { StatTile, ViewToggle, FilterTab, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 
 type Activity = { at: string; type: string; note: string };
 type ConsentRecord = {
@@ -28,22 +31,6 @@ type Lead = {
   submissions: LeadSubmission[];
 };
 
-const SUBMISSION_FIELD_LABELS: Record<string, string> = {
-  inicio: "Inicio deseado", fechaInicioPersonalizada: "Fecha elegida", codigoPostal: "Código postal",
-  numAsegurados: "Personas a asegurar", coberturaDental: "Cobertura dental", motivo: "Motivo",
-  fumador: "Fumador", fechaNacimiento: "Fecha de nacimiento", sexo: "Sexo", yaTieneSeguro: "Ya tenía seguro",
-  seguroActualImporte: "Pagaba antes", seguroActualPeriodo: "Periodicidad", seguroActualServicios: "Servicios actuales",
-  compania: "Compañía de interés", producto: "Producto",
-  diaLlamada: "Día preferido", turnoLlamada: "Turno preferido",
-};
-
-function formatSubmissionValue(v: unknown): string {
-  if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "Sí" : "No";
-  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
-  return String(v);
-}
-
 const STATUS_COLORS: Record<string, string> = {
   nuevo: "bg-brand-red/10 text-brand-red-deep",
   contactado: "bg-navy/10 text-navy",
@@ -51,11 +38,6 @@ const STATUS_COLORS: Record<string, string> = {
   ganado: "bg-emerald-100 text-emerald-700",
   perdido: "bg-slate-200 text-slate-600",
 };
-
-function fmt(iso: string) {
-  try { return new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso)); }
-  catch { return iso; }
-}
 
 export default function AdminLeadsPage() {
   return (
@@ -96,6 +78,15 @@ function LeadsCrm() {
   }, []);
 
   useEffect(() => { load(token); }, [token, load]);
+
+  // Enlace directo desde la ficha de presupuesto ("vinculación con leads"):
+  // /admin?lead={id} abre esa ficha en cuanto el listado esté cargado.
+  useEffect(() => {
+    if (!loadedOnce) return;
+    const leadParam = new URLSearchParams(window.location.search).get("lead");
+    if (leadParam) openLead(leadParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedOnce]);
 
   async function openLead(id: string) {
     // Se pide la ficha fresca (no la del listado, que puede estar desactualizada
@@ -391,50 +382,6 @@ function LeadsCrm() {
   );
 }
 
-function StatTile({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-card border p-3 text-left transition-colors ${active ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
-    >
-      <p className={`text-[20px] font-extrabold tnums ${active ? "text-white" : "text-navy"}`}>{value}</p>
-      <p className={`truncate text-[11px] font-medium ${active ? "text-white/80" : "text-slate2"}`}>{label}</p>
-    </button>
-  );
-}
-
-function ViewToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className={`rounded-pill px-3 py-1 text-[12px] font-semibold transition-colors ${active ? "bg-navy text-white" : "text-navy hover:bg-mist"}`}>
-      {label}
-    </button>
-  );
-}
-
-function FilterTab({ label, active, onClick, small }: { label: string; active: boolean; onClick: () => void; small?: boolean }) {
-  return (
-    <button role="tab" aria-selected={active} onClick={onClick}
-      className={`rounded-pill capitalize transition-colors ${small ? "px-3 py-1 text-[12px]" : "px-3.5 py-1.5 text-[13px]"} font-semibold ${active ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
-      {label}
-    </button>
-  );
-}
-
-function CollapsiblePanel({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-[24px] border border-hair bg-white shadow-card">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 p-6 text-left">
-        <h2 className="text-[15px] font-bold text-navy">{title}</h2>
-        <span aria-hidden="true" className={`shrink-0 text-navy transition-transform ${open ? "rotate-180" : ""}`}>
-          <ChevronDown width={18} height={18} />
-        </span>
-      </button>
-      {open && <div className="border-t border-hair px-6 pb-6 pt-4">{children}</div>}
-    </div>
-  );
-}
-
 function ActivityPanel({ activity }: { activity: Activity[] }) {
   const entries = activity.filter((a) => a.type !== "note" && a.type !== "contact");
   if (entries.length === 0) return <p className="text-[13px] text-slate2">Sin actividad registrada.</p>;
@@ -562,6 +509,9 @@ function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
                     Precio orientativo según la compañía recomendada del catálogo; no es una cotización en firme.
                   </p>
                 )}
+                <Link href={`/admin/presupuestos/${s.id}`} className="mt-3 inline-block text-[12px] font-semibold text-navy underline">
+                  Ver ficha de presupuesto (estado, notas, cierre) →
+                </Link>
               </div>
             )}
           </li>
@@ -571,17 +521,3 @@ function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
   );
 }
 
-function NoteBox({ onSave }: { onSave: (txt: string) => void }) {
-  const [txt, setTxt] = useState("");
-  return (
-    <div className="mt-2">
-      <textarea value={txt} onChange={(e) => setTxt(e.target.value)} rows={2}
-        placeholder="Escribe una nota de seguimiento…"
-        className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]" />
-      <button onClick={() => { if (txt.trim()) { onSave(txt.trim()); setTxt(""); } }}
-        className="mt-2 rounded-card bg-navy px-4 py-2 text-[14px] font-semibold text-white disabled:bg-slate2/40" disabled={!txt.trim()}>
-        Guardar nota
-      </button>
-    </div>
-  );
-}

@@ -1,0 +1,177 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { quoteNumber } from "@/lib/quote";
+import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue, PRESUPUESTO_STATUS_COLORS } from "@/lib/adminFormat";
+import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
+
+type PresupuestoNote = { id: string; at: string; texto: string };
+type Presupuesto = {
+  id: string; leadId: string; createdAt: string; updatedAt: string; closedAt: string;
+  source: string; producto: string; status: string; data: Record<string, unknown>;
+  precioAprox: number | null; notas: PresupuestoNote[];
+  nombre: string; telefono: string; email: string;
+};
+type LeadSummary = { id: string; nombre: string; telefono: string; email: string; status: string } | null;
+
+export default function AdminPresupuestoDetailPage() {
+  return (
+    <AdminShell active="presupuestos">
+      <PresupuestoDetail />
+    </AdminShell>
+  );
+}
+
+function PresupuestoDetail() {
+  const params = useParams<{ id: string }>();
+  const { token } = useAdminToken();
+  const [presupuesto, setPresupuesto] = useState<Presupuesto | null>(null);
+  const [lead, setLead] = useState<LeadSummary>(null);
+  const [statuses, setStatuses] = useState<string[]>([]);
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const [detailRes, listRes] = await Promise.all([
+        fetch(`/api/admin/presupuestos/${params.id}`, { headers: { "x-admin-token": token } }),
+        fetch("/api/admin/presupuestos", { headers: { "x-admin-token": token } }),
+      ]);
+      const detail = await detailRes.json();
+      const list = await listRes.json();
+      if (!detailRes.ok || !detail.ok) { setError(detail.error ?? "No se pudo cargar el presupuesto."); setLoading(false); return; }
+      setPresupuesto(detail.presupuesto);
+      setLead(detail.lead);
+      if (list.ok) { setStatuses(list.statuses); setStatusLabels(list.statusLabels); }
+    } catch { setError("Error de conexión."); }
+    setLoading(false);
+  }, [params.id, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function patch(payload: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/presupuestos/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-admin-token": token },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json();
+    if (res.ok && body.ok) setPresupuesto(body.presupuesto);
+  }
+
+  if (loading) {
+    return <main className="mx-auto max-w-4xl px-5 py-10 text-center text-[14px] text-slate2">Cargando…</main>;
+  }
+  if (error || !presupuesto) {
+    return (
+      <main className="mx-auto max-w-4xl px-5 py-10 text-center">
+        <p className="font-medium text-brand-red">{error ?? "Presupuesto no encontrado."}</p>
+        <Link href="/admin/presupuestos" className="mt-3 inline-block text-[14px] font-semibold text-navy">← Volver al listado</Link>
+      </main>
+    );
+  }
+
+  const p = presupuesto;
+  const fields = Object.entries(p.data).filter(([k, v]) => SUBMISSION_FIELD_LABELS[k] && v !== "" && v !== null && v !== undefined);
+
+  return (
+    <main className="mx-auto max-w-6xl px-5 py-6">
+      <Link href="/admin/presupuestos" className="text-[14px] font-semibold text-navy">← Volver al listado</Link>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr] lg:items-start">
+        {/* IZQUIERDA (30%): resumen del presupuesto */}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-[19px] font-extrabold leading-tight tnums text-navy">#{quoteNumber(p.id)}</h1>
+              <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${PRESUPUESTO_STATUS_COLORS[p.status] ?? "bg-slate-200"}`}>
+                {statusLabels[p.status] ?? p.status}
+              </span>
+            </div>
+            <p className="mt-1 text-[14px] font-semibold text-ink">Seguro de {p.producto}</p>
+            {p.precioAprox != null && (
+              <p className="mt-1 text-[22px] font-extrabold tnums text-navy">
+                ≈ {p.precioAprox.toFixed(2)} €<span className="text-[14px] font-medium text-slate2">/mes</span>
+              </p>
+            )}
+
+            <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
+              <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Cliente</dt><dd className="text-right font-medium text-ink">{p.nombre || "—"}</dd></div>
+              <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Teléfono</dt><dd className="text-right font-medium tnums text-ink">{p.telefono || "—"}</dd></div>
+              <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Email</dt><dd className="text-right font-medium text-ink">{p.email || "—"}</dd></div>
+              <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Creado</dt><dd className="text-right font-medium text-ink">{fmt(p.createdAt)}</dd></div>
+              <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Actualizado</dt><dd className="text-right font-medium text-ink">{fmt(p.updatedAt)}</dd></div>
+              {p.closedAt && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Cerrado</dt><dd className="text-right font-medium text-ink">{fmt(p.closedAt)}</dd></div>}
+            </dl>
+
+            <div className="mt-5 border-t border-hair pt-4">
+              <p className="text-[12px] font-semibold text-ink">Lead vinculado</p>
+              {lead ? (
+                <Link href={`/admin?lead=${lead.id}`} className="mt-1.5 block text-[13px] font-semibold text-navy underline">
+                  Ver ficha completa del lead →
+                </Link>
+              ) : (
+                <p className="mt-1.5 text-[12px] text-slate2">Sin lead vinculado.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+            <label className="block text-[13px] font-semibold text-ink">Estado</label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {statuses.map((s) => (
+                <button key={s} onClick={() => patch({ status: s })}
+                  className={`rounded-pill px-3 py-1.5 text-[13px] font-semibold transition-colors ${p.status === s ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
+                  {statusLabels[s] ?? s}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[12px] text-slate2">
+              Marcar como <b className="text-ink">Ganado</b> o <b className="text-ink">Perdido</b> cierra el presupuesto y registra la fecha.
+            </p>
+          </div>
+        </div>
+
+        {/* DERECHA (70%): paneles colapsables */}
+        <div className="flex flex-col gap-4">
+          <CollapsiblePanel title="Datos del tarificador">
+            {fields.length > 0 ? (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                {fields.map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="text-slate2">{SUBMISSION_FIELD_LABELS[k] ?? k}</dt>
+                    <dd className="font-medium text-ink">{formatSubmissionValue(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : <p className="text-[13px] text-slate2">Sin detalles adicionales.</p>}
+          </CollapsiblePanel>
+
+          <CollapsiblePanel title={`Notas internas (${p.notas.length})`}>
+            <NoteBox onSave={(txt) => patch({ note: txt })} placeholder="Escribe una nota de seguimiento sobre este presupuesto…" />
+            {p.notas.length === 0 ? (
+              <p className="mt-3 text-[13px] text-slate2">Sin notas todavía.</p>
+            ) : (
+              <ol className="mt-4 flex flex-col gap-3">
+                {p.notas.map((n) => (
+                  <li key={n.id} className="flex gap-3">
+                    <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
+                    <div>
+                      <p className="text-[14px] text-ink">{n.texto}</p>
+                      <p className="text-[12px] text-slate2">{fmt(n.at)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CollapsiblePanel>
+        </div>
+      </div>
+    </main>
+  );
+}

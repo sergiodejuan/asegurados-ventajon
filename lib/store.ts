@@ -1,7 +1,11 @@
 import { normalizePhone } from "./schema";
-import { SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status } from "./crm";
+import {
+  SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status,
+  type Presupuesto, type PresupuestoStatus, type PresupuestoNote,
+} from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
+import { saludPrice, vidaPrice } from "./quote";
 
 function makeSubmissionId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -111,7 +115,7 @@ export async function upsertLead(
   draft: LeadDraft,
   source: string,
   consent?: ConsentRecord
-): Promise<{ id: string; deduped: boolean }> {
+): Promise<{ id: string; deduped: boolean; submissionId: string }> {
   const phone = draft.telefono ? normalizePhone(draft.telefono) : "";
   const email = draft.email ? draft.email.trim().toLowerCase() : "";
   const now = new Date().toISOString();
@@ -143,7 +147,7 @@ export async function upsertLead(
       if (email) await jset(`idx:email:${email}`, id);
       await zadd("leads:index", score, id);
       await zadd(`leads:source:${source}`, score, id);
-      return { id, deduped: true };
+      return { id, deduped: true, submissionId: submission.id };
     }
   }
 
@@ -171,15 +175,17 @@ export async function upsertLead(
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
-    submissions: [{ id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> }],
+    submissions: [],
   };
+  const firstSubmission: LeadSubmission = { id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> };
+  lead.submissions = [firstSubmission];
 
   await jset(`lead:${newId}`, lead);
   if (phone) await jset(`idx:phone:${phone}`, newId);
   if (email) await jset(`idx:email:${email}`, newId);
   await zadd("leads:index", score, newId);
   await zadd(`leads:source:${source}`, score, newId);
-  return { id: newId, deduped: false };
+  return { id: newId, deduped: false, submissionId: firstSubmission.id };
 }
 
 /* ------------------ Área de cliente (sin registro) ------------------------- */
@@ -363,4 +369,94 @@ export async function saveCampaignBanner(patch: Partial<CampaignBanner>): Promis
   const next: CampaignBanner = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(CAMPAIGN_KEY, next);
   return next;
+}
+
+/* ------------------------------ Presupuestos -------------------------------- */
+// Precio orientativo según la compañía recomendada/destacada del catálogo
+// (no es una cotización en firme). Compartido entre la creación del
+// presupuesto (al completar el tarificador) y cualquier recálculo posterior.
+export async function estimatePrecio(producto: string, data: Record<string, unknown>): Promise<number | null> {
+  if (producto !== "salud" && producto !== "vida") return null;
+  const products = await listProducts(producto, true);
+  if (!products.length) return null;
+  const rec = products.find((p) => p.destacado) ?? products[0];
+  if (producto === "salud") {
+    const price = saludPrice(
+      { conCopago: rec.precioConCopago ?? 0, sinCopago: rec.precioSinCopago ?? 0 },
+      { numAsegurados: Number(data.numAsegurados) || 1, coberturaDental: !!data.coberturaDental }
+    );
+    return Math.min(price.conCopago, price.sinCopago);
+  }
+  const price = vidaPrice({ precio: rec.precio ?? 0 }, { fumador: !!data.fumador });
+  return price.precio;
+}
+
+export async function createPresupuesto(input: {
+  id: string;
+  leadId: string;
+  source: string;
+  producto: string;
+  data: Record<string, unknown>;
+  nombre: string;
+  telefono: string;
+  email: string;
+}): Promise<Presupuesto> {
+  const now = new Date().toISOString();
+  const precioAprox = await estimatePrecio(input.producto, input.data);
+  const presupuesto: Presupuesto = {
+    id: input.id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
+    source: input.source, producto: input.producto, status: "nuevo",
+    data: input.data, precioAprox, notas: [],
+    nombre: input.nombre, telefono: input.telefono, email: input.email,
+  };
+  await jset(`presupuesto:${input.id}`, presupuesto);
+  await zadd("presupuestos:index", Date.parse(now), input.id);
+  await zadd(`presupuestos:byLead:${input.leadId}`, Date.parse(now), input.id);
+  return presupuesto;
+}
+
+export async function listPresupuestos(): Promise<Presupuesto[]> {
+  const ids = await zrangeRev("presupuestos:index");
+  const out: Presupuesto[] = [];
+  for (const id of ids) {
+    const p = await jget<Presupuesto>(`presupuesto:${id}`);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+export async function listPresupuestosByLead(leadId: string): Promise<Presupuesto[]> {
+  const ids = await zrangeRev(`presupuestos:byLead:${leadId}`);
+  const out: Presupuesto[] = [];
+  for (const id of ids) {
+    const p = await jget<Presupuesto>(`presupuesto:${id}`);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+export async function getPresupuesto(id: string): Promise<Presupuesto | null> {
+  return jget<Presupuesto>(`presupuesto:${id}`);
+}
+
+export async function updatePresupuesto(
+  id: string,
+  patch: { status?: PresupuestoStatus; note?: string }
+): Promise<Presupuesto | null> {
+  const p = await jget<Presupuesto>(`presupuesto:${id}`);
+  if (!p) return null;
+  const now = new Date().toISOString();
+  if (patch.status && patch.status !== p.status) {
+    p.status = patch.status;
+    p.closedAt = patch.status === "ganado" || patch.status === "perdido" ? now : "";
+  }
+  if (patch.note && patch.note.trim()) {
+    const note: PresupuestoNote = { id: makeSubmissionId(), at: now, texto: patch.note.trim() };
+    p.notas = [note, ...p.notas];
+  }
+  p.updatedAt = now;
+  await jset(`presupuesto:${id}`, p);
+  await zadd("presupuestos:index", Date.parse(now), id);
+  await zadd(`presupuestos:byLead:${p.leadId}`, Date.parse(now), id);
+  return p;
 }

@@ -15,11 +15,12 @@ export function useAdminToken() {
 
 const TABS = [
   { href: "/admin", label: "Leads", key: "leads" },
+  { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos" },
   { href: "/admin/productos", label: "Productos", key: "productos" },
   { href: "/admin/campana", label: "Campaña", key: "campana" },
 ] as const;
 
-export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "productos" | "campana" }) {
+export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "presupuestos" | "productos" | "campana" }) {
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);
@@ -74,28 +75,31 @@ export function AdminShell({ children, active }: { children: React.ReactNode; ac
 
   return (
     <AdminTokenContext.Provider value={{ token, clear }}>
-      <div className="min-h-screen bg-mist">
-        <header className="sticky top-0 z-30 border-b border-hair bg-white">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-3">
-            <p className="shrink-0 font-display text-[15px] font-extrabold text-navy" translate="no">{BRAND_NAME} · Admin</p>
-            <nav className="flex flex-1 gap-2">
-              {TABS.map((t) => (
-                <a
-                  key={t.key} href={t.href}
-                  className={`rounded-pill px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                    active === t.key ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"
-                  }`}
-                >
-                  {t.label}
-                </a>
-              ))}
-            </nav>
-            <button onClick={clear} className="shrink-0 text-[12px] font-medium text-slate2 underline">
+      <div className="flex min-h-screen bg-mist">
+        <aside className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-hair bg-white">
+          <div className="border-b border-hair px-5 py-4">
+            <p className="font-display text-[15px] font-extrabold leading-tight text-navy" translate="no">{BRAND_NAME}</p>
+            <p className="text-[12px] font-medium text-slate2">Admin</p>
+          </div>
+          <nav className="flex flex-1 flex-col gap-1 p-3">
+            {TABS.map((t) => (
+              <a
+                key={t.key} href={t.href}
+                className={`rounded-card px-3.5 py-2.5 text-[14px] font-semibold transition-colors ${
+                  active === t.key ? "bg-navy text-white" : "text-navy hover:bg-mist"
+                }`}
+              >
+                {t.label}
+              </a>
+            ))}
+          </nav>
+          <div className="border-t border-hair p-3">
+            <button onClick={clear} className="w-full rounded-card px-3.5 py-2 text-left text-[13px] font-medium text-slate2 transition-colors hover:bg-mist">
               Salir
             </button>
           </div>
-        </header>
-        {children}
+        </aside>
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
     </AdminTokenContext.Provider>
   );
