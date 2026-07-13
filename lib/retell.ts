@@ -1,4 +1,5 @@
 import { BRAND_NAME } from "./brand";
+import { toE164Spain } from "./phone";
 
 // Integración con Retell AI: cuando un lead completa el tarificador (y ya ha
 // dado autorización de contacto), se dispara una llamada saliente automática
@@ -16,14 +17,6 @@ const CREATE_CALL_URL = "https://api.retellai.com/v2/create-phone-call";
 
 export function retellConfigured(): boolean {
   return !!(process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID && process.env.RETELL_FROM_NUMBER);
-}
-
-// Los teléfonos se guardan normalizados sin prefijo de país (ver lib/schema.ts);
-// Retell exige E.164. Asume España (+34), el único mercado que atiende el sitio.
-export function toE164Spain(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("34") && digits.length > 9) return `+${digits}`;
-  return `+34${digits}`;
 }
 
 export async function triggerOutboundCall(opts: {

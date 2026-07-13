@@ -78,6 +78,25 @@ https://tu-dominio.vercel.app/api/retell/webhook
 Con `RETELL_API_KEY` configurada, el webhook verifica la firma (`x-retell-signature`) antes de
 procesar cualquier evento.
 
+## Llamada automática con Bland.ai
+
+Alternativa a Retell (⚠️ no actives las dos a la vez, o el lead recibe dos llamadas). Si se
+configuran `BLAND_API_KEY` y `BLAND_PATHWAY_ID`, se dispara una llamada saliente del pathway
+configurado en Bland tanto al completar el tarificador (`/api/lead`, `/api/vida`) como al
+solicitar una llamada (`/api/call-request`, incluidas las reprogramaciones desde el área de
+cliente), con nombre, producto, código postal y (si aplica) compañía como `request_data`
+(`{{nombre}}`, `{{producto}}`, `{{codigo_postal}}`, `{{compania}}`, `{{company}}`).
+
+Para el resultado de la llamada, configura en Bland el webhook de post-call hacia:
+
+```
+https://tu-dominio.vercel.app/api/bland/webhook
+```
+
+Si además configuras `BLAND_WEBHOOK_SECRET` (secreto de firma, distinto de la API key — se genera
+en Dev Portal → Account Settings → Keys), el webhook verifica la cabecera `X-Webhook-Signature`
+antes de procesar el evento.
+
 ## Personalización
 
 - **Nombre de marca / WhatsApp / horario / compañías / contenido**: `lib/brand.ts`.

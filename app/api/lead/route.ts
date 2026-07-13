@@ -3,6 +3,7 @@ import { leadSchema } from "@/lib/schema";
 import { upsertLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
+import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,16 @@ export async function POST(request: Request) {
       dynamicVariables: { nombre: d.nombre, producto: "seguro de salud", codigo_postal: d.codigoPostal },
     });
     if (!call.ok) console.error("[lead] retell call error", call.error);
+  }
+
+  if (blandConfigured() && d.autorizaContacto) {
+    const call = await triggerBlandCall({
+      toNumber: d.telefono,
+      leadId: id,
+      source: "tarificador-salud",
+      requestData: { nombre: d.nombre, producto: "seguro de salud", codigo_postal: d.codigoPostal },
+    });
+    if (!call.ok) console.error("[lead] bland call error", call.error);
   }
 
   return NextResponse.json({ ok: true, id, deduped });

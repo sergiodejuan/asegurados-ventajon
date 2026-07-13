@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { callRequestSchema } from "@/lib/schema";
 import { upsertLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
+import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,22 @@ export async function POST(request: Request) {
     try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source: "quiero-que-me-llamen", ...d }) }); }
     catch (err) { console.error("[call-request] webhook error", err); }
   }
+
+  if (blandConfigured() && d.autorizaContacto) {
+    const call = await triggerBlandCall({
+      toNumber: d.telefono,
+      leadId: id,
+      source: "quiero-que-me-llamen",
+      requestData: {
+        nombre: d.nombre ?? "",
+        producto: d.producto ?? "salud",
+        codigo_postal: d.codigoPostal,
+        ...(d.compania ? { compania: d.compania } : {}),
+      },
+    });
+    if (!call.ok) console.error("[call-request] bland call error", call.error);
+  }
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 
