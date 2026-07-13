@@ -5,7 +5,7 @@ import {
   type Task, type TaskDraft,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
-import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
+import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { saludPrice, vidaPrice } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -424,18 +424,19 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return true;
 }
 
-/* ---------------------------- Banner de campaña ---------------------------- */
+/* ------------------------ Banners de campaña (slider) ----------------------- */
 
 const CAMPAIGN_KEY = "campaign:home";
 
-export async function getCampaignBanner(): Promise<CampaignBanner> {
-  const stored = await jget<CampaignBanner>(CAMPAIGN_KEY);
-  return stored ?? DEFAULT_CAMPAIGN_BANNER;
+export async function getCampaignConfig(): Promise<CampaignConfig> {
+  const stored = await jget<CampaignConfig>(CAMPAIGN_KEY);
+  if (!stored || !Array.isArray(stored.slides)) return DEFAULT_CAMPAIGN_CONFIG;
+  return { ...DEFAULT_CAMPAIGN_CONFIG, ...stored };
 }
 
-export async function saveCampaignBanner(patch: Partial<CampaignBanner>): Promise<CampaignBanner> {
-  const current = await getCampaignBanner();
-  const next: CampaignBanner = { ...current, ...patch, updatedAt: new Date().toISOString() };
+export async function saveCampaignConfig(patch: Partial<CampaignConfig>): Promise<CampaignConfig> {
+  const current = await getCampaignConfig();
+  const next: CampaignConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(CAMPAIGN_KEY, next);
   return next;
 }

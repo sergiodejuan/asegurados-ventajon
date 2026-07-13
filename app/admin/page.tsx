@@ -152,7 +152,7 @@ function LeadsCrm() {
       if (filterProducto !== "all" && l.producto !== filterProducto) return false;
       if (filterStatus !== "all" && l.status !== filterStatus) return false;
       if (q) {
-        const hay = `${l.nombre} ${l.telefono} ${l.email} ${l.codigoPostal}`.toLowerCase();
+        const hay = `${l.nombre} ${l.telefono} ${l.email} ${l.codigoPostal} ${l.utm?.campaign ?? ""} ${l.utm?.source ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -344,7 +344,7 @@ function LeadsCrm() {
       <div className="mt-5 flex flex-col gap-3">
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, teléfono, email o código postal…"
+          placeholder="Buscar por nombre, teléfono, email, código postal o campaña…"
           className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]"
         />
         <div role="tablist" aria-label="Filtrar por fuente" className="flex flex-wrap gap-2">
