@@ -5,7 +5,9 @@ import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName } from "@/components/icons";
+import { CompanyLogo } from "@/components/Comparativa";
 import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
+import { getTheme } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: `Quiénes somos — ${BRAND_NAME}`,
@@ -31,7 +33,8 @@ const FAQ_QUIENES_SOMOS = [
   { q: "¿Con qué aseguradoras trabajáis?", a: "Con las principales compañías del país: Mapfre, Adeslas, Asisa, Zurich y Generali, entre otras. Seguimos ampliando acuerdos para ofrecerte siempre más opciones donde comparar." },
 ];
 
-export default function QuienesSomos() {
+export default async function QuienesSomos() {
+  const theme = await getTheme();
   return (
     <>
       <Header />
@@ -143,7 +146,10 @@ export default function QuienesSomos() {
           </p>
           <ul className="mt-5 flex flex-wrap gap-3" translate="no">
             {PARTNERS.map((p) => (
-              <li key={p} className="rounded-pill border border-hair bg-white px-5 py-2.5 text-[15px] font-bold text-navy shadow-soft">{p}</li>
+              <li key={p} className="flex items-center gap-2 rounded-pill border border-hair bg-white px-5 py-2.5 text-[15px] font-bold text-navy shadow-soft">
+                <CompanyLogo logoUrl={theme.partnerLogos[p]} compania={p} />
+                {p}
+              </li>
             ))}
           </ul>
         </section>

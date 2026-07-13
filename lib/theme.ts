@@ -1,8 +1,11 @@
-// Apariencia del sitio (colores, tipografías, logos, favicon, fotos de hero)
-// editable desde /admin/diseno. Los colores/tipografías se aplican vía
-// variables CSS (ver tailwind.config.ts + app/layout.tsx), así que todas las
-// clases existentes (bg-navy, text-brand-red…) siguen funcionando igual y se
-// vuelven editables sin tocar componentes.
+// Apariencia del sitio (colores, tipografías, logos, favicon, fotos de hero,
+// logos de aseguradoras aliadas, módulo de cookies) editable desde
+// /admin/diseno. Los colores/tipografías se aplican vía variables CSS (ver
+// tailwind.config.ts + app/layout.tsx), así que todas las clases existentes
+// (bg-navy, text-brand-red…) siguen funcionando igual y se vuelven editables
+// sin tocar componentes.
+
+import { BRAND_NAME } from "./brand";
 
 export type SiteColors = {
   navy: string;
@@ -74,6 +77,51 @@ export const HERO_PAGE_KEYS: { key: string; label: string }[] = [
   { key: "auto", label: "Seguro de auto" },
 ];
 
+export type CookieConsentConfig = {
+  enabled: boolean;
+  heading: string;
+  body: string;
+  acceptLabel: string;
+  rejectLabel: string;
+  configureLabel: string;
+  savePreferencesLabel: string;
+  necessaryLabel: string;
+  necessaryDesc: string;
+  analyticsLabel: string;
+  analyticsDesc: string;
+  marketingLabel: string;
+  marketingDesc: string;
+  privacyLinkLabel: string;
+  privacyHref: string;
+  cookiesLinkLabel: string;
+  cookiesHref: string;
+};
+
+export const DEFAULT_COOKIE_CONSENT: CookieConsentConfig = {
+  enabled: true,
+  heading: "Aviso de cookies",
+  body:
+    `${BRAND_NAME} utiliza cookies propias y de terceros para realizar análisis estadísticos, ` +
+    `mantener tu sesión y mejorar tu experiencia mediante el análisis de tus hábitos de navegación. ` +
+    `Puedes configurar estas cookies, pudiendo en tal caso limitarse la navegación y servicios del ` +
+    `sitio web. Si aceptas las cookies estás consintiendo su utilización en este sitio web. Puedes ` +
+    `aceptar todas las cookies pulsando el botón "Aceptar", configurar o rechazar su uso.`,
+  acceptLabel: "Aceptar",
+  rejectLabel: "Rechazar",
+  configureLabel: "Configurar cookies",
+  savePreferencesLabel: "Guardar preferencias",
+  necessaryLabel: "Necesarias",
+  necessaryDesc: "Imprescindibles para que el sitio funcione (navegación, formularios). Siempre activas.",
+  analyticsLabel: "Analíticas",
+  analyticsDesc: "Nos ayudan a entender cómo se usa el sitio para mejorarlo.",
+  marketingLabel: "Marketing",
+  marketingDesc: "Para mostrarte contenido y ofertas relevantes.",
+  privacyLinkLabel: "Política de Privacidad",
+  privacyHref: "/legal",
+  cookiesLinkLabel: "Política de Cookies",
+  cookiesHref: "/legal",
+};
+
 export type SiteTheme = {
   colors: SiteColors;
   displayFont: string;
@@ -82,6 +130,8 @@ export type SiteTheme = {
   minimalLogoUrl: string; // logo de páginas sin salida (vacío = usa logoUrl, si no, texto)
   faviconUrl: string; // vacío = favicon.ico por defecto
   heroImages: Record<string, string>; // pageKey -> imagen (data URL)
+  partnerLogos: Record<string, string>; // nombre de aseguradora (lib/brand.ts PARTNERS) -> logo (data URL)
+  cookieConsent: CookieConsentConfig;
   updatedAt: string;
 };
 
@@ -93,5 +143,7 @@ export const DEFAULT_THEME: SiteTheme = {
   minimalLogoUrl: "",
   faviconUrl: "",
   heroImages: {},
+  partnerLogos: {},
+  cookieConsent: DEFAULT_COOKIE_CONSENT,
   updatedAt: new Date(0).toISOString(),
 };

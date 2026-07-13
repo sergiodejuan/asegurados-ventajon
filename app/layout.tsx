@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { BRAND_NAME } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -91,6 +92,7 @@ export default async function RootLayout({
           Saltar al contenido
         </a>
         {children}
+        <CookieConsentBanner />
       </body>
     </html>
   );

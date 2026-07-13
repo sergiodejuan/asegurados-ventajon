@@ -42,6 +42,16 @@ export async function PATCH(request: Request) {
       }
     }
   }
+  if (body.partnerLogos) {
+    for (const [key, val] of Object.entries(body.partnerLogos)) {
+      if (typeof val === "string" && val.length > MAX_LOGO_LENGTH) {
+        return NextResponse.json({ ok: false, error: `El logo de "${key}" es demasiado grande.` }, { status: 413 });
+      }
+    }
+  }
+  if (body.cookieConsent?.body && body.cookieConsent.body.length > 5000) {
+    return NextResponse.json({ ok: false, error: "El texto de cookies es demasiado largo." }, { status: 413 });
+  }
 
   const theme = await saveTheme(body);
   return NextResponse.json({ ok: true, theme });

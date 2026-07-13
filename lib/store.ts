@@ -452,6 +452,8 @@ export async function getTheme(): Promise<SiteTheme> {
     ...stored,
     colors: { ...DEFAULT_THEME.colors, ...(stored.colors ?? {}) },
     heroImages: { ...(stored.heroImages ?? {}) },
+    partnerLogos: { ...(stored.partnerLogos ?? {}) },
+    cookieConsent: { ...DEFAULT_THEME.cookieConsent, ...(stored.cookieConsent ?? {}) },
   };
 }
 
@@ -462,6 +464,8 @@ export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
     ...patch,
     colors: { ...current.colors, ...(patch.colors ?? {}) },
     heroImages: { ...current.heroImages, ...(patch.heroImages ?? {}) },
+    partnerLogos: { ...current.partnerLogos, ...(patch.partnerLogos ?? {}) },
+    cookieConsent: { ...current.cookieConsent, ...(patch.cookieConsent ?? {}) },
     updatedAt: new Date().toISOString(),
   };
   await jset(THEME_KEY, next);
