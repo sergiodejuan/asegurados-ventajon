@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WhatsApp, Close } from "./icons";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 
 const SHOW_DELAY_MS = 3000;
 
@@ -40,6 +41,7 @@ export function WhatsAppHelpWidget({ message, waHref }: { message: string; waHre
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "widget_ayuda" })}
             className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#1a9c4c]"
           >
             Escríbenos por WhatsApp

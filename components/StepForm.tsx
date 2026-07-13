@@ -1,7 +1,7 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
@@ -10,6 +10,8 @@ import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
 import { saveQuote } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
+import { getAttribution } from "@/lib/attribution";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -23,7 +25,6 @@ function progressKey(variant: string) {
 export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida"; onStepChange?: (idx: number) => void }) {
   const config = variant === "vida" ? VIDA_CONFIG : SALUD_CONFIG;
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [data, setData] = useState<FormData>({ seguroActualPeriodo: "mes", seguroActualServicios: [] });
   const [stepIndex, setStepIndex] = useState(0);
@@ -31,7 +32,6 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
-  const [referrer, setReferrer] = useState("");
   const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -41,8 +41,6 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
   const ddRef = useRef<HTMLInputElement>(null);
   const mmRef = useRef<HTMLInputElement>(null);
   const aaaaRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (typeof document !== "undefined") setReferrer(document.referrer || ""); }, []);
 
   // Recuperación de abandono: si hay un cálculo a medias en esta sesión, se
   // ofrece continuar en vez de perderlo. No se toca `data`/`stepIndex` hasta
@@ -76,14 +74,6 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
     try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
     setResumeData(null);
   }
-
-  const utm = useMemo(() => ({
-    source: searchParams.get("utm_source") ?? undefined,
-    medium: searchParams.get("utm_medium") ?? undefined,
-    campaign: searchParams.get("utm_campaign") ?? undefined,
-    content: searchParams.get("utm_content") ?? undefined,
-    term: searchParams.get("utm_term") ?? undefined,
-  }), [searchParams]);
 
   const activeSteps = config.steps.filter((s) => !s.showIf || s.showIf(data));
   const total = activeSteps.length;
@@ -142,7 +132,7 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
       seguroActualServicios: (data.seguroActualServicios as string[]) ?? [],
       company: "",
       consent: consentTimes,
-      utm: { ...utm, referrer },
+      utm: getAttribution(),
     };
 
     setSubmitting(true);
@@ -171,6 +161,7 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
         addClientQuote(quoteProfile);
         saveClientProfile({ nombre: quoteProfile.nombre, telefono: quoteProfile.telefono, email: quoteProfile.email });
         try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
+        pushDataLayerEvent("generate_lead", { producto: variant, form: "tarificador" });
         pendingUrlRef.current = `/comparativa?producto=${variant}`;
         setFinalizing(true);
         return;

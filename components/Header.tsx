@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { WhatsApp } from "./icons";
 
 export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
@@ -107,6 +108,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "header" })}
             className="inline-flex items-center gap-1.5 rounded-pill border border-hair px-3 py-1.5 text-[13px] font-semibold text-navy transition-colors hover:border-navy/30 hover:bg-mist"
           >
             <WhatsApp className="text-[#25D366]" />

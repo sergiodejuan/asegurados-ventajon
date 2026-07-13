@@ -8,6 +8,7 @@ import { Wordmark } from "./Header";
 type Decision = { necesarias: true; analiticas: boolean; marketing: boolean; decidedAt: string };
 
 const STORAGE_KEY = "ventajon:cookieConsent";
+export const CONSENT_CHANGED_EVENT = "ventajon:consent-changed";
 
 function loadDecision(): Decision | null {
   try {
@@ -19,7 +20,12 @@ function loadDecision(): Decision | null {
 }
 
 function saveDecision(d: Decision) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch { /* localStorage no disponible */ }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    // Notifica en caliente (sin recarga) a quien dependa del consentimiento,
+    // como el cargador de Google Tag Manager.
+    window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
+  } catch { /* localStorage no disponible */ }
 }
 
 export function CookieConsentBanner() {

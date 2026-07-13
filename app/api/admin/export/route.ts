@@ -50,6 +50,9 @@ const COLUMNS: { key: string; get: (l: Lead) => unknown }[] = [
   { key: "utm_source", get: (l) => l.utm?.source ?? "" },
   { key: "utm_medium", get: (l) => l.utm?.medium ?? "" },
   { key: "utm_campaign", get: (l) => l.utm?.campaign ?? "" },
+  { key: "utm_content", get: (l) => l.utm?.content ?? "" },
+  { key: "utm_term", get: (l) => l.utm?.term ?? "" },
+  { key: "landing_page", get: (l) => l.utm?.landingPage ?? "" },
   { key: "referrer", get: (l) => l.utm?.referrer ?? "" },
 ];
 

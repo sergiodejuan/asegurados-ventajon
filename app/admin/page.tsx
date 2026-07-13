@@ -152,7 +152,7 @@ function LeadsCrm() {
       if (filterProducto !== "all" && l.producto !== filterProducto) return false;
       if (filterStatus !== "all" && l.status !== filterStatus) return false;
       if (q) {
-        const hay = `${l.nombre} ${l.telefono} ${l.email} ${l.codigoPostal} ${l.utm?.campaign ?? ""} ${l.utm?.source ?? ""}`.toLowerCase();
+        const hay = `${l.nombre} ${l.telefono} ${l.email} ${l.codigoPostal} ${l.utm?.campaign ?? ""} ${l.utm?.source ?? ""} ${l.utm?.medium ?? ""} ${l.utm?.landingPage ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -213,9 +213,22 @@ function LeadsCrm() {
                 {l.turnoLlamada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Turno preferido</dt><dd className="text-right font-medium text-ink">{l.turnoLlamada}</dd></div>}
                 {l.presupuestoId && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Último presupuesto</dt><dd className="text-right font-medium tnums text-ink">#{quoteNumber(l.presupuestoId)}</dd></div>}
                 {(l.seguroActualServicios?.length ?? 0) > 0 && <div><dt className="text-slate2">Servicios actuales</dt><dd className="mt-0.5 font-medium text-ink">{l.seguroActualServicios.join(", ")}</dd></div>}
-                {l.utm?.source && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_source</dt><dd className="text-right font-medium text-ink">{l.utm.source}</dd></div>}
-                {l.utm?.campaign && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_campaign</dt><dd className="text-right font-medium text-ink">{l.utm.campaign}</dd></div>}
               </dl>
+
+              {(l.utm?.source || l.utm?.medium || l.utm?.campaign || l.utm?.content || l.utm?.term || l.utm?.landingPage || l.utm?.referrer) && (
+                <div className="mt-5 border-t border-hair pt-4">
+                  <p className="text-[12px] font-semibold text-ink">Origen (UTM)</p>
+                  <dl className="mt-1.5 flex flex-col gap-1.5 text-[12px]">
+                    {l.utm?.landingPage && <div className="flex items-baseline justify-between gap-3"><dt className="shrink-0 text-slate2">Página de aterrizaje</dt><dd className="truncate text-right font-medium text-ink" title={l.utm.landingPage}>{l.utm.landingPage}</dd></div>}
+                    {l.utm?.source && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_source</dt><dd className="text-right font-medium text-ink">{l.utm.source}</dd></div>}
+                    {l.utm?.medium && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_medium</dt><dd className="text-right font-medium text-ink">{l.utm.medium}</dd></div>}
+                    {l.utm?.campaign && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_campaign</dt><dd className="text-right font-medium text-ink">{l.utm.campaign}</dd></div>}
+                    {l.utm?.content && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_content</dt><dd className="text-right font-medium text-ink">{l.utm.content}</dd></div>}
+                    {l.utm?.term && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_term</dt><dd className="text-right font-medium text-ink">{l.utm.term}</dd></div>}
+                    {l.utm?.referrer && <div className="flex items-baseline justify-between gap-3"><dt className="shrink-0 text-slate2">Referrer</dt><dd className="truncate text-right font-medium text-ink" title={l.utm.referrer}>{l.utm.referrer}</dd></div>}
+                  </dl>
+                </div>
+              )}
 
               <div className="mt-5 border-t border-hair pt-4">
                 <p className="text-[12px] font-semibold text-ink">Último consentimiento</p>

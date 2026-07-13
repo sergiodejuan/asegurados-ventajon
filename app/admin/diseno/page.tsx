@@ -308,6 +308,33 @@ function DisenoAdmin() {
               </div>
             </details>
           </section>
+
+          {/* Analítica */}
+          <section className="rounded-[20px] border border-hair bg-white p-5">
+            <h2 className="text-[15px] font-bold text-navy">Analítica (Google Tag Manager)</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+              Pega aquí el ID de tu contenedor de Google Tag Manager (formato GTM-XXXXXXX) para conectar
+              GA4 u otras etiquetas. Solo se carga para visitantes que hayan aceptado cookies analíticas
+              o de marketing en el aviso de cookies.
+            </p>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[13px] font-semibold text-ink">ID de contenedor GTM</span>
+              <input
+                value={theme.gtmId}
+                onChange={(e) => setTheme((t) => ({ ...t, gtmId: e.target.value.trim() }))}
+                placeholder="GTM-XXXXXXX"
+                className="w-full max-w-xs rounded-card border border-hair bg-white px-4 py-3 text-[14px] tnums"
+              />
+            </label>
+            <p className="mt-3 text-[12px] leading-relaxed text-slate2">
+              El sitio ya envía eventos a <code className="rounded bg-mist px-1 py-0.5">dataLayer</code> listos para
+              configurar en GTM/GA4: <code className="rounded bg-mist px-1 py-0.5">page_view</code> (navegación),{" "}
+              <code className="rounded bg-mist px-1 py-0.5">generate_lead</code> (tarificador y &ldquo;quiero que me
+              llamen&rdquo;) y <code className="rounded bg-mist px-1 py-0.5">whatsapp_click</code>. El{" "}
+              <a href="/admin/utm" className="font-semibold text-navy underline">dashboard de UTM</a> del panel
+              muestra la atribución interna (origen, campaña, página de aterrizaje) de cada lead.
+            </p>
+          </section>
         </div>
       )}
 

@@ -19,6 +19,7 @@ const utmField = z
     content: z.string().optional(),
     term: z.string().optional(),
     referrer: z.string().optional(),
+    landingPage: z.string().optional(),
   })
   .partial()
   .optional();

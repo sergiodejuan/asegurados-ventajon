@@ -133,6 +133,7 @@ export type SiteTheme = {
   heroImages: Record<string, string>; // pageKey -> imagen (data URL)
   partnerLogos: Record<string, string>; // nombre de aseguradora (lib/brand.ts PARTNERS) -> logo (data URL)
   cookieConsent: CookieConsentConfig;
+  gtmId: string; // ID de contenedor de Google Tag Manager (GTM-XXXXXXX); vacío = no se carga
   updatedAt: string;
 };
 
@@ -146,5 +147,6 @@ export const DEFAULT_THEME: SiteTheme = {
   heroImages: {},
   partnerLogos: {},
   cookieConsent: DEFAULT_COOKIE_CONSENT,
+  gtmId: "",
   updatedAt: new Date(0).toISOString(),
 };

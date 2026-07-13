@@ -52,6 +52,9 @@ export async function PATCH(request: Request) {
   if (body.cookieConsent?.body && body.cookieConsent.body.length > 5000) {
     return NextResponse.json({ ok: false, error: "El texto de cookies es demasiado largo." }, { status: 413 });
   }
+  if (typeof body.gtmId === "string" && body.gtmId.length > 30) {
+    return NextResponse.json({ ok: false, error: "El ID de Google Tag Manager no es válido." }, { status: 413 });
+  }
 
   const theme = await saveTheme(body);
   return NextResponse.json({ ok: true, theme });

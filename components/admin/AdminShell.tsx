@@ -19,6 +19,7 @@ const TABS = [
   { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos" },
   { href: "/admin/tareas", label: "Tareas", key: "tareas" },
   { href: "/admin/informes", label: "Informes", key: "informes" },
+  { href: "/admin/utm", label: "UTM", key: "utm" },
   { href: "/admin/productos", label: "Productos", key: "productos" },
   { href: "/admin/campana", label: "Campaña", key: "campana" },
   { href: "/admin/diseno", label: "Diseño", key: "diseno" },
@@ -27,7 +28,7 @@ const TABS = [
 
 export function AdminShell({
   children, active,
-}: { children: React.ReactNode; active: "leads" | "presupuestos" | "tareas" | "informes" | "productos" | "campana" | "diseno" | "rgpd" }) {
+}: { children: React.ReactNode; active: "leads" | "presupuestos" | "tareas" | "informes" | "utm" | "productos" | "campana" | "diseno" | "rgpd" }) {
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);

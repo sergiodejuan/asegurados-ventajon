@@ -4,6 +4,8 @@ import { BRAND_NAME } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
+import { GoogleTagManager } from "@/components/GoogleTagManager";
+import { Analytics } from "@/components/Analytics";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -85,6 +87,7 @@ export default async function RootLayout({
         </head>
       )}
       <body>
+        <GoogleTagManager gtmId={theme.gtmId} />
         <a
           href="#contenido"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-navy focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
@@ -92,6 +95,7 @@ export default async function RootLayout({
           Saltar al contenido
         </a>
         {children}
+        <Analytics />
         <CookieConsentBanner />
       </body>
     </html>

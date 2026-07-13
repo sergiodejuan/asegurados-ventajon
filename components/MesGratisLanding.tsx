@@ -7,6 +7,11 @@ import { Header } from "./Header";
 import { Modal } from "./Modal";
 import { Check, IconByName, WhatsApp } from "./icons";
 import { useSiteTheme } from "@/lib/useTheme";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
+
+function trackCta(placement: string) {
+  pushDataLayerEvent("select_promotion", { promotion_name: "mes-gratis-salud", placement });
+}
 
 const PARTNERS_TEXT = new Intl.ListFormat("es-ES", { style: "long", type: "conjunction" }).format(PARTNERS);
 
@@ -85,7 +90,7 @@ export function MesGratisLanding() {
           </p>
 
           <div className="motion-safe:animate-fade-up mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <a href={CTA_HREF}
+            <a href={CTA_HREF} onClick={() => trackCta("hero")}
               className="flex w-full items-center justify-center rounded-card bg-white px-8 py-4 text-[17px] font-extrabold text-navy shadow-card transition-transform hover:scale-[1.02] sm:w-auto">
               Quiero mi mes gratis →
             </a>
@@ -136,7 +141,7 @@ export function MesGratisLanding() {
             ))}
           </div>
           <div className="mt-10 text-center">
-            <a href={CTA_HREF}
+            <a href={CTA_HREF} onClick={() => trackCta("como_funciona")}
               className="inline-flex items-center justify-center rounded-card bg-brand-red px-8 py-4 text-[16px] font-bold text-white shadow-card transition-colors hover:bg-brand-red-deep">
               Empezar ahora →
             </a>
@@ -217,7 +222,7 @@ export function MesGratisLanding() {
             ))}
           </div>
           <div className="mt-8 flex flex-col items-center gap-3">
-            <a href={CTA_HREF}
+            <a href={CTA_HREF} onClick={() => trackCta("faq")}
               className="flex w-full items-center justify-center rounded-card bg-white px-8 py-4 text-[16px] font-extrabold text-navy shadow-card sm:w-auto">
               Quiero mi mes gratis →
             </a>
@@ -231,10 +236,11 @@ export function MesGratisLanding() {
       {/* Barra fija móvil */}
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur lg:hidden">
         <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+          onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "mes_gratis_sticky" })}
           className="grid h-12 w-12 shrink-0 place-items-center rounded-card border border-white/15 text-[#25D366]">
           <WhatsApp width={20} height={20} />
         </a>
-        <a href={CTA_HREF} className="flex-1 rounded-card bg-brand-red px-4 py-3 text-center text-[14px] font-bold text-white">
+        <a href={CTA_HREF} onClick={() => trackCta("sticky_mobile")} className="flex-1 rounded-card bg-brand-red px-4 py-3 text-center text-[14px] font-bold text-white">
           Quiero mi mes gratis
         </a>
       </div>

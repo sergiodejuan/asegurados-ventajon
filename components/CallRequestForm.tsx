@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { loadQuote, saveCallResult, type QuoteProfile } from "@/lib/quote";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
+import { getAttribution } from "@/lib/attribution";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -40,12 +42,10 @@ export function CallRequestForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [referrer, setReferrer] = useState("");
 
   const hasProductoParam = searchParams.has("producto");
 
   useEffect(() => {
-    if (typeof document !== "undefined") setReferrer(document.referrer || "");
     const q = loadQuote();
     setQuote(q);
     setQuoteChecked(true);
@@ -61,16 +61,6 @@ export function CallRequestForm({
   const precioElegidoParam = searchParams.get("precio");
   const precioElegido = precioProp ?? (precioElegidoParam ? Number(precioElegidoParam) : undefined);
   const headingText = clientFirstName ? `${clientFirstName}, te llamamos gratis` : "Te llamamos gratis";
-  const utm = useMemo(
-    () => ({
-      source: searchParams.get("utm_source") ?? undefined,
-      medium: searchParams.get("utm_medium") ?? undefined,
-      campaign: searchParams.get("utm_campaign") ?? undefined,
-      content: searchParams.get("utm_content") ?? undefined,
-      term: searchParams.get("utm_term") ?? undefined,
-    }),
-    [searchParams]
-  );
 
   async function confirmQuick() {
     if (!quote) return;
@@ -94,12 +84,13 @@ export function CallRequestForm({
           aceptaComercial: !!quote.consentAt?.comercialAt,
           company: "",
           consent: quote.consentAt,
-          utm: { ...utm, referrer },
+          utm: getAttribution(),
         }),
       });
       if (res.ok) {
         saveCallResult({ nombre: quote.nombre, diaLlamada, turnoLlamada });
         saveClientProfile({ nombre: quote.nombre, telefono: quote.telefono, diaLlamada, turnoLlamada });
+        pushDataLayerEvent("generate_lead", { producto, form: "quiero_que_me_llamen" });
         router.push("/gracias");
         return;
       }
@@ -128,7 +119,7 @@ export function CallRequestForm({
       aceptaComercial: comercial,
       company: "",
       consent: consentTimes,
-      utm: { ...utm, referrer },
+      utm: getAttribution(),
     };
     const parsed = callRequestSchema.safeParse(payload);
     if (!parsed.success) {
@@ -151,6 +142,7 @@ export function CallRequestForm({
       if (res.ok) {
         saveCallResult({ nombre, diaLlamada, turnoLlamada });
         saveClientProfile({ nombre, telefono, diaLlamada, turnoLlamada });
+        pushDataLayerEvent("generate_lead", { producto, form: "quiero_que_me_llamen" });
         router.push("/gracias");
         return;
       }
