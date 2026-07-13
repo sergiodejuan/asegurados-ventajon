@@ -6,7 +6,7 @@ import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
-import { CompanyLogo } from "@/components/Comparativa";
+import { PartnerBadge } from "@/components/PartnerBadge";
 import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
@@ -160,12 +160,9 @@ export default async function Home() {
               <p className="mt-2 text-[15px] leading-relaxed text-slate2 md:text-[16px]">
                 Trabajamos con las principales aseguradoras del país para encontrar la que te conviene.
               </p>
-              <ul className="mt-4 flex flex-wrap gap-2" translate="no">
+              <ul className="mt-4 flex flex-wrap items-center gap-4" translate="no">
                 {PARTNERS.map((p) => (
-                  <li key={p} className="flex items-center gap-2 rounded-pill border border-hair bg-white px-3.5 py-1.5 text-[14px] font-semibold text-navy">
-                    <CompanyLogo logoUrl={theme.partnerLogos[p]} compania={p} />
-                    {p}
-                  </li>
+                  <PartnerBadge key={p} name={p} logoUrl={theme.partnerLogos[p]} />
                 ))}
               </ul>
             </div>

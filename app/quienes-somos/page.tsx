@@ -5,7 +5,7 @@ import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName } from "@/components/icons";
-import { CompanyLogo } from "@/components/Comparativa";
+import { PartnerBadge } from "@/components/PartnerBadge";
 import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 
@@ -144,12 +144,9 @@ export default async function QuienesSomos() {
             No trabajamos con una única marca: comparamos entre varias de las compañías más solventes del país, para
             que la decisión final sea tuya, con toda la información encima de la mesa.
           </p>
-          <ul className="mt-5 flex flex-wrap gap-3" translate="no">
+          <ul className="mt-5 flex flex-wrap items-center gap-4" translate="no">
             {PARTNERS.map((p) => (
-              <li key={p} className="flex items-center gap-2 rounded-pill border border-hair bg-white px-5 py-2.5 text-[15px] font-bold text-navy shadow-soft">
-                <CompanyLogo logoUrl={theme.partnerLogos[p]} compania={p} />
-                {p}
-              </li>
+              <PartnerBadge key={p} name={p} logoUrl={theme.partnerLogos[p]} />
             ))}
           </ul>
         </section>

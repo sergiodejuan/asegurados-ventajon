@@ -57,8 +57,8 @@ export function CookieConsentBanner() {
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="cookie-heading" className="fixed inset-0 z-[100] grid place-items-end bg-ink/40 p-0 sm:place-items-center sm:p-4">
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-[24px] bg-white p-5 shadow-card sm:max-w-lg sm:rounded-[24px] sm:p-7">
+    <div role="dialog" aria-modal="true" aria-labelledby="cookie-heading" className="fixed inset-0 z-[100] grid place-items-end bg-[#1B2B6B]/30 p-0 sm:place-items-center sm:p-4">
+      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-[24px] bg-white p-5 shadow-card sm:max-w-2xl sm:rounded-[24px] sm:p-8">
         <Wordmark logoUrl={theme.logoUrl} />
 
         <h2 id="cookie-heading" className="mt-4 text-[19px] font-extrabold text-navy">{c.heading}</h2>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BRAND_NAME, WHATSAPP_URL, PARTNERS } from "@/lib/brand";
-import { CompanyLogo } from "./Comparativa";
+import { PartnerBadge } from "./PartnerBadge";
 import { Modal } from "./Modal";
 import { Check, IconByName, WhatsApp } from "./icons";
 import { useSiteTheme } from "@/lib/useTheme";
@@ -136,14 +136,11 @@ export function MesGratisLanding() {
       <section className="bg-mist py-12">
         <div className="mx-auto max-w-5xl px-5 text-center">
           <p className="text-[12px] font-bold uppercase tracking-wide text-slate2">Comparamos entre las mejores aseguradoras</p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3" translate="no">
+          <ul className="mt-4 flex flex-wrap items-center justify-center gap-4" translate="no">
             {PARTNERS.map((name) => (
-              <span key={name} className="flex items-center gap-2 rounded-pill border border-hair bg-white px-4 py-2 text-[13px] font-semibold text-navy">
-                <CompanyLogo logoUrl={theme.partnerLogos[name]} compania={name} />
-                {name}
-              </span>
+              <PartnerBadge key={name} name={name} logoUrl={theme.partnerLogos[name]} />
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 

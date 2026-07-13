@@ -240,10 +240,12 @@ export function Comparativa() {
   );
 }
 
-export function CompanyLogo({ logoUrl, compania }: { logoUrl?: string; compania: string }) {
+export function CompanyLogo({
+  logoUrl, compania, size = "h-6 max-w-[72px]",
+}: { logoUrl?: string; compania: string; size?: string }) {
   if (!logoUrl) return null;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={logoUrl} alt={compania} className="h-6 w-auto max-w-[72px] shrink-0 object-contain" />;
+  return <img src={logoUrl} alt={compania} className={`w-auto shrink-0 object-contain ${size}`} />;
 }
 
 function CompanyActions({ producto, compania, precio }: { producto: string; compania: string; precio: number }) {
