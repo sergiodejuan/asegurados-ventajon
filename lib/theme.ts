@@ -75,6 +75,7 @@ export const HERO_PAGE_KEYS: { key: string; label: string }[] = [
   { key: "decesos", label: "Seguro de decesos" },
   { key: "hogar", label: "Seguro de hogar" },
   { key: "auto", label: "Seguro de auto" },
+  { key: "mesGratis", label: "Landing campaña · 1 mes gratis" },
 ];
 
 export type CookieConsentConfig = {

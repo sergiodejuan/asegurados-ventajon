@@ -4,6 +4,7 @@ import { StickyMobileCta } from "./StickyMobileCta";
 import { Testimonials } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
+import { PartnerBadge } from "./PartnerBadge";
 import { ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES, type ProductPage } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
@@ -105,9 +106,9 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
           <p className="mt-2 text-[15px] leading-relaxed text-slate2 md:text-[16px]">
             Trabajamos con las principales aseguradoras del país para encontrar la que te conviene.
           </p>
-          <ul className="mt-4 flex flex-wrap gap-2" translate="no">
+          <ul className="mt-4 flex flex-wrap items-center gap-4" translate="no">
             {PARTNERS.map((p) => (
-              <li key={p} className="rounded-pill border border-hair bg-white px-3.5 py-1.5 text-[14px] font-semibold text-navy">{p}</li>
+              <PartnerBadge key={p} name={p} logoUrl={theme.partnerLogos[p]} />
             ))}
           </ul>
         </section>

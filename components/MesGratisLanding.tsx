@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BRAND_NAME, WHATSAPP_URL, PARTNERS } from "@/lib/brand";
+import { BRAND_NAME, WHATSAPP_URL, PARTNERS, ECOSYSTEM_MEMBERS } from "@/lib/brand";
 import { PartnerBadge } from "./PartnerBadge";
+import { Header } from "./Header";
 import { Modal } from "./Modal";
 import { Check, IconByName, WhatsApp } from "./icons";
 import { useSiteTheme } from "@/lib/useTheme";
+
+const PARTNERS_TEXT = new Intl.ListFormat("es-ES", { style: "long", type: "conjunction" }).format(PARTNERS);
 
 // UTM fijo de esta landing: todo lead que tarifique desde aquí queda
 // marcado de forma única para poder filtrarlo/exportarlo en /admin (el
@@ -34,22 +37,33 @@ const FAQ = [
 export function MesGratisLanding() {
   const [termsOpen, setTermsOpen] = useState(false);
   const theme = useSiteTheme();
+  const heroImage = theme.heroImages.mesGratis;
 
   return (
     <main id="contenido" className="overflow-x-hidden bg-ink">
-      {/* CABECERA — sin salida, sin navegación */}
-      <header className="relative z-10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-          <p className="font-display text-[16px] font-extrabold text-white" translate="no">{BRAND_NAME}</p>
-          <span className="rounded-pill bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white">
-            Oferta por tiempo limitado
-          </span>
-        </div>
-      </header>
+      {/* Mismo menú isla que el resto del sitio */}
+      <Header />
+      {/* lg:mt-4 compensa el desplazamiento del menú isla (lg:top-4) para que no se solape */}
+      <div className="bg-brand-red py-2 text-center text-[12px] font-bold uppercase tracking-wide text-white lg:mt-4">
+        Oferta por tiempo limitado — 1 mes gratis en tu seguro de salud
+      </div>
 
       {/* HERO */}
       <section className="relative overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-navy via-navy-deep to-brand-red-deep" />
+        {heroImage ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            {/* Velo de degradado sobre la foto para que el texto blanco siga siendo legible */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(135deg, rgba(18,32,79,.92) 0%, rgba(27,43,107,.85) 45%, rgba(168,38,31,.82) 100%)" }}
+            />
+          </>
+        ) : (
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-navy via-navy-deep to-brand-red-deep" />
+        )}
         <div aria-hidden="true" className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-red/30 blur-3xl motion-safe:animate-pulse" />
         <div aria-hidden="true" className="absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
@@ -141,6 +155,51 @@ export function MesGratisLanding() {
               <PartnerBadge key={name} name={name} logoUrl={theme.partnerLogos[name]} />
             ))}
           </ul>
+        </div>
+      </section>
+
+      {/* CONTENIDO SEO — posiciona la marca y la promoción */}
+      <section aria-labelledby="seo-heading" className="bg-white py-14 md:py-20">
+        <div className="mx-auto max-w-3xl px-5">
+          <h2 id="seo-heading" className="text-[24px] font-extrabold leading-tight text-navy md:text-[28px]">
+            1 mes gratis en tu seguro de salud, comparando entre las mejores aseguradoras
+          </h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-slate2">
+            {BRAND_NAME} es una correduría de seguros: no vendemos un único producto, comparamos tu perfil entre
+            varias compañías —como {PARTNERS_TEXT}— para encontrar la póliza de salud que de verdad se ajusta a
+            lo que necesitas. Durante esta campaña, además, contratar tu seguro de salud nuevo a través de nuestra
+            intermediación te regala la primera mensualidad.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-6">
+            <div>
+              <h3 className="text-[17px] font-bold text-ink">¿Cómo funciona la promoción del mes gratis?</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-slate2">
+                Calculas tu precio en un minuto con nuestro comparador, un asesor de {BRAND_NAME} te confirma la
+                propuesta final con la compañía elegida y, al formalizar tu póliza de salud nueva, te aplicamos el
+                importe de una mensualidad de regalo. Sin letra pequeña ni pasos extra: tú solo te preocupas de
+                elegir la cobertura que mejor te conviene.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-[17px] font-bold text-ink">¿Por qué comparar tu seguro de salud con {BRAND_NAME}?</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-slate2">
+                Somos correduría, no agentes de una única aseguradora: estamos de tu lado, no del de la compañía.
+                Comparamos por ti entre las mejores del país, te explicamos en claro lo que cubre cada póliza y lo
+                que no, y te acompañamos en toda España. Formamos parte del ecosistema Ventajon, con {ECOSYSTEM_MEMBERS},
+                lo que nos da más poder de negociación frente a las aseguradoras y mejores condiciones para ti.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-[17px] font-bold text-ink">Un seguro de salud comparado, no vendido a ciegas</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-slate2">
+                Contratar con la primera aseguradora que te llama suele salir caro. Comparar entre varias compañías
+                —con o sin copago, con o sin cobertura dental, cuadro médico más o menos amplio— es la única forma
+                de saber si el precio que te ofrecen es realmente competitivo. Con {BRAND_NAME} lo haces gratis, sin
+                compromiso y, durante esta campaña, con un mes de tu nueva póliza de regalo.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 

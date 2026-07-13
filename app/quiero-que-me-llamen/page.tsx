@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import { CallRequestForm } from "@/components/CallRequestForm";
 import { PromoBanner } from "@/components/PromoBanner";
 import { MinimalTopBar } from "@/components/MinimalTopBar";
+import { PartnerBadge } from "@/components/PartnerBadge";
 import { Check, IconByName } from "@/components/icons";
 import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, SELLING_POINTS, VENTAJAS } from "@/lib/brand";
+import { getTheme } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: `Te llamamos gratis — ${BRAND_NAME}`,
@@ -12,8 +14,9 @@ export const metadata: Metadata = {
 };
 
 // Página de conversión: SIN cabecera, SIN navegación, SIN footer con enlaces de salida.
-export default function QuieroQueMeLlamen({ searchParams }: { searchParams?: { producto?: string; compania?: string } }) {
+export default async function QuieroQueMeLlamen({ searchParams }: { searchParams?: { producto?: string; compania?: string } }) {
   const isGeneric = !searchParams?.producto;
+  const theme = await getTheme();
 
   return (
     <main className="safe-top min-h-screen bg-mist">
@@ -62,9 +65,9 @@ export default function QuieroQueMeLlamen({ searchParams }: { searchParams?: { p
               <p className="mt-1 text-[14px] leading-relaxed text-slate2">
                 Comparamos entre las mejores aseguradoras del país para que pagues lo justo.
               </p>
-              <ul className="mt-4 flex flex-wrap gap-2" translate="no">
+              <ul className="mt-4 flex flex-wrap items-center gap-4" translate="no">
                 {PARTNERS.map((p) => (
-                  <li key={p} className="rounded-pill border border-hair bg-white px-3 py-1.5 text-[13px] font-semibold text-navy">{p}</li>
+                  <PartnerBadge key={p} name={p} logoUrl={theme.partnerLogos[p]} />
                 ))}
               </ul>
             </section>
