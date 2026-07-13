@@ -120,3 +120,12 @@ export const SERVICIOS_VIDA = [
   "Enfermedades graves",
   "Cobertura de hipoteca",
 ];
+
+export const SERVICIOS_AUTO = [
+  "Responsabilidad civil",
+  "Lunas",
+  "Robo",
+  "Incendio",
+  "Asistencia en viaje",
+  "Vehículo de sustitución",
+];

@@ -6,7 +6,7 @@ import {
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
-import { saludPrice, vidaPrice } from "./quote";
+import { saludPrice, vidaPrice, autoPrice } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
 function makeSubmissionId() {
@@ -95,6 +95,8 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   const keys: (keyof LeadDraft)[] = [
     "nombre", "email", "codigoPostal", "inicio", "numAsegurados", "coberturaDental",
     "motivo", "fumador", "fechaNacimiento", "sexo", "producto",
+    "tipoVehiculo", "matricula", "marcaVehiculo", "modeloVehiculo", "anioVehiculo",
+    "usoVehiculo", "antiguedadCarnet", "coberturaDeseada",
     "seguroActualImporte", "seguroActualPeriodo", "diaLlamada", "turnoLlamada",
   ];
   for (const k of keys) {
@@ -173,6 +175,9 @@ export async function upsertLead(
     nombre: draft.nombre ?? "", telefono: phone, email, codigoPostal: draft.codigoPostal ?? "",
     inicio: draft.inicio ?? "", numAsegurados: draft.numAsegurados ?? null, coberturaDental: draft.coberturaDental ?? null,
     motivo: draft.motivo ?? "", fumador: draft.fumador ?? null,
+    tipoVehiculo: draft.tipoVehiculo ?? "", matricula: draft.matricula ?? "",
+    marcaVehiculo: draft.marcaVehiculo ?? "", modeloVehiculo: draft.modeloVehiculo ?? "", anioVehiculo: draft.anioVehiculo ?? "",
+    usoVehiculo: draft.usoVehiculo ?? "", antiguedadCarnet: draft.antiguedadCarnet ?? "", coberturaDeseada: draft.coberturaDeseada ?? "",
     fechaNacimiento: draft.fechaNacimiento ?? "", sexo: draft.sexo ?? "",
     yaTieneSeguro: draft.yaTieneSeguro ?? null,
     seguroActualImporte: draft.seguroActualImporte ?? null,
@@ -380,9 +385,21 @@ const PRODUCTS_KEY = "products:all";
 
 async function readProducts(): Promise<Product[]> {
   const stored = await jget<Product[]>(PRODUCTS_KEY);
-  if (stored && stored.length) return stored;
-  await jset(PRODUCTS_KEY, DEFAULT_PRODUCTS);
-  return DEFAULT_PRODUCTS;
+  if (!stored || !stored.length) {
+    await jset(PRODUCTS_KEY, DEFAULT_PRODUCTS);
+    return DEFAULT_PRODUCTS;
+  }
+  // Añade de forma aditiva cualquier producto por defecto que todavía no
+  // exista en lo guardado (p.ej. al lanzar un producto nuevo como "auto" en
+  // un sitio que ya tenía datos reales de salud/vida) sin tocar lo existente.
+  const knownIds = new Set(stored.map((p) => p.id));
+  const missing = DEFAULT_PRODUCTS.filter((p) => !knownIds.has(p.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(PRODUCTS_KEY, next);
+    return next;
+  }
+  return stored;
 }
 
 export async function listProducts(producto?: string, onlyActive = false): Promise<Product[]> {
@@ -478,7 +495,7 @@ export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
 // (no es una cotización en firme). Compartido entre la creación del
 // presupuesto (al completar el tarificador) y cualquier recálculo posterior.
 export async function estimatePrecio(producto: string, data: Record<string, unknown>): Promise<number | null> {
-  if (producto !== "salud" && producto !== "vida") return null;
+  if (producto !== "salud" && producto !== "vida" && producto !== "auto") return null;
   const products = await listProducts(producto, true);
   if (!products.length) return null;
   const rec = products.find((p) => p.destacado) ?? products[0];
@@ -488,6 +505,13 @@ export async function estimatePrecio(producto: string, data: Record<string, unkn
       { numAsegurados: Number(data.numAsegurados) || 1, coberturaDental: !!data.coberturaDental }
     );
     return Math.min(price.conCopago, price.sinCopago);
+  }
+  if (producto === "auto") {
+    const price = autoPrice(
+      { precio: rec.precio ?? 0 },
+      { antiguedadCarnet: data.antiguedadCarnet as string | undefined, coberturaDeseada: data.coberturaDeseada as string | undefined }
+    );
+    return price.precio;
   }
   const price = vidaPrice({ precio: rec.precio ?? 0 }, { fumador: !!data.fumador });
   return price.precio;

@@ -10,7 +10,7 @@ export function TarificadorExperience({
   heading,
   subheading,
 }: {
-  variant: "salud" | "vida";
+  variant: "salud" | "vida" | "auto";
   heading: string;
   subheading: string;
 }) {

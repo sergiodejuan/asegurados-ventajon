@@ -50,6 +50,25 @@ export function humanizeMotivo(motivo: string | undefined): string {
   }
 }
 
+export function humanizeUsoVehiculo(uso: string | undefined): string {
+  switch (uso) {
+    case "particular": return "uso particular";
+    case "trabajo": return "trabajo (autónomo o empresa)";
+    case "vtc_taxi": return "VTC o taxi";
+    default: return uso ?? "";
+  }
+}
+
+export function humanizeCobertura(cobertura: string | undefined): string {
+  switch (cobertura) {
+    case "terceros": return "terceros";
+    case "terceros_ampliado": return "terceros ampliado";
+    case "todo_riesgo": return "todo riesgo";
+    case "no_lo_tengo_claro": return "no lo tiene claro todavía";
+    default: return cobertura ?? "";
+  }
+}
+
 export async function triggerBlandCall(opts: {
   toNumber: string; // ya normalizado (sin +34)
   leadId: string;

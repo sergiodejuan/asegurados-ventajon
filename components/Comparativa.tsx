@@ -9,7 +9,7 @@ import { Check } from "./icons";
 import { BRAND_NAME } from "@/lib/brand";
 import type { Product } from "@/lib/catalog";
 import {
-  loadQuote, updateQuote, saludPrice, vidaPrice, quoteNumber, ageFromDob,
+  loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
 
@@ -17,9 +17,23 @@ function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function tarificadorHref(producto: string) {
+  if (producto === "vida") return "/tarificador-vida";
+  if (producto === "auto") return "/tarificador-auto";
+  return "/tarificador";
+}
+
+const COBERTURA_LABELS: Record<string, string> = {
+  terceros: "Terceros",
+  terceros_ampliado: "Terceros ampliado",
+  todo_riesgo: "Todo riesgo",
+  no_lo_tengo_claro: "Sin decidir",
+};
+
 export function Comparativa() {
   const searchParams = useSearchParams();
-  const producto = searchParams.get("producto") === "vida" ? "vida" : "salud";
+  const productoParam = searchParams.get("producto");
+  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : "salud";
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -29,6 +43,7 @@ export function Comparativa() {
   const [n, setN] = useState(1);
   const [dental, setDental] = useState(false);
   const [fumador, setFumador] = useState(false);
+  const [coberturaDeseada, setCoberturaDeseada] = useState("");
 
   useEffect(() => {
     const q = loadQuote();
@@ -39,6 +54,7 @@ export function Comparativa() {
       setN(q.numAsegurados ?? 1);
       setDental(!!q.coberturaDental);
       setFumador(!!q.fumador);
+      setCoberturaDeseada(q.coberturaDeseada ?? "");
     }
   }, []);
 
@@ -55,6 +71,7 @@ export function Comparativa() {
       numAsegurados: Math.max(1, Math.min(9, n)),
       coberturaDental: dental,
       fumador,
+      coberturaDeseada,
     });
     if (next) setQuote(next);
     setEditing(false);
@@ -69,7 +86,7 @@ export function Comparativa() {
             No encontramos los datos de tu comparativa. Vuelve a calcular tu precio para verla.
           </p>
           <a
-            href={producto === "vida" ? "/tarificador-vida" : "/tarificador"}
+            href={tarificadorHref(producto)}
             className="mt-5 inline-flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
           >
             Calcula tu precio
@@ -120,17 +137,28 @@ export function Comparativa() {
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                 <dt className="text-slate2">Código postal</dt>
                 <dd className="text-right font-semibold tnums text-ink">{quote.codigoPostal || "—"}</dd>
-                {producto === "salud" ? (
+                {producto === "salud" && (
                   <>
                     <dt className="text-slate2">Personas a asegurar</dt>
                     <dd className="text-right font-semibold tnums text-ink">{quote.numAsegurados ?? 1}</dd>
                     <dt className="text-slate2">Cobertura dental</dt>
                     <dd className="text-right font-semibold text-ink">{quote.coberturaDental ? "Sí" : "No"}</dd>
                   </>
-                ) : (
-                  <dt className="text-slate2">Fumador</dt>
                 )}
-                {producto === "vida" && <dd className="text-right font-semibold text-ink">{quote.fumador ? "Sí" : "No"}</dd>}
+                {producto === "vida" && (
+                  <>
+                    <dt className="text-slate2">Fumador</dt>
+                    <dd className="text-right font-semibold text-ink">{quote.fumador ? "Sí" : "No"}</dd>
+                  </>
+                )}
+                {producto === "auto" && (
+                  <>
+                    <dt className="text-slate2">Vehículo</dt>
+                    <dd className="text-right font-semibold capitalize text-ink">{quote.tipoVehiculo || "—"}</dd>
+                    <dt className="text-slate2">Cobertura</dt>
+                    <dd className="text-right font-semibold text-ink">{COBERTURA_LABELS[quote.coberturaDeseada ?? ""] ?? "—"}</dd>
+                  </>
+                )}
                 {age !== null && (
                   <>
                     <dt className="text-slate2">Edad</dt>
@@ -170,6 +198,19 @@ export function Comparativa() {
                     <input type="checkbox" checked={fumador} onChange={(e) => setFumador(e.target.checked)} className="h-5 w-5 accent-navy" />
                   </label>
                 )}
+                {producto === "auto" && (
+                  <div>
+                    <span className="mb-1.5 block text-[13px] font-semibold text-ink">Cobertura deseada</span>
+                    <div className="flex flex-wrap gap-2">
+                      {(["terceros", "terceros_ampliado", "todo_riesgo"] as const).map((c) => (
+                        <button key={c} type="button" aria-pressed={coberturaDeseada === c} onClick={() => setCoberturaDeseada(c)}
+                          className={`rounded-pill border px-3.5 py-2 text-[13px] font-medium transition-colors ${coberturaDeseada === c ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}>
+                          {COBERTURA_LABELS[c]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={saveEdits}
@@ -191,9 +232,11 @@ export function Comparativa() {
         </div>
 
         <ul className="mt-5 flex flex-col gap-3">
-          {producto === "vida"
+          {producto !== "salud"
             ? products.map((c) => {
-                const price = vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
+                const price = producto === "auto"
+                  ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+                  : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">

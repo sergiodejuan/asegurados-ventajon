@@ -5,6 +5,7 @@ import { CoverageTabs } from "@/components/CoverageTabs";
 import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
+import { AutoWidget } from "@/components/AutoWidget";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
@@ -203,6 +204,7 @@ export default async function Home() {
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
       <StickyMobileCta label="Calcula tu precio" href="/tarificador" secondaryLabel="Que te llamen" secondaryHref="/quiero-que-me-llamen" />
+      <AutoWidget />
     </>
   );
 }

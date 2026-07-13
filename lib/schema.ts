@@ -110,6 +110,34 @@ export const vidaSchema = z.object({
 });
 export type VidaInput = z.input<typeof vidaSchema>;
 
+/* -------------------------- Tarificador de auto ---------------------------- */
+
+export const autoSchema = z.object({
+  tipoVehiculo: z.enum(["coche", "moto"]),
+  matricula: z.string().trim().max(12).optional().default(""),
+  marcaVehiculo: z.string().trim().max(60).optional().default(""),
+  modeloVehiculo: z.string().trim().max(60).optional().default(""),
+  anioVehiculo: z.string().trim().max(4).optional().default(""),
+  usoVehiculo: z.enum(["particular", "trabajo", "vtc_taxi"]),
+  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  fechaNacimiento: dobField,
+  sexo: z.enum(["hombre", "mujer"]),
+  antiguedadCarnet: z.enum(["menos_2", "2_5", "mas_5"]),
+  coberturaDeseada: z.enum(["terceros", "terceros_ampliado", "todo_riesgo", "no_lo_tengo_claro"]),
+  yaTieneSeguro: z.boolean(),
+  ...seguroActual,
+  nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  telefono: phoneField,
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  aceptaComercial: z.boolean().default(false),
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+});
+export type AutoInput = z.input<typeof autoSchema>;
+
 /* --------------------- Formulario "quiero que me llamen" ------------------- */
 
 export const callRequestSchema = z.object({

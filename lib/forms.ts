@@ -1,4 +1,4 @@
-import { SERVICIOS_SALUD, SERVICIOS_VIDA } from "./brand";
+import { SERVICIOS_SALUD, SERVICIOS_VIDA, SERVICIOS_AUTO } from "./brand";
 
 export type Option = { value: string; label: string; requiresDate?: boolean };
 
@@ -9,6 +9,8 @@ export type Step =
   | { type: "dobsex"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "cp"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "seguroActual"; key: string; title: string; helper?: string; servicios: string[]; showIf?: (d: FormData) => boolean }
+  | { type: "matricula"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
+  | { type: "vehiculo"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "contact"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean };
 
 export type FormData = Record<string, unknown>;
@@ -64,6 +66,60 @@ export const VIDA_CONFIG: FormConfig = {
     { type: "yesno", key: "fumador", field: "fumador", title: "¿Fumas?", helper: "Es un dato clave para calcular tu seguro de vida." },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", title: "¿Ya tienes un seguro de vida?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", title: "Tu seguro de vida actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_VIDA, showIf: (d) => d.yaTieneSeguro === true },
+    { type: "contact", key: "contacto", title: "Ya casi está" },
+  ],
+};
+
+export const AUTO_CONFIG: FormConfig = {
+  producto: "auto",
+  endpoint: "/api/auto",
+  steps: [
+    {
+      type: "choice", key: "tipoVehiculo", field: "tipoVehiculo",
+      title: "¿Qué quieres asegurar?",
+      helper: "Adaptamos las preguntas siguientes a tu vehículo.",
+      options: [
+        { value: "coche", label: "Coche" },
+        { value: "moto", label: "Moto" },
+      ],
+    },
+    { type: "matricula", key: "matricula", title: "¿Cuál es tu matrícula?", helper: "Nos ayuda a identificar tu vehículo. Si no la tienes a mano, puedes indicarlo a continuación." },
+    { type: "vehiculo", key: "vehiculo", title: "Cuéntanos sobre tu vehículo", helper: "Marca, modelo y año de matriculación.", showIf: (d) => d.matriculaDesconocida === true },
+    {
+      type: "choice", key: "uso", field: "usoVehiculo",
+      title: "¿Cómo usas el vehículo?",
+      helper: "El uso influye en el precio del seguro.",
+      options: [
+        { value: "particular", label: "Uso particular" },
+        { value: "trabajo", label: "Trabajo (autónomo o empresa)" },
+        { value: "vtc_taxi", label: "VTC o taxi" },
+      ],
+    },
+    { type: "cp", key: "cp", title: "¿Dónde se guarda habitualmente?", helper: "El código postal de garaje o aparcamiento habitual." },
+    { type: "dobsex", key: "titular", title: "Datos del conductor principal", helper: "La edad influye en el precio del seguro de auto." },
+    {
+      type: "choice", key: "carnet", field: "antiguedadCarnet",
+      title: "¿Cuánto tiempo llevas con el carnet?",
+      helper: "Es uno de los factores que más influyen en el precio.",
+      options: [
+        { value: "menos_2", label: "Menos de 2 años" },
+        { value: "2_5", label: "Entre 2 y 5 años" },
+        { value: "mas_5", label: "Más de 5 años" },
+      ],
+    },
+    {
+      type: "choice", key: "cobertura", field: "coberturaDeseada",
+      title: "¿Qué cobertura te interesa?",
+      helper: "Si no lo tienes claro, tu asesor te ayuda a elegir.",
+      options: [
+        { value: "terceros", label: "Terceros" },
+        { value: "terceros_ampliado", label: "Terceros ampliado" },
+        { value: "todo_riesgo", label: "Todo riesgo" },
+        { value: "no_lo_tengo_claro", label: "No lo tengo claro" },
+      ],
+    },
+    { type: "yesno", key: "tiene", field: "yaTieneSeguro", title: "¿Ya tienes seguro de auto?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
+    { type: "seguroActual", key: "actual", title: "Tu seguro de auto actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_AUTO, showIf: (d) => d.yaTieneSeguro === true },
     { type: "contact", key: "contacto", title: "Ya casi está" },
   ],
 };

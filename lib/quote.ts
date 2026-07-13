@@ -5,7 +5,7 @@ import { WHATSAPP_URL } from "./brand";
 // mientras dura la sesión del navegador, no es información persistida en servidor.
 export type QuoteProfile = {
   id: string;
-  producto: "salud" | "vida";
+  producto: "salud" | "vida" | "auto";
   createdAt: string;
   codigoPostal?: string;
   numAsegurados?: number;
@@ -15,6 +15,15 @@ export type QuoteProfile = {
   motivo?: string; // vida
   fumador?: boolean; // vida
   inicio?: string;
+  // Auto
+  tipoVehiculo?: string;
+  matricula?: string;
+  marcaVehiculo?: string;
+  modeloVehiculo?: string;
+  anioVehiculo?: string;
+  usoVehiculo?: string;
+  antiguedadCarnet?: string;
+  coberturaDeseada?: string;
   // Contacto + consentimiento ya dados en el tarificador: si están presentes,
   // "quiero que me llamen" no debe volver a pedirlos.
   nombre?: string;
@@ -79,14 +88,32 @@ export function vidaPrice(base: { precio: number }, profile: Pick<QuoteProfile, 
   return { precio: base.precio + smokerExtra };
 }
 
+export function autoPrice(base: { precio: number }, profile: Pick<QuoteProfile, "antiguedadCarnet" | "coberturaDeseada">) {
+  const carnetExtra = profile.antiguedadCarnet === "menos_2" ? Math.round(base.precio * 0.35)
+    : profile.antiguedadCarnet === "2_5" ? Math.round(base.precio * 0.12)
+    : 0;
+  const coberturaExtra = profile.coberturaDeseada === "todo_riesgo" ? Math.round(base.precio * 0.6)
+    : profile.coberturaDeseada === "terceros_ampliado" ? Math.round(base.precio * 0.2)
+    : 0;
+  return { precio: base.precio + carnetExtra + coberturaExtra };
+}
+
+const PRODUCTO_LABELS: Record<string, string> = {
+  salud: "Seguro de salud",
+  vida: "Seguro de vida",
+  auto: "Seguro de auto",
+};
+
 export function buildWhatsAppText(opts: { producto: string; compania?: string; quote?: QuoteProfile | null; origen?: string }) {
   const lines = ["Hola, vengo de la comparativa de Asegurados Ventajon."];
   if (opts.compania) lines.push(`Me interesa la opción de ${opts.compania}.`);
-  lines.push(`Producto: ${opts.producto === "vida" ? "Seguro de vida" : "Seguro de salud"}.`);
+  lines.push(`Producto: ${PRODUCTO_LABELS[opts.producto] ?? "Seguro"}.`);
   if (opts.quote?.id) lines.push(`Presupuesto nº ${quoteNumber(opts.quote.id)}.`);
   if (opts.quote?.codigoPostal) lines.push(`Código postal: ${opts.quote.codigoPostal}.`);
   if (opts.quote?.numAsegurados) lines.push(`Personas a asegurar: ${opts.quote.numAsegurados}.`);
   if (opts.quote?.fechaNacimiento) lines.push(`Fecha de nacimiento: ${opts.quote.fechaNacimiento}.`);
+  if (opts.quote?.matricula) lines.push(`Matrícula: ${opts.quote.matricula}.`);
+  if (opts.quote?.marcaVehiculo) lines.push(`Vehículo: ${opts.quote.marcaVehiculo} ${opts.quote.modeloVehiculo ?? ""}.`.trim());
   if (opts.origen) lines.push(`Origen: ${opts.origen}.`);
   return lines.join(" ");
 }

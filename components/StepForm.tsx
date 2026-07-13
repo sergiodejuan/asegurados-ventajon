@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
-import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
+import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
@@ -22,8 +22,8 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida"; onStepChange?: (idx: number) => void }) {
-  const config = variant === "vida" ? VIDA_CONFIG : SALUD_CONFIG;
+export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida" | "auto"; onStepChange?: (idx: number) => void }) {
+  const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : SALUD_CONFIG;
   const router = useRouter();
 
   const [data, setData] = useState<FormData>({ seguroActualPeriodo: "mes", seguroActualServicios: [] });
@@ -152,6 +152,14 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
           motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
           fumador: variant === "vida" ? !!data.fumador : undefined,
           inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
+          tipoVehiculo: variant === "auto" ? String(data.tipoVehiculo ?? "") : undefined,
+          matricula: variant === "auto" ? String(data.matricula ?? "") : undefined,
+          marcaVehiculo: variant === "auto" ? String(data.marcaVehiculo ?? "") : undefined,
+          modeloVehiculo: variant === "auto" ? String(data.modeloVehiculo ?? "") : undefined,
+          anioVehiculo: variant === "auto" ? String(data.anioVehiculo ?? "") : undefined,
+          usoVehiculo: variant === "auto" ? String(data.usoVehiculo ?? "") : undefined,
+          antiguedadCarnet: variant === "auto" ? String(data.antiguedadCarnet ?? "") : undefined,
+          coberturaDeseada: variant === "auto" ? String(data.coberturaDeseada ?? "") : undefined,
           nombre: String(data.nombre ?? ""),
           telefono: normalizePhone(String(data.telefono ?? "")),
           email: String(data.email ?? ""),
@@ -244,6 +252,46 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida";
                 className={`w-full rounded-card border bg-white px-5 py-4 text-[18px] tracking-wide tnums text-ink placeholder:text-slate2/60 ${errors.codigoPostal ? "border-brand-red" : "border-hair"}`} />
               <FieldError id="err-cp" msg={errors.codigoPostal} />
               <PrimaryButton disabled={String(data.codigoPostal ?? "").length !== 5}>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      case "matricula": {
+        const matricula = String(data.matricula ?? "");
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (matricula.length >= 4) { set({ matriculaDesconocida: false }); next(); } }}>
+              <label htmlFor="f-matricula" className="sr-only">Matrícula</label>
+              <div className="flex overflow-hidden rounded-card border border-hair bg-white focus-within:border-navy/40">
+                <span aria-hidden="true" className="flex w-11 shrink-0 flex-col items-center justify-center gap-0.5 bg-[#003399] py-2 text-white">
+                  <span className="text-[8px]">★★★</span>
+                  <span className="text-[11px] font-extrabold">E</span>
+                </span>
+                <input id="f-matricula" name="matricula" autoComplete="off" spellCheck={false} maxLength={10}
+                  placeholder="1234ABC…" value={matricula}
+                  onChange={(ev) => set({ matricula: ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) })}
+                  className="w-full min-w-0 bg-transparent px-4 py-4 text-[18px] font-bold uppercase tracking-widest text-ink placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-slate2/60" />
+              </div>
+              <PrimaryButton disabled={matricula.length < 4}>Continuar</PrimaryButton>
+              <button
+                type="button"
+                onClick={() => { set({ matricula: "", matriculaDesconocida: true }); next(); }}
+                className="mt-3 w-full text-center text-[13px] font-semibold text-navy underline underline-offset-2"
+              >
+                No la tengo a mano
+              </button>
+            </form>
+          </Shell>
+        );
+      }
+      case "vehiculo":
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); next(); }}>
+              <Field id="f-marcaVehiculo" label="Marca" value={String(data.marcaVehiculo ?? "")} onChange={(v) => set({ marcaVehiculo: v })} placeholder="Volkswagen…" />
+              <Field id="f-modeloVehiculo" label="Modelo" value={String(data.modeloVehiculo ?? "")} onChange={(v) => set({ modeloVehiculo: v })} placeholder="Golf…" />
+              <Field id="f-anioVehiculo" label="Año de matriculación" type="text" inputMode="numeric" value={String(data.anioVehiculo ?? "")}
+                onChange={(v) => set({ anioVehiculo: v.replace(/\D/g, "").slice(0, 4) })} placeholder="2018…" />
+              <PrimaryButton disabled={!String(data.marcaVehiculo ?? "").trim() || !String(data.modeloVehiculo ?? "").trim()}>Continuar</PrimaryButton>
             </form>
           </Shell>
         );

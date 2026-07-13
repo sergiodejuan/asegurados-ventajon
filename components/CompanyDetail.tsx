@@ -9,17 +9,24 @@ import { CompanyLogo } from "./Comparativa";
 import { Check } from "./icons";
 import type { Product } from "@/lib/catalog";
 import {
-  loadQuote, saludPrice, vidaPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
+  loadQuote, saludPrice, vidaPrice, autoPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
 
 function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const PRODUCTO_TITLES: Record<string, string> = {
+  salud: "Seguro de salud",
+  vida: "Seguro de vida",
+  auto: "Seguro de auto",
+};
+
 export function CompanyDetail() {
   const params = useParams<{ compania: string }>();
   const searchParams = useSearchParams();
-  const producto = searchParams.get("producto") === "vida" ? "vida" : "salud";
+  const productoParam = searchParams.get("producto");
+  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : "salud";
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -53,6 +60,8 @@ export function CompanyDetail() {
   const widgetWaText = buildWhatsAppText({ producto, compania: entry.compania, quote, origen: `ficha ${entry.compania}` });
   const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
   const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
+  const precioAuto = autoPrice({ precio: entry.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada });
+  const precioUnico = producto === "auto" ? precioAuto.precio : precioVida.precio;
 
   async function downloadPdf() {
     setDownloading(true);
@@ -62,7 +71,7 @@ export function CompanyDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           producto, compania: entry!.compania, quote,
-          precio: producto === "vida" ? { precio: precioVida.precio } : { conCopago: precioSalud.conCopago, sinCopago: precioSalud.sinCopago },
+          precio: producto === "salud" ? { conCopago: precioSalud.conCopago, sinCopago: precioSalud.sinCopago } : { precio: precioUnico },
           servicios: entry!.servicios, condiciones: entry!.condiciones,
         }),
       });
@@ -88,7 +97,7 @@ export function CompanyDetail() {
         <a href="/comparativa" className="text-[13px] font-semibold text-navy underline">← Volver a la comparativa</a>
 
         <p className="mt-4 text-[12px] font-bold uppercase tracking-wide text-brand-red">
-          {producto === "vida" ? "Seguro de vida" : "Seguro de salud"}
+          {PRODUCTO_TITLES[producto]}
         </p>
         <h1 className="mt-1 flex items-center gap-2.5 text-[28px] font-extrabold leading-tight text-navy">
           <CompanyLogo logoUrl={entry.logoUrl} compania={entry.compania} />
@@ -96,9 +105,9 @@ export function CompanyDetail() {
         </h1>
         {quote && <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>}
 
-        {producto === "vida" ? (
+        {producto !== "salud" ? (
           <p className="mt-5 text-[32px] font-extrabold tnums text-navy">
-            Desde {euros(precioVida.precio)} €
+            Desde {euros(precioUnico)} €
             <span className="text-[16px] font-medium text-slate2">/mes</span>
           </p>
         ) : (
@@ -164,7 +173,7 @@ export function CompanyDetail() {
             <CallRequestForm
               showHeading={false}
               compania={entry.compania}
-              precioElegido={producto === "vida" ? precioVida.precio : precioSalud.conCopago}
+              precioElegido={producto !== "salud" ? precioUnico : precioSalud.conCopago}
             />
           </div>
         </div>

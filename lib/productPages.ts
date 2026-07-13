@@ -202,8 +202,8 @@ export const PRODUCT_PAGES: ProductPage[] = [
     h1: "Seguro de coche comparado por un experto, no por un algoritmo",
     subheadline: "Comparamos entre las mejores compañías de auto para que pagues lo justo, elijas terceros o todo riesgo.",
     heroIcon: "car",
-    cta: { label: "Que te llamen gratis", href: "/quiero-que-me-llamen?producto=auto" },
-    ctaSecondary: { label: "Escríbenos por WhatsApp", href: "/quiero-que-me-llamen?producto=auto" },
+    cta: { label: "Calcula tu precio", href: "/tarificador-auto" },
+    ctaSecondary: { label: "Que te llamen gratis", href: "/quiero-que-me-llamen?producto=auto" },
     benefits: [
       { icon: "shield", t: "De tu lado", d: "Comparamos por ti, no vendemos un único producto." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras de auto del país." },

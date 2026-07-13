@@ -8,6 +8,9 @@ export const SUBMISSION_FIELD_LABELS: Record<string, string> = {
   seguroActualImporte: "Pagaba antes", seguroActualPeriodo: "Periodicidad", seguroActualServicios: "Servicios actuales",
   compania: "Compañía de interés", producto: "Producto",
   diaLlamada: "Día preferido", turnoLlamada: "Turno preferido",
+  tipoVehiculo: "Tipo de vehículo", matricula: "Matrícula", marcaVehiculo: "Marca", modeloVehiculo: "Modelo",
+  anioVehiculo: "Año de matriculación", usoVehiculo: "Uso del vehículo", antiguedadCarnet: "Antigüedad del carnet",
+  coberturaDeseada: "Cobertura deseada",
 };
 
 export function formatSubmissionValue(v: unknown): string {

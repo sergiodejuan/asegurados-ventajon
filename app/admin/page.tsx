@@ -23,6 +23,8 @@ type Lead = {
   nombre: string; telefono: string; email: string; codigoPostal: string;
   inicio: string; numAsegurados: number | null; coberturaDental: boolean | null;
   motivo: string; fumador: boolean | null;
+  tipoVehiculo: string; matricula: string; marcaVehiculo: string; modeloVehiculo: string; anioVehiculo: string;
+  usoVehiculo: string; antiguedadCarnet: string; coberturaDeseada: string;
   fechaNacimiento: string; sexo: string; yaTieneSeguro: boolean | null;
   seguroActualImporte: number | null; seguroActualPeriodo: string; seguroActualServicios: string[];
   diaLlamada: string; turnoLlamada: string; presupuestoId: string;
@@ -39,6 +41,23 @@ const STATUS_COLORS: Record<string, string> = {
   presupuestado: "bg-amber-100 text-amber-700",
   ganado: "bg-emerald-100 text-emerald-700",
   perdido: "bg-slate-200 text-slate-600",
+};
+
+const USO_LABELS: Record<string, string> = {
+  particular: "Particular",
+  trabajo: "Trabajo (autónomo o empresa)",
+  vtc_taxi: "VTC o taxi",
+};
+const CARNET_LABELS: Record<string, string> = {
+  menos_2: "Menos de 2 años",
+  "2_5": "Entre 2 y 5 años",
+  mas_5: "Más de 5 años",
+};
+const COBERTURA_LABELS: Record<string, string> = {
+  terceros: "Terceros",
+  terceros_ampliado: "Terceros ampliado",
+  todo_riesgo: "Todo riesgo",
+  no_lo_tengo_claro: "Sin decidir",
 };
 
 export default function AdminLeadsPage() {
@@ -208,6 +227,11 @@ function LeadsCrm() {
                 {l.yaTieneSeguro != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Ya tiene seguro</dt><dd className="text-right font-medium text-ink">{l.yaTieneSeguro ? "Sí" : "No"}</dd></div>}
                 {l.motivo && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Motivo (vida)</dt><dd className="text-right font-medium text-ink">{l.motivo}</dd></div>}
                 {l.fumador != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Fumador</dt><dd className="text-right font-medium text-ink">{l.fumador ? "Sí" : "No"}</dd></div>}
+                {l.tipoVehiculo && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Vehículo</dt><dd className="text-right font-medium capitalize text-ink">{l.tipoVehiculo}{l.marcaVehiculo ? ` · ${l.marcaVehiculo} ${l.modeloVehiculo}`.trim() : ""}</dd></div>}
+                {l.matricula && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Matrícula</dt><dd className="text-right font-medium tnums text-ink">{l.matricula}</dd></div>}
+                {l.usoVehiculo && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Uso</dt><dd className="text-right font-medium text-ink">{USO_LABELS[l.usoVehiculo] ?? l.usoVehiculo}</dd></div>}
+                {l.antiguedadCarnet && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Antigüedad carnet</dt><dd className="text-right font-medium text-ink">{CARNET_LABELS[l.antiguedadCarnet] ?? l.antiguedadCarnet}</dd></div>}
+                {l.coberturaDeseada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Cobertura deseada</dt><dd className="text-right font-medium text-ink">{COBERTURA_LABELS[l.coberturaDeseada] ?? l.coberturaDeseada}</dd></div>}
                 {l.seguroActualImporte != null && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Paga ahora</dt><dd className="text-right font-medium tnums text-ink">{l.seguroActualImporte} € / {l.seguroActualPeriodo || "mes"}</dd></div>}
                 {l.diaLlamada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Día preferido</dt><dd className="text-right font-medium text-ink">{l.diaLlamada}</dd></div>}
                 {l.turnoLlamada && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Turno preferido</dt><dd className="text-right font-medium text-ink">{l.turnoLlamada}</dd></div>}

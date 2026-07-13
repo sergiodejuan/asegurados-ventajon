@@ -60,7 +60,7 @@ function InformesAdmin() {
   const porProducto = useMemo(() => {
     const acc = new Map<string, number>();
     for (const p of ganados) {
-      const key = p.producto === "vida" ? "Vida" : "Salud";
+      const key = p.producto === "vida" ? "Vida" : p.producto === "auto" ? "Auto" : "Salud";
       acc.set(key, (acc.get(key) ?? 0) + valorGanado(p));
     }
     return Array.from(acc.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);

@@ -3,6 +3,7 @@
 export const SOURCE_LABELS: Record<string, string> = {
   "tarificador-salud": "Tarificador salud",
   "tarificador-vida": "Tarificador vida",
+  "tarificador-auto": "Tarificador auto",
   "quiero-que-me-llamen": "Quiero que me llamen",
 };
 
@@ -67,6 +68,15 @@ export type Lead = {
   // Vida
   motivo: string;
   fumador: boolean | null;
+  // Auto
+  tipoVehiculo: string;
+  matricula: string;
+  marcaVehiculo: string;
+  modeloVehiculo: string;
+  anioVehiculo: string;
+  usoVehiculo: string;
+  antiguedadCarnet: string;
+  coberturaDeseada: string;
   // Común
   fechaNacimiento: string;
   sexo: string;

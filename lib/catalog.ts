@@ -5,7 +5,7 @@
 
 export type Product = {
   id: string;
-  producto: "salud" | "vida";
+  producto: "salud" | "vida" | "auto";
   compania: string;
   activo: boolean; // se muestra en la comparativa pública
   destacado: boolean; // insignia "Recomendado" + se ordena primero
@@ -14,7 +14,7 @@ export type Product = {
   // Salud
   precioConCopago?: number;
   precioSinCopago?: number;
-  // Vida
+  // Vida y auto (precio único de partida)
   precio?: number;
   condiciones: string;
   servicios: string[];
@@ -94,6 +94,41 @@ export const DEFAULT_PRODUCTS: Product[] = [
     precio: 11,
     condiciones: "Precio orientativo para un capital estándar, no fumador. Sujeto a cuestionario de salud.",
     servicios: ["Fallecimiento", "Invalidez absoluta", "Cobertura de hipoteca"],
+    updatedAt: now,
+  },
+  {
+    id: "auto-mapfre", producto: "auto", compania: "Mapfre", activo: true, destacado: true, orden: 1,
+    precio: 28,
+    condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
+    servicios: ["Responsabilidad civil", "Asistencia en viaje 24h", "Defensa jurídica"],
+    updatedAt: now,
+  },
+  {
+    id: "auto-zurich", producto: "auto", compania: "Zurich", activo: true, destacado: false, orden: 2,
+    precio: 30,
+    condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
+    servicios: ["Responsabilidad civil", "Lunas", "Asistencia en viaje 24h"],
+    updatedAt: now,
+  },
+  {
+    id: "auto-generali", producto: "auto", compania: "Generali", activo: true, destacado: false, orden: 3,
+    precio: 31,
+    condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
+    servicios: ["Responsabilidad civil", "Robo", "Incendio"],
+    updatedAt: now,
+  },
+  {
+    id: "auto-adeslas", producto: "auto", compania: "Adeslas", activo: true, destacado: false, orden: 4,
+    precio: 32,
+    condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
+    servicios: ["Responsabilidad civil", "Asistencia en viaje 24h", "Vehículo de sustitución"],
+    updatedAt: now,
+  },
+  {
+    id: "auto-asisa", producto: "auto", compania: "Asisa", activo: true, destacado: false, orden: 5,
+    precio: 29,
+    condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
+    servicios: ["Responsabilidad civil", "Lunas", "Robo"],
     updatedAt: now,
   },
 ];

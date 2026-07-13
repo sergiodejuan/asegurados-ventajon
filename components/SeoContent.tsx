@@ -67,9 +67,41 @@ const CONTENT = {
       },
     ],
   },
+  auto: {
+    h1: "Comparador de seguros de auto",
+    intro: `Un seguro de coche o moto puede costar el doble o el triple según con quién lo contrates para el mismo perfil. ${BRAND_NAME} compara tu vehículo entre varias compañías —como ${PARTNERS_TEXT}— para encontrar la cobertura adecuada, a terceros o a todo riesgo, al precio justo.`,
+    sections: [
+      {
+        h2: "¿Terceros, terceros ampliado o todo riesgo?",
+        p: "El seguro a terceros cubre los daños que causas a otros, es obligatorio y el más económico. El terceros ampliado añade extras habituales como lunas o robo. El todo riesgo cubre además los daños de tu propio vehículo, aunque la culpa sea tuya; suele compensar en coches más nuevos o de mayor valor. Qué modalidad te conviene depende de la antigüedad y el uso de tu vehículo; te ayudamos a decidirlo.",
+      },
+      {
+        h2: "¿Qué influye en el precio de un seguro de auto?",
+        p: "Los factores que más pesan son la antigüedad del carnet de conducir, el uso del vehículo (particular, profesional o VTC/taxi) y la cobertura elegida. También influyen la marca, el modelo y el código postal donde se guarda habitualmente. Por eso una comparativa genérica dice poco: lo que importa es tu comparativa, con tus datos.",
+      },
+      {
+        h2: `¿Por qué comparar con ${BRAND_NAME}?`,
+        p: `Somos correduría, no agentes de una única aseguradora: comparamos por ti entre las mejores compañías del país y te explicamos en claro la diferencia entre coberturas, sin letra pequeña. Trabajamos en toda España, en horario ${CONTACT_HOURS} y con cercanía especial en Canarias y Baleares, dentro del ecosistema Ventajon con ${ECOSYSTEM_MEMBERS}.`,
+      },
+    ],
+    faq: [
+      {
+        q: "¿Cuánto cuesta un seguro de auto?",
+        a: "Depende sobre todo de la antigüedad de tu carnet, el uso del vehículo y la cobertura que elijas (terceros o todo riesgo). Calcula tu precio con el formulario de arriba y un asesor te confirma la propuesta final, sin compromiso.",
+      },
+      {
+        q: "No tengo la matrícula a mano, ¿puedo calcular el precio igualmente?",
+        a: "Sí. Si no la tienes, te pedimos la marca, el modelo y el año de matriculación de tu vehículo para poder orientarte igualmente.",
+      },
+      {
+        q: "¿La comparativa tiene algún coste?",
+        a: "No. Comparar y recibir asesoramiento es gratuito y sin compromiso de contratación.",
+      },
+    ],
+  },
 } as const;
 
-export function SeoContent({ variant }: { variant: "salud" | "vida" }) {
+export function SeoContent({ variant }: { variant: "salud" | "vida" | "auto" }) {
   const c = CONTENT[variant];
   return (
     <section aria-labelledby="seo-heading" className="mx-auto mt-16 max-w-app px-5 pb-14 md:mt-24 md:max-w-5xl lg:max-w-6xl">
