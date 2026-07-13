@@ -9,12 +9,13 @@ import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue, PRESUPUESTO_STATUS
 import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 
-type PresupuestoNote = { id: string; at: string; texto: string };
+type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };
 type PresupuestoEleccion = { compania: string; precio: number | null; condiciones?: string; servicios?: string[]; at: string };
 type Presupuesto = {
   id: string; leadId: string; createdAt: string; updatedAt: string; closedAt: string;
   source: string; producto: string; status: string; data: Record<string, unknown>;
   precioAprox: number | null; notas: PresupuestoNote[]; eleccion: PresupuestoEleccion | null;
+  closedBy: string;
   nombre: string; telefono: string; email: string;
 };
 type LeadSummary = { id: string; nombre: string; telefono: string; email: string; status: string } | null;
@@ -29,7 +30,7 @@ export default function AdminPresupuestoDetailPage() {
 
 function PresupuestoDetail() {
   const params = useParams<{ id: string }>();
-  const { token } = useAdminToken();
+  const { token, agent } = useAdminToken();
   const [presupuesto, setPresupuesto] = useState<Presupuesto | null>(null);
   const [lead, setLead] = useState<LeadSummary>(null);
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -62,7 +63,7 @@ function PresupuestoDetail() {
     const res = await fetch(`/api/admin/presupuestos/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, agente: agent }),
     });
     const body = await res.json();
     if (res.ok && body.ok) setPresupuesto(body.presupuesto);
@@ -200,6 +201,7 @@ function PresupuestoDetail() {
             <p className="mt-3 text-[12px] text-slate2">
               Marcar como <b className="text-ink">Ganado</b> o <b className="text-ink">Perdido</b> cierra el presupuesto y registra la fecha.
             </p>
+            {p.closedBy && <p className="mt-2 text-[12px] text-slate2">Cerrado por <b className="text-ink">{p.closedBy}</b>.</p>}
           </div>
         </div>
 
@@ -229,7 +231,7 @@ function PresupuestoDetail() {
                     <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
                     <div>
                       <p className="text-[14px] text-ink">{n.texto}</p>
-                      <p className="text-[12px] text-slate2">{fmt(n.at)}</p>
+                      <p className="text-[12px] text-slate2">{fmt(n.at)}{n.agente ? ` · ${n.agente}` : ""}</p>
                     </div>
                   </li>
                 ))}

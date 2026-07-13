@@ -9,7 +9,7 @@ import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/admin
 import { StatTile, ViewToggle, FilterTab, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 
-type Activity = { at: string; type: string; note: string };
+type Activity = { at: string; type: string; note: string; meta?: { agente?: string; channel?: string } };
 type ConsentRecord = {
   at: string; ip: string; userAgent: string; source: string; page: string;
   privacidad: { granted: boolean; at?: string };
@@ -30,6 +30,7 @@ type Lead = {
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
   submissions: LeadSubmission[];
+  anonymizedAt: string;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -49,7 +50,7 @@ export default function AdminLeadsPage() {
 }
 
 function LeadsCrm() {
-  const { token } = useAdminToken();
+  const { token, agent } = useAdminToken();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [sources, setSources] = useState<Record<string, string>>({});
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -108,7 +109,7 @@ function LeadsCrm() {
     const res = await fetch(`/api/admin/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, agente: agent }),
     });
     const body = await res.json();
     if (res.ok && body.ok) {
@@ -231,6 +232,35 @@ function LeadsCrm() {
                   <p className="mt-1.5 text-[12px] text-slate2">Sin registro de consentimiento.</p>
                 )}
               </div>
+
+              <div className="mt-5 border-t border-hair pt-4">
+                <p className="text-[12px] font-semibold text-ink">RGPD</p>
+                {l.anonymizedAt ? (
+                  <p className="mt-1.5 text-[12px] text-slate2">Datos anonimizados el {fmt(l.anonymizedAt)}.</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <a href={`/api/admin/leads/${l.id}/export?token=${encodeURIComponent(token)}`}
+                      className="text-[12px] font-semibold text-navy underline">
+                      Exportar datos
+                    </a>
+                    <span className="text-slate2">·</span>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`¿Seguro que quieres anonimizar los datos de ${l.nombre || "este cliente"}? No se puede deshacer.`)) return;
+                        const res = await fetch(`/api/admin/leads/${l.id}/anonymize`, {
+                          method: "POST", headers: { "Content-Type": "application/json", "x-admin-token": token },
+                          body: JSON.stringify({ agente: agent }),
+                        });
+                        const body = await res.json();
+                        if (res.ok && body.ok) { setSelected(body.lead); setLeads((prev) => prev.map((x) => (x.id === body.lead.id ? body.lead : x))); }
+                      }}
+                      className="text-[12px] font-semibold text-brand-red underline"
+                    >
+                      Anonimizar (derecho de supresión)
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
@@ -268,6 +298,10 @@ function LeadsCrm() {
 
             <CollapsiblePanel title="Presupuestos">
               <PresupuestosPanel leadId={l.id} />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel title="Tareas">
+              <TasksPanel leadId={l.id} />
             </CollapsiblePanel>
           </div>
         </div>
@@ -392,7 +426,7 @@ function ActivityPanel({ activity }: { activity: Activity[] }) {
           <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
           <div>
             <p className="text-[14px] text-ink">{a.note}</p>
-            <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+            <p className="text-[12px] text-slate2">{fmt(a.at)}{a.meta?.agente ? ` · ${a.meta.agente}` : ""}</p>
           </div>
         </li>
       ))}
@@ -427,7 +461,7 @@ function ContactLogPanel({ activity, onLog }: { activity: Activity[]; onLog: (ch
               <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-navy" />
               <div>
                 <p className="text-[14px] text-ink">{a.note}</p>
-                <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+                <p className="text-[12px] text-slate2">{fmt(a.at)}{a.meta?.agente ? ` · ${a.meta.agente}` : ""}</p>
               </div>
             </li>
           ))}
@@ -451,7 +485,7 @@ function NotesPanel({ activity, onSave }: { activity: Activity[]; onSave: (txt: 
               <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-red" />
               <div>
                 <p className="text-[14px] text-ink">{a.note}</p>
-                <p className="text-[12px] text-slate2">{fmt(a.at)}</p>
+                <p className="text-[12px] text-slate2">{fmt(a.at)}{a.meta?.agente ? ` · ${a.meta.agente}` : ""}</p>
               </div>
             </li>
           ))}
@@ -547,6 +581,81 @@ function PresupuestosPanel({ leadId }: { leadId: string }) {
         />
       )}
     </ol>
+  );
+}
+
+type TaskItem = {
+  id: string; titulo: string; notas: string; fecha: string; hora: string;
+  agente: string; completada: boolean;
+};
+
+function TasksPanel({ leadId }: { leadId: string }) {
+  const { token, agent } = useAdminToken();
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [titulo, setTitulo] = useState("");
+  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/admin/tasks?leadId=${leadId}`, { headers: { "x-admin-token": token } });
+    const body = await res.json();
+    if (body.ok) setTasks(body.tasks);
+    setLoaded(true);
+  }, [leadId, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function create() {
+    if (!titulo.trim() || !fecha) return;
+    await fetch("/api/admin/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-token": token },
+      body: JSON.stringify({ leadId, titulo, fecha, agente: agent }),
+    });
+    setTitulo("");
+    load();
+  }
+
+  async function toggle(id: string, completada: boolean) {
+    await fetch(`/api/admin/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-admin-token": token },
+      body: JSON.stringify({ completada }),
+    });
+    load();
+  }
+
+  if (!loaded) return <p className="text-[13px] text-slate2">Cargando…</p>;
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Nueva tarea…"
+          className="min-w-[160px] flex-1 rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+        <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+          className="rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+        <button onClick={create} disabled={!titulo.trim()}
+          className="rounded-card bg-navy px-3 py-2 text-[13px] font-semibold text-white disabled:bg-slate2/40">
+          Crear
+        </button>
+      </div>
+      {tasks.length === 0 ? (
+        <p className="mt-3 text-[13px] text-slate2">Sin tareas para este lead.</p>
+      ) : (
+        <ol className="mt-4 flex flex-col gap-2">
+          {tasks.map((t) => (
+            <li key={t.id} className="flex items-start gap-2.5">
+              <input type="checkbox" checked={t.completada} onChange={(e) => toggle(t.id, e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-navy" />
+              <div className="min-w-0">
+                <p className={`text-[14px] ${t.completada ? "text-slate2 line-through" : "text-ink"}`}>{t.titulo}</p>
+                <p className="text-[12px] text-slate2">{t.fecha}{t.hora ? ` · ${t.hora}` : ""}{t.agente ? ` · ${t.agente}` : ""}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 

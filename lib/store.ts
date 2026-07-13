@@ -2,6 +2,7 @@ import { normalizePhone } from "./schema";
 import {
   SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status,
   type Presupuesto, type PresupuestoStatus, type PresupuestoNote, type PresupuestoEleccion,
+  type Task, type TaskDraft,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
@@ -59,6 +60,14 @@ async function jset(key: string, val: unknown): Promise<void> {
     return;
   }
   mem.data.set(key, val);
+}
+async function jdel(key: string): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    await r.del(key);
+    return;
+  }
+  mem.data.delete(key);
 }
 async function zadd(key: string, score: number, member: string): Promise<void> {
   if (hasKV) {
@@ -177,6 +186,7 @@ export async function upsertLead(
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
     submissions: [],
+    anonymizedAt: "",
   };
   const firstSubmission: LeadSubmission = { id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> };
   lead.submissions = [firstSubmission];
@@ -277,30 +287,88 @@ const CONTACT_CHANNEL_LABELS: Record<string, string> = {
 
 export async function updateLead(
   id: string,
-  patch: { status?: Status; nextStep?: string; note?: string; contact?: { channel: string; note?: string } }
+  patch: { status?: Status; nextStep?: string; note?: string; contact?: { channel: string; note?: string }; agente?: string }
 ): Promise<Lead | null> {
   const lead = await jget<Lead>(`lead:${id}`);
   if (!lead) return null;
   const now = new Date().toISOString();
+  const agente = patch.agente?.trim() || undefined;
   if (patch.status && patch.status !== lead.status) {
-    lead.activity.unshift({ at: now, type: "status", note: `Estado → ${patch.status}` });
+    lead.activity.unshift({ at: now, type: "status", note: `Estado → ${patch.status}`, meta: agente ? { agente } : undefined });
     lead.status = patch.status;
   }
   if (typeof patch.nextStep === "string" && patch.nextStep !== lead.nextStep) {
     lead.nextStep = patch.nextStep;
-    lead.activity.unshift({ at: now, type: "nextstep", note: `Próximo paso: ${patch.nextStep || "—"}` });
+    lead.activity.unshift({ at: now, type: "nextstep", note: `Próximo paso: ${patch.nextStep || "—"}`, meta: agente ? { agente } : undefined });
   }
   if (patch.note && patch.note.trim()) {
-    lead.activity.unshift({ at: now, type: "note", note: patch.note.trim() });
+    lead.activity.unshift({ at: now, type: "note", note: patch.note.trim(), meta: agente ? { agente } : undefined });
   }
   if (patch.contact?.channel) {
     const label = CONTACT_CHANNEL_LABELS[patch.contact.channel] ?? patch.contact.channel;
     const note = patch.contact.note?.trim() ? `${label}: ${patch.contact.note.trim()}` : label;
-    lead.activity.unshift({ at: now, type: "contact", note, meta: { channel: patch.contact.channel } });
+    lead.activity.unshift({ at: now, type: "contact", note, meta: { channel: patch.contact.channel, ...(agente ? { agente } : {}) } });
   }
   lead.updatedAt = now;
   await jset(`lead:${id}`, lead);
   await zadd("leads:index", Date.parse(now), id);
+  return lead;
+}
+
+/* ------------------------------- RGPD --------------------------------------- */
+// Derechos de acceso/portabilidad y supresión (RGPD arts. 15/17/20). La
+// supresión se implementa como anonimización: se sustituyen los datos
+// identificativos por marcadores y se borran los índices de búsqueda, pero
+// se conserva activity/consents como prueba de que la solicitud se atendió
+// (requisito de auditoría DGSFP — borrarlo todo eliminaría la propia prueba
+// de cumplimiento).
+
+export async function exportLeadData(id: string): Promise<{ lead: Lead; presupuestos: Presupuesto[] } | null> {
+  const lead = await jget<Lead>(`lead:${id}`);
+  if (!lead) return null;
+  const presupuestos = await listPresupuestosByLead(id);
+  return { lead, presupuestos };
+}
+
+export async function anonymizeLead(id: string, agente?: string): Promise<Lead | null> {
+  const lead = await jget<Lead>(`lead:${id}`);
+  if (!lead) return null;
+  const now = new Date().toISOString();
+
+  if (lead.telefono) await jdel(`idx:phone:${lead.telefono}`);
+  if (lead.email) await jdel(`idx:email:${lead.email}`);
+
+  lead.nombre = "[anonimizado]";
+  lead.telefono = "";
+  lead.email = "";
+  lead.codigoPostal = "";
+  lead.fechaNacimiento = "";
+  lead.seguroActualServicios = [];
+  lead.utm = {};
+  lead.anonymizedAt = now;
+  lead.updatedAt = now;
+  lead.activity.unshift({
+    at: now, type: "rgpd",
+    note: "Datos personales anonimizados a petición del interesado (derecho de supresión, RGPD).",
+    meta: agente ? { agente } : undefined,
+  });
+  await jset(`lead:${id}`, lead);
+  await zadd("leads:index", Date.parse(now), id);
+
+  const presupuestos = await listPresupuestosByLead(id);
+  for (const p of presupuestos) {
+    p.nombre = "[anonimizado]";
+    p.telefono = "";
+    p.email = "";
+    if (p.data) {
+      p.data = { ...p.data };
+      delete p.data.codigoPostal;
+      delete p.data.fechaNacimiento;
+    }
+    p.updatedAt = now;
+    await jset(`presupuesto:${p.id}`, p);
+  }
+
   return lead;
 }
 
@@ -435,7 +503,7 @@ export async function createPresupuesto(input: {
   const presupuesto: Presupuesto = {
     id: input.id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
     source: input.source, producto: input.producto, status: "nuevo",
-    data: input.data, precioAprox, notas: [], eleccion: null,
+    data: input.data, precioAprox, notas: [], eleccion: null, closedBy: "",
     nombre: input.nombre, telefono: input.telefono, email: input.email,
   };
   await jset(`presupuesto:${input.id}`, presupuesto);
@@ -469,7 +537,7 @@ export async function createManualPresupuesto(input: {
   const presupuesto: Presupuesto = {
     id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
     source: "admin-manual", producto: input.producto, status: "enviado",
-    data: { codigoPostal: lead.codigoPostal }, precioAprox: input.precio, notas: [], eleccion,
+    data: { codigoPostal: lead.codigoPostal }, precioAprox: input.precio, notas: [], eleccion, closedBy: "",
     nombre: lead.nombre, telefono: lead.telefono, email: lead.email,
   };
   await jset(`presupuesto:${id}`, presupuesto);
@@ -524,17 +592,21 @@ export async function getPresupuesto(id: string): Promise<Presupuesto | null> {
 
 export async function updatePresupuesto(
   id: string,
-  patch: { status?: PresupuestoStatus; note?: string }
+  patch: { status?: PresupuestoStatus; note?: string; agente?: string }
 ): Promise<Presupuesto | null> {
   const p = await jget<Presupuesto>(`presupuesto:${id}`);
   if (!p) return null;
   const now = new Date().toISOString();
+  const agente = patch.agente?.trim() || "";
   if (patch.status && patch.status !== p.status) {
     p.status = patch.status;
-    p.closedAt = patch.status === "ganado" || patch.status === "perdido" ? now : "";
+    const closing = patch.status === "ganado" || patch.status === "perdido";
+    p.closedAt = closing ? now : "";
+    if (closing && agente) p.closedBy = agente;
+    if (!closing) p.closedBy = "";
   }
   if (patch.note && patch.note.trim()) {
-    const note: PresupuestoNote = { id: makeSubmissionId(), at: now, texto: patch.note.trim() };
+    const note: PresupuestoNote = { id: makeSubmissionId(), at: now, texto: patch.note.trim(), agente: agente || undefined };
     p.notas = [note, ...p.notas];
   }
   p.updatedAt = now;
@@ -542,4 +614,76 @@ export async function updatePresupuesto(
   await zadd("presupuestos:index", Date.parse(now), id);
   await zadd(`presupuestos:byLead:${p.leadId}`, Date.parse(now), id);
   return p;
+}
+
+/* ---------------------------------- Tareas ------------------------------------ */
+
+export async function createTask(draft: TaskDraft): Promise<Task> {
+  const now = new Date().toISOString();
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const task: Task = {
+    id, leadId: draft.leadId ?? "", presupuestoId: draft.presupuestoId ?? "",
+    titulo: draft.titulo.trim(), notas: draft.notas?.trim() ?? "",
+    fecha: draft.fecha, hora: draft.hora ?? "", agente: draft.agente?.trim() ?? "",
+    completada: false, completedAt: "", createdAt: now, updatedAt: now,
+  };
+  await jset(`task:${id}`, task);
+  // Orden cronológico por fecha+hora (no por creación), para la agenda.
+  const score = Date.parse(`${task.fecha}T${task.hora || "00:00"}:00`) || Date.parse(now);
+  await zadd("tasks:index", score, id);
+  if (task.leadId) await zadd(`tasks:byLead:${task.leadId}`, score, id);
+  return task;
+}
+
+export async function listTasks(): Promise<Task[]> {
+  const ids = await zrangeRev("tasks:index");
+  const out: Task[] = [];
+  for (const id of ids) {
+    const t = await jget<Task>(`task:${id}`);
+    if (t) out.push(t);
+  }
+  return out.reverse(); // orden cronológico ascendente (próximas primero)
+}
+
+export async function listTasksByLead(leadId: string): Promise<Task[]> {
+  const ids = await zrangeRev(`tasks:byLead:${leadId}`);
+  const out: Task[] = [];
+  for (const id of ids) {
+    const t = await jget<Task>(`task:${id}`);
+    if (t) out.push(t);
+  }
+  return out.reverse();
+}
+
+export async function updateTask(
+  id: string,
+  patch: { completada?: boolean; titulo?: string; notas?: string; fecha?: string; hora?: string }
+): Promise<Task | null> {
+  const t = await jget<Task>(`task:${id}`);
+  if (!t) return null;
+  const now = new Date().toISOString();
+  if (typeof patch.completada === "boolean") {
+    t.completada = patch.completada;
+    t.completedAt = patch.completada ? now : "";
+  }
+  if (typeof patch.titulo === "string" && patch.titulo.trim()) t.titulo = patch.titulo.trim();
+  if (typeof patch.notas === "string") t.notas = patch.notas.trim();
+  if (typeof patch.fecha === "string") t.fecha = patch.fecha;
+  if (typeof patch.hora === "string") t.hora = patch.hora;
+  t.updatedAt = now;
+  await jset(`task:${id}`, t);
+  const score = Date.parse(`${t.fecha}T${t.hora || "00:00"}:00`) || Date.parse(now);
+  await zadd("tasks:index", score, id);
+  if (t.leadId) await zadd(`tasks:byLead:${t.leadId}`, score, id);
+  return t;
+}
+
+export async function deleteTask(id: string): Promise<boolean> {
+  const t = await jget<Task>(`task:${id}`);
+  if (!t) return false;
+  await jdel(`task:${id}`);
+  return true;
 }

@@ -29,7 +29,7 @@ export async function PATCH(
   const denied = adminAuthFail(request);
   if (denied) return denied;
 
-  let body: { status?: string; note?: string };
+  let body: { status?: string; note?: string; agente?: string };
   try {
     body = await request.json();
   } catch {
@@ -41,7 +41,7 @@ export async function PATCH(
       ? (body.status as PresupuestoStatus)
       : undefined;
 
-  const presupuesto = await updatePresupuesto(params.id, { status, note: body.note });
+  const presupuesto = await updatePresupuesto(params.id, { status, note: body.note, agente: body.agente });
   if (!presupuesto) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
   return NextResponse.json({ ok: true, presupuesto });
 }

@@ -19,7 +19,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 
 export type Activity = {
   at: string;
-  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact";
+  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact" | "rgpd";
   note: string;
   meta?: Record<string, unknown>;
 };
@@ -91,6 +91,11 @@ export type Lead = {
   activity: Activity[];
   // Histórico de tarificaciones / presupuestos (uno por envío de formulario).
   submissions: LeadSubmission[];
+  // RGPD: fecha de anonimización si el interesado ha ejercido su derecho de
+  // supresión ("" = no se ha solicitado). Los datos identificativos se
+  // sustituyen por marcadores; se conserva la traza de actividad como
+  // prueba de que la solicitud se atendió (no se borra activity/consents).
+  anonymizedAt: string;
 };
 
 export type LeadDraft = Partial<
@@ -121,7 +126,7 @@ export const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   perdido: "Perdido",
 };
 
-export type PresupuestoNote = { id: string; at: string; texto: string };
+export type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };
 
 // Elección real del cliente: aseguradora, precio y (si aplica) coberturas
 // concretas que se le van a proponer/confirmar — se rellena cuando pide que
@@ -148,9 +153,42 @@ export type Presupuesto = {
   precioAprox: number | null;
   notas: PresupuestoNote[];
   eleccion: PresupuestoEleccion | null;
+  // Agente que cerró el presupuesto (ganado/perdido) — para el ranking de
+  // agentes en /admin/informes. "" si sigue abierto o no se identificó.
+  closedBy: string;
   // Contacto denormalizado del lead en el momento de crear el presupuesto,
   // para poder listar/exportar sin tener que resolver cada lead.
   nombre: string;
   telefono: string;
   email: string;
+};
+
+/* ---------------------------------- Tareas ----------------------------------- */
+// Recordatorios/agenda del equipo comercial, opcionalmente vinculados a un
+// lead y/o presupuesto. Sustituye (y complementa) el campo de texto libre
+// "Próximo paso" con algo accionable y con fecha real.
+
+export type Task = {
+  id: string;
+  leadId: string; // "" si no está vinculada a un lead
+  presupuestoId: string; // "" si no está vinculada a un presupuesto
+  titulo: string;
+  notas: string;
+  fecha: string; // yyyy-mm-dd
+  hora: string; // HH:MM, opcional ("" si no se fija)
+  agente: string; // nombre libre de quien la creó/debe hacerla
+  completada: boolean;
+  completedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TaskDraft = {
+  leadId?: string;
+  presupuestoId?: string;
+  titulo: string;
+  notas?: string;
+  fecha: string;
+  hora?: string;
+  agente?: string;
 };
