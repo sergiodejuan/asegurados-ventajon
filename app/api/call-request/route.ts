@@ -50,6 +50,11 @@ export async function POST(request: Request) {
         producto: d.producto ?? "salud",
         codigo_postal: d.codigoPostal,
         ...(d.compania ? { compania: d.compania } : {}),
+        ...(d.diaLlamada ? { dia_preferido: d.diaLlamada } : {}),
+        ...(d.turnoLlamada ? { turno_preferido: d.turnoLlamada } : {}),
+        contexto_llamada: d.presupuestoId
+          ? "ha pedido reprogramar la llamada sobre un presupuesto que ya había calculado"
+          : "ha solicitado que le llamemos",
       },
     });
     if (!call.ok) console.error("[call-request] bland call error", call.error);

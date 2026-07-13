@@ -3,7 +3,8 @@ import { leadSchema } from "@/lib/schema";
 import { upsertLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
-import { blandConfigured, triggerBlandCall } from "@/lib/bland";
+import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
+import { ageFromDob } from "@/lib/quote";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,11 +60,26 @@ export async function POST(request: Request) {
   }
 
   if (blandConfigured() && d.autorizaContacto) {
+    const edad = ageFromDob(d.fechaNacimiento);
     const call = await triggerBlandCall({
       toNumber: d.telefono,
       leadId: id,
       source: "tarificador-salud",
-      requestData: { nombre: d.nombre, producto: "seguro de salud", codigo_postal: d.codigoPostal },
+      requestData: {
+        nombre: d.nombre,
+        producto: "seguro de salud",
+        codigo_postal: d.codigoPostal,
+        ...(edad != null ? { edad: String(edad) } : {}),
+        sexo: d.sexo,
+        num_asegurados: String(d.numAsegurados),
+        cobertura_dental: d.coberturaDental ? "sí" : "no",
+        ya_tiene_seguro: d.yaTieneSeguro ? "sí" : "no",
+        ...(d.yaTieneSeguro && d.seguroActualImporte != null
+          ? { seguro_actual_importe: `${d.seguroActualImporte} €/${d.seguroActualPeriodo}` }
+          : {}),
+        ...(humanizeInicio(inicio) ? { inicio: humanizeInicio(inicio) } : {}),
+        contexto_llamada: "acaba de calcular su precio en el tarificador de salud",
+      },
     });
     if (!call.ok) console.error("[lead] bland call error", call.error);
   }

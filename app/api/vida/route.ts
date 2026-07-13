@@ -3,7 +3,8 @@ import { vidaSchema } from "@/lib/schema";
 import { upsertLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
-import { blandConfigured, triggerBlandCall } from "@/lib/bland";
+import { blandConfigured, triggerBlandCall, humanizeMotivo } from "@/lib/bland";
+import { ageFromDob } from "@/lib/quote";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,11 +56,25 @@ export async function POST(request: Request) {
   }
 
   if (blandConfigured() && d.autorizaContacto) {
+    const edad = ageFromDob(d.fechaNacimiento);
     const call = await triggerBlandCall({
       toNumber: d.telefono,
       leadId: id,
       source: "tarificador-vida",
-      requestData: { nombre: d.nombre, producto: "seguro de vida", codigo_postal: d.codigoPostal },
+      requestData: {
+        nombre: d.nombre,
+        producto: "seguro de vida",
+        codigo_postal: d.codigoPostal,
+        ...(edad != null ? { edad: String(edad) } : {}),
+        sexo: d.sexo,
+        motivo: humanizeMotivo(d.motivo),
+        fumador: d.fumador ? "sí" : "no",
+        ya_tiene_seguro: d.yaTieneSeguro ? "sí" : "no",
+        ...(d.yaTieneSeguro && d.seguroActualImporte != null
+          ? { seguro_actual_importe: `${d.seguroActualImporte} €/${d.seguroActualPeriodo}` }
+          : {}),
+        contexto_llamada: "acaba de calcular su precio en el tarificador de vida",
+      },
     });
     if (!call.ok) console.error("[vida] bland call error", call.error);
   }

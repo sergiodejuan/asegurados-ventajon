@@ -23,6 +23,33 @@ export function blandConfigured(): boolean {
   return !!(process.env.BLAND_API_KEY && process.env.BLAND_PATHWAY_ID);
 }
 
+// "inicio" llega ya resuelto (o un enum, o la fecha personalizada en
+// formato yyyy-mm-dd) desde /api/lead — se convierte a texto natural para
+// que el agente de voz lo diga sin tener que interpretar el valor bruto.
+export function humanizeInicio(inicio: string | undefined): string {
+  switch (inicio) {
+    case "cuanto_antes": return "cuanto antes";
+    case "proximo_mes": return "el próximo mes";
+    case "comparando": return "aún está comparando, sin fecha decidida";
+    case undefined: return "";
+    case "fecha_personalizada": return "";
+    default: {
+      const m = inicio.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? `el ${m[3]}/${m[2]}/${m[1]}` : inicio;
+    }
+  }
+}
+
+export function humanizeMotivo(motivo: string | undefined): string {
+  switch (motivo) {
+    case "familia": return "proteger a su familia";
+    case "hipoteca": return "cubrir su hipoteca";
+    case "ahorro": return "ahorro e inversión";
+    case "otro": return "otro motivo";
+    default: return motivo ?? "";
+  }
+}
+
 export async function triggerBlandCall(opts: {
   toNumber: string; // ya normalizado (sin +34)
   leadId: string;
