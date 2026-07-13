@@ -6,6 +6,7 @@ import {
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
 import { saludPrice, vidaPrice } from "./quote";
+import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
 function makeSubmissionId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -368,6 +369,34 @@ export async function saveCampaignBanner(patch: Partial<CampaignBanner>): Promis
   const current = await getCampaignBanner();
   const next: CampaignBanner = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(CAMPAIGN_KEY, next);
+  return next;
+}
+
+/* --------------------------- Apariencia del sitio --------------------------- */
+
+const THEME_KEY = "theme:site";
+
+export async function getTheme(): Promise<SiteTheme> {
+  const stored = await jget<SiteTheme>(THEME_KEY);
+  if (!stored) return DEFAULT_THEME;
+  return {
+    ...DEFAULT_THEME,
+    ...stored,
+    colors: { ...DEFAULT_THEME.colors, ...(stored.colors ?? {}) },
+    heroImages: { ...(stored.heroImages ?? {}) },
+  };
+}
+
+export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
+  const current = await getTheme();
+  const next: SiteTheme = {
+    ...current,
+    ...patch,
+    colors: { ...current.colors, ...(patch.colors ?? {}) },
+    heroImages: { ...current.heroImages, ...(patch.heroImages ?? {}) },
+    updatedAt: new Date().toISOString(),
+  };
+  await jset(THEME_KEY, next);
   return next;
 }
 

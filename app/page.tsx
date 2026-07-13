@@ -8,6 +8,7 @@ import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
+import { getTheme } from "@/lib/store";
 
 const PRODUCT_BLURBS: Record<string, string> = {
   salud: "Con o sin copago. Calcula tu precio al instante.",
@@ -25,7 +26,9 @@ const FAQ_GENERAL = [
   { q: "¿En qué zonas trabajáis?", a: "Trabajamos en toda España, con atención especialmente cercana en Canarias y Baleares." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const theme = await getTheme();
+  const heroImage = theme.heroImages.home;
   return (
     <>
       <Header />
@@ -47,13 +50,20 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Imagen de marca (placeholder — sustituir por foto real aprobada) */}
+            {/* Imagen de marca: editable desde /admin/diseno; si no hay foto, placeholder con icono */}
             <div
               role="img"
               aria-label="Comparamos tu seguro entre las mejores compañías"
-              className="mt-6 grid h-52 place-items-center overflow-hidden rounded-[24px] bg-gradient-to-br from-navy to-navy-deep text-white/90 md:col-start-2 md:row-span-2 md:row-start-1 md:mt-0 md:h-full md:min-h-[420px]"
+              className="mt-6 h-52 overflow-hidden rounded-[24px] bg-gradient-to-br from-navy to-navy-deep text-white/90 md:col-start-2 md:row-span-2 md:row-start-1 md:mt-0 md:h-full md:min-h-[420px]"
             >
-              <IconByName name="compare" width={64} height={64} />
+              {heroImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={heroImage} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  <IconByName name="compare" width={64} height={64} />
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">

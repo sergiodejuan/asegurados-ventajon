@@ -5,22 +5,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Sistema visual Asegurados Ventajon (Estrategia §8)
+        // Sistema visual Asegurados Ventajon (Estrategia §8). Los valores son
+        // variables CSS (ver app/layout.tsx + lib/theme.ts) para que sean
+        // editables desde /admin/diseno sin tocar ninguna clase de Tailwind.
         navy: {
-          DEFAULT: "#1B2B6B", // azul marino dominante
-          deep: "#12204F",
-          soft: "#31418A",
+          DEFAULT: "var(--color-navy)",
+          deep: "var(--color-navy-deep)",
+          soft: "var(--color-navy-soft)",
         },
         brand: {
-          red: "#C8312A", // acento e identidad
-          "red-deep": "#A8261F",
+          red: "var(--color-brand-red)",
+          "red-deep": "var(--color-brand-red-deep)",
         },
-        ink: "#1C2333", // texto principal
-        slate2: "#5A6473", // texto secundario
-        mist: "#F5F7FB", // fondo
-        hair: "#E4E8F0", // hairline / bordes
+        ink: "var(--color-ink)",
+        slate2: "var(--color-slate2)",
+        mist: "var(--color-mist)",
+        hair: "var(--color-hair)",
         mint: {
-          DEFAULT: "#E4F3F0", // banner promo (estilo referencia)
+          DEFAULT: "#E4F3F0", // banner promo (estilo referencia) — no editable
           deep: "#0E5A4E",
         },
       },

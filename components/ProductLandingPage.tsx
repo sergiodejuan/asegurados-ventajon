@@ -6,9 +6,12 @@ import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
 import { ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES, type ProductPage } from "@/lib/productPages";
+import { getTheme } from "@/lib/store";
 
-export function ProductLandingPage({ page }: { page: ProductPage }) {
+export async function ProductLandingPage({ page }: { page: ProductPage }) {
   const otros = PRODUCT_PAGES.filter((p) => p.slug !== page.slug);
+  const theme = await getTheme();
+  const heroImage = theme.heroImages[page.slug];
 
   return (
     <>
@@ -32,9 +35,16 @@ export function ProductLandingPage({ page }: { page: ProductPage }) {
             <div
               role="img"
               aria-label={page.badge}
-              className="mt-6 grid h-52 place-items-center overflow-hidden rounded-[24px] bg-gradient-to-br from-navy to-navy-deep text-white/90 md:col-start-2 md:row-span-2 md:row-start-1 md:mt-0 md:h-full md:min-h-[380px]"
+              className="mt-6 h-52 overflow-hidden rounded-[24px] bg-gradient-to-br from-navy to-navy-deep text-white/90 md:col-start-2 md:row-span-2 md:row-start-1 md:mt-0 md:h-full md:min-h-[380px]"
             >
-              <IconByName name={page.heroIcon} width={64} height={64} />
+              {heroImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={heroImage} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  <IconByName name={page.heroIcon} width={64} height={64} />
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">

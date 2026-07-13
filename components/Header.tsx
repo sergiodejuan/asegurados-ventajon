@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
+import { useSiteTheme } from "@/lib/useTheme";
 import { WhatsApp } from "./icons";
 
-export function Wordmark() {
+export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={logoUrl} alt={BRAND_NAME} className="h-8 w-auto max-w-[160px] object-contain" />;
+  }
   const parts = BRAND_NAME.split(" ");
   const first = parts[0];
   const rest = parts.slice(1).join(" ");
@@ -77,6 +82,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
   const isHome = pathname === "/";
   const crumbs = !isHome ? (crumbsOverride ?? BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
   const progress = useScrollProgress(showProgress && !isHome);
+  const theme = useSiteTheme();
 
   return (
     <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md xl:mx-12">
@@ -87,7 +93,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
       )}
       <div className="mx-auto flex h-14 max-w-app items-center justify-between px-5 md:max-w-5xl lg:h-16 lg:max-w-none lg:px-6">
         <a href="/" className="rounded-md" aria-label={`${BRAND_NAME} · Inicio`}>
-          <Wordmark />
+          <Wordmark logoUrl={theme.logoUrl} />
         </a>
         <nav aria-label="Principal" className="hidden items-center gap-8 lg:flex">
           {NAV_LINKS.map((l) => (

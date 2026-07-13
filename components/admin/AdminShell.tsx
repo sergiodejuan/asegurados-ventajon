@@ -18,9 +18,10 @@ const TABS = [
   { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos" },
   { href: "/admin/productos", label: "Productos", key: "productos" },
   { href: "/admin/campana", label: "Campaña", key: "campana" },
+  { href: "/admin/diseno", label: "Diseño", key: "diseno" },
 ] as const;
 
-export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "presupuestos" | "productos" | "campana" }) {
+export function AdminShell({ children, active }: { children: React.ReactNode; active: "leads" | "presupuestos" | "productos" | "campana" | "diseno" }) {
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);

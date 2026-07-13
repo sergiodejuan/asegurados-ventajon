@@ -4,6 +4,17 @@
 
 :root {
   color-scheme: light;
+  /* Valores por defecto (red de seguridad si el layout raíz aún no ha
+     aplicado el tema guardado en /admin/diseno vía estilo inline en <html>). */
+  --color-navy: #1b2b6b;
+  --color-navy-deep: #12204f;
+  --color-navy-soft: #31418a;
+  --color-brand-red: #c8312a;
+  --color-brand-red-deep: #a8261f;
+  --color-ink: #1c2333;
+  --color-slate2: #5a6473;
+  --color-mist: #f5f7fb;
+  --color-hair: #e4e8f0;
 }
 
 @layer base {
