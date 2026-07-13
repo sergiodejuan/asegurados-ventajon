@@ -41,14 +41,7 @@ export function MesGratisLanding() {
 
   return (
     <main id="contenido" className="overflow-x-hidden bg-ink">
-      {/* Mismo menú isla que el resto del sitio */}
-      <Header />
-      {/* lg:mt-4 compensa el desplazamiento del menú isla (lg:top-4) para que no se solape */}
-      <div className="bg-brand-red py-2 text-center text-[12px] font-bold uppercase tracking-wide text-white lg:mt-4">
-        Oferta por tiempo limitado — 1 mes gratis en tu seguro de salud
-      </div>
-
-      {/* HERO */}
+      {/* HERO — la foto sube hasta arriba del todo; el menú isla flota encima, sin franja detrás */}
       <section className="relative overflow-hidden">
         {heroImage ? (
           <>
@@ -67,6 +60,11 @@ export function MesGratisLanding() {
         <div aria-hidden="true" className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-red/30 blur-3xl motion-safe:animate-pulse" />
         <div aria-hidden="true" className="absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
+        {/* Mismo menú isla que el resto del sitio, flotando sobre la foto */}
+        <div className="relative">
+          <Header />
+        </div>
+
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-6 text-center md:pb-24 md:pt-10">
           <span className="motion-safe:animate-fade-up inline-flex items-center gap-2 rounded-pill bg-brand-red px-4 py-2 text-[13px] font-extrabold uppercase tracking-wide text-white shadow-card">
             <IconByName name="shield" width={16} height={16} />
@@ -76,9 +74,9 @@ export function MesGratisLanding() {
           <h1 className="motion-safe:animate-fade-up mt-6 text-[42px] font-extrabold leading-[1.02] tracking-tight text-white sm:text-[56px] md:text-[68px]">
             Contrata ahora
             <br />
-            <span className="bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">y te regalamos</span>
+            y te regalamos
             <br />
-            <span className="text-brand-red drop-shadow-[0_2px_24px_rgba(200,49,42,0.6)]">1 mes gratis</span>
+            1 mes gratis
           </h1>
 
           <p className="motion-safe:animate-fade-up mx-auto mt-5 max-w-lg text-[17px] leading-relaxed text-white/80">
