@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Header } from "./Header";
+import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
@@ -63,7 +63,7 @@ export function Comparativa() {
   if (loaded && !quote) {
     return (
       <>
-        <Header />
+        <MinimalTopBar />
         <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
           <p className="text-[16px] leading-relaxed text-slate2">
             No encontramos los datos de tu comparativa. Vuelve a calcular tu precio para verla.
@@ -86,7 +86,7 @@ export function Comparativa() {
 
   return (
     <>
-      <Header />
+      <MinimalTopBar />
       <main id="contenido" className="mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-white">
           <Check width={30} height={30} />
@@ -198,6 +198,7 @@ export function Comparativa() {
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">
                       <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
+                        <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} />
                         {c.compania}
                         {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
                       </p>
@@ -205,7 +206,7 @@ export function Comparativa() {
                         Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
                       </p>
                     </div>
-                    <CompanyActions producto={producto} compania={c.compania} />
+                    <CompanyActions producto={producto} compania={c.compania} precio={price.precio} />
                   </li>
                 );
               })
@@ -214,6 +215,7 @@ export function Comparativa() {
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
+                      <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} />
                       {c.compania}
                       {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
                     </p>
@@ -225,7 +227,7 @@ export function Comparativa() {
                       <span>Sin copago</span>
                       <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
                     </div>
-                    <CompanyActions producto={producto} compania={c.compania} />
+                    <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} />
                   </li>
                 );
               })}
@@ -238,7 +240,13 @@ export function Comparativa() {
   );
 }
 
-function CompanyActions({ producto, compania }: { producto: string; compania: string }) {
+export function CompanyLogo({ logoUrl, compania }: { logoUrl?: string; compania: string }) {
+  if (!logoUrl) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={logoUrl} alt={compania} className="h-6 w-auto max-w-[72px] shrink-0 object-contain" />;
+}
+
+function CompanyActions({ producto, compania, precio }: { producto: string; compania: string; precio: number }) {
   return (
     <div className="mt-3 flex gap-2">
       <a
@@ -248,7 +256,7 @@ function CompanyActions({ producto, compania }: { producto: string; compania: st
         Más información
       </a>
       <a
-        href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}`}
+        href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
         className="flex-1 rounded-card bg-brand-red px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
       >
         Que me llamen

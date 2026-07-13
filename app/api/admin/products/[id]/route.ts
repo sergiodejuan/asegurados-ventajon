@@ -6,6 +6,8 @@ import type { ProductDraft } from "@/lib/catalog";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const MAX_LOGO_LENGTH = 400_000;
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const denied = adminAuthFail(request);
   if (denied) return denied;
@@ -21,6 +23,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   let body: ProductDraft;
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  if (typeof body.logoUrl === "string" && body.logoUrl.length > MAX_LOGO_LENGTH) {
+    return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+  }
 
   const product = await saveProduct(params.id, body);
   if (!product) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });

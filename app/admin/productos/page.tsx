@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 
 type Product = {
@@ -10,6 +10,7 @@ type Product = {
   activo: boolean;
   destacado: boolean;
   orden: number;
+  logoUrl?: string;
   precioConCopago?: number;
   precioSinCopago?: number;
   precio?: number;
@@ -17,6 +18,35 @@ type Product = {
   servicios: string[];
   updatedAt: string;
 };
+
+const MAX_LOGO_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_LOGO_WIDTH = 300;
+
+function resizeLogoFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("No se pudo procesar la imagen."));
+      img.onload = () => {
+        const scale = Math.min(1, MAX_LOGO_WIDTH / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        // PNG para conservar transparencia (logos suelen llevarla).
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function AdminProductosPage() {
   return (
@@ -115,6 +145,8 @@ function ProductsAdmin() {
           <li key={p.id} className="rounded-card border border-hair bg-white p-4 shadow-soft">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {p.logoUrl && <img src={p.logoUrl} alt="" className="h-7 w-auto max-w-[80px] object-contain" />}
                 <p className="text-[16px] font-bold text-ink">{p.compania}</p>
                 {p.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[11px] font-bold text-brand-red">Recomendado</span>}
                 {!p.activo && <span className="rounded-pill bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">Oculto</span>}
@@ -169,8 +201,23 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
   const [orden, setOrden] = useState(String(product.orden ?? 1));
   const [condiciones, setCondiciones] = useState(product.condiciones ?? "");
   const [servicios, setServicios] = useState(product.servicios.join("\n"));
+  const [logoUrl, setLogoUrl] = useState(product.logoUrl ?? "");
+  const [processingLogo, setProcessingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError(null);
+    if (file.size > MAX_LOGO_FILE_BYTES) { setLogoError("El archivo pesa demasiado. Usa uno de menos de 5 MB."); return; }
+    setProcessingLogo(true);
+    try { setLogoUrl(await resizeLogoFile(file)); }
+    catch { setLogoError("No se pudo procesar la imagen. Prueba con otro archivo."); }
+    setProcessingLogo(false);
+  }
 
   async function handleSave() {
     setSaving(true); setSaved(false);
@@ -181,6 +228,7 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
     patch.orden = Number(orden) || 1;
     patch.condiciones = condiciones;
     patch.servicios = servicios.split("\n").map((s) => s.trim()).filter(Boolean);
+    patch.logoUrl = logoUrl;
     const ok = await onSave(patch);
     setSaving(false);
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1800); }
@@ -188,6 +236,26 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
 
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-card border border-hair bg-mist p-4">
+      <label className="block">
+        <span className="mb-1 block text-[12px] font-semibold text-ink">Logo de la compañía</span>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {logoUrl && <img src={logoUrl} alt="" className="h-9 w-auto max-w-[100px] rounded border border-hair bg-white object-contain p-1" />}
+          <input ref={fileRef} type="file" accept="image/*" onChange={onLogoChange} className="text-[13px]" />
+          {processingLogo && <span className="text-[12px] text-slate2">Procesando…</span>}
+        </div>
+        {logoUrl && (
+          <button type="button" onClick={() => { setLogoUrl(""); if (fileRef.current) fileRef.current.value = ""; }}
+            className="mt-1.5 text-[12px] font-semibold text-brand-red underline">
+            Quitar logo
+          </button>
+        )}
+        {logoError && <p role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{logoError}</p>}
+        <p className="mt-1 text-[11px] leading-relaxed text-slate2">
+          Solo sube logos que tengas autorización para usar. Sin logo, se muestra el nombre de la compañía en texto.
+        </p>
+      </label>
+
       {product.producto === "salud" ? (
         <div className="flex gap-3">
           <label className="flex-1">

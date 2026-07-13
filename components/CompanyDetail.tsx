@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { Header } from "./Header";
+import { MinimalTopBar } from "./MinimalTopBar";
 import { CallRequestForm } from "./CallRequestForm";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
+import { CompanyLogo } from "./Comparativa";
 import { Check } from "./icons";
 import type { Product } from "@/lib/catalog";
 import {
@@ -38,7 +39,7 @@ export function CompanyDetail() {
   if (loaded && !entry) {
     return (
       <>
-        <Header />
+        <MinimalTopBar />
         <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
           <p className="text-[16px] leading-relaxed text-slate2">No encontramos esa opción.</p>
           <a href="/comparativa" className="mt-5 inline-block font-semibold text-navy underline">Volver a la comparativa</a>
@@ -82,14 +83,17 @@ export function CompanyDetail() {
 
   return (
     <>
-      <Header />
+      <MinimalTopBar />
       <main id="contenido" className="mx-auto max-w-app px-5 py-10 md:max-w-2xl md:py-16">
         <a href="/comparativa" className="text-[13px] font-semibold text-navy underline">← Volver a la comparativa</a>
 
         <p className="mt-4 text-[12px] font-bold uppercase tracking-wide text-brand-red">
           {producto === "vida" ? "Seguro de vida" : "Seguro de salud"}
         </p>
-        <h1 className="mt-1 text-[28px] font-extrabold leading-tight text-navy">{entry.compania}</h1>
+        <h1 className="mt-1 flex items-center gap-2.5 text-[28px] font-extrabold leading-tight text-navy">
+          <CompanyLogo logoUrl={entry.logoUrl} compania={entry.compania} />
+          {entry.compania}
+        </h1>
         {quote && <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>}
 
         {producto === "vida" ? (
@@ -157,7 +161,11 @@ export function CompanyDetail() {
             Déjanos tu teléfono y un asesor te llama para confirmar tu presupuesto con {entry.compania}.
           </p>
           <div className="mt-4">
-            <CallRequestForm showHeading={false} />
+            <CallRequestForm
+              showHeading={false}
+              compania={entry.compania}
+              precioElegido={producto === "vida" ? precioVida.precio : precioSalud.conCopago}
+            />
           </div>
         </div>
       </main>

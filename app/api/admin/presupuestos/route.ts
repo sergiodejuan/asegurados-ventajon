@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listPresupuestos, storageMode } from "@/lib/store";
+import { listPresupuestos, storageMode, createManualPresupuesto } from "@/lib/store";
 import { PRESUPUESTO_STATUSES, PRESUPUESTO_STATUS_LABELS, SOURCE_LABELS } from "@/lib/crm";
 import { adminAuthFail } from "@/lib/adminAuth";
 
@@ -10,7 +10,9 @@ export async function GET(request: Request) {
   const denied = adminAuthFail(request);
   if (denied) return denied;
 
-  const presupuestos = await listPresupuestos();
+  const leadId = new URL(request.url).searchParams.get("leadId");
+  const all = await listPresupuestos();
+  const presupuestos = leadId ? all.filter((p) => p.leadId === leadId) : all;
 
   return NextResponse.json({
     ok: true,
@@ -20,4 +22,32 @@ export async function GET(request: Request) {
     statusLabels: PRESUPUESTO_STATUS_LABELS,
     presupuestos,
   });
+}
+
+// Presupuesto creado a mano por un agente, vinculado a un lead ya existente
+// (desde el catálogo de productos o con datos completamente personalizados).
+export async function POST(request: Request) {
+  const denied = adminAuthFail(request);
+  if (denied) return denied;
+
+  let body: {
+    leadId?: string; producto?: string; compania?: string; precio?: number;
+    condiciones?: string; servicios?: string[];
+  };
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  if (!body.leadId) return NextResponse.json({ ok: false, error: "Falta el lead." }, { status: 400 });
+  if (body.producto !== "salud" && body.producto !== "vida") {
+    return NextResponse.json({ ok: false, error: "Producto no válido." }, { status: 400 });
+  }
+  if (!body.compania?.trim()) return NextResponse.json({ ok: false, error: "Falta la aseguradora." }, { status: 400 });
+
+  const presupuesto = await createManualPresupuesto({
+    leadId: body.leadId, producto: body.producto, compania: body.compania.trim(),
+    precio: typeof body.precio === "number" && !Number.isNaN(body.precio) ? body.precio : null,
+    condiciones: body.condiciones, servicios: body.servicios,
+  });
+  if (!presupuesto) return NextResponse.json({ ok: false, error: "Lead no encontrado." }, { status: 404 });
+  return NextResponse.json({ ok: true, presupuesto });
 }

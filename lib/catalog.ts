@@ -10,6 +10,7 @@ export type Product = {
   activo: boolean; // se muestra en la comparativa pública
   destacado: boolean; // insignia "Recomendado" + se ordena primero
   orden: number;
+  logoUrl?: string; // logo subido desde /admin/productos (data URL); sin logo, se muestra el nombre en texto
   // Salud
   precioConCopago?: number;
   precioSinCopago?: number;

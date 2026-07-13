@@ -15,7 +15,9 @@ function hasContactAndConsent(q: QuoteProfile | null): q is QuoteProfile & { tel
   return !!(q?.telefono && q?.consentAt?.privacidadAt && q?.consentAt?.contactoAt);
 }
 
-export function CallRequestForm({ showHeading = true }: { showHeading?: boolean }) {
+export function CallRequestForm({
+  showHeading = true, compania: companiaProp, precioElegido: precioProp,
+}: { showHeading?: boolean; compania?: string; precioElegido?: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
@@ -55,7 +57,9 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
   }, []);
 
   const producto = hasProductoParam ? (searchParams.get("producto") ?? "salud") : (quote?.producto ?? genericProducto);
-  const compania = searchParams.get("compania") ?? undefined;
+  const compania = companiaProp ?? searchParams.get("compania") ?? undefined;
+  const precioElegidoParam = searchParams.get("precio");
+  const precioElegido = precioProp ?? (precioElegidoParam ? Number(precioElegidoParam) : undefined);
   const headingText = clientFirstName ? `${clientFirstName}, te llamamos gratis` : "Te llamamos gratis";
   const utm = useMemo(
     () => ({
@@ -82,6 +86,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
           codigoPostal: quote.codigoPostal ?? "",
           producto,
           compania,
+          precioElegido,
           diaLlamada,
           turnoLlamada,
           aceptaPrivacidad: true,
@@ -115,6 +120,7 @@ export function CallRequestForm({ showHeading = true }: { showHeading?: boolean 
       codigoPostal,
       producto,
       compania,
+      precioElegido,
       diaLlamada,
       turnoLlamada,
       aceptaPrivacidad: priv,

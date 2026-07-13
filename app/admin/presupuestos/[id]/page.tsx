@@ -7,12 +7,14 @@ import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue, PRESUPUESTO_STATUS_COLORS } from "@/lib/adminFormat";
 import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
+import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 
 type PresupuestoNote = { id: string; at: string; texto: string };
+type PresupuestoEleccion = { compania: string; precio: number | null; condiciones?: string; servicios?: string[]; at: string };
 type Presupuesto = {
   id: string; leadId: string; createdAt: string; updatedAt: string; closedAt: string;
   source: string; producto: string; status: string; data: Record<string, unknown>;
-  precioAprox: number | null; notas: PresupuestoNote[];
+  precioAprox: number | null; notas: PresupuestoNote[]; eleccion: PresupuestoEleccion | null;
   nombre: string; telefono: string; email: string;
 };
 type LeadSummary = { id: string; nombre: string; telefono: string; email: string; status: string } | null;
@@ -34,6 +36,8 @@ function PresupuestoDetail() {
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [waOpen, setWaOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -62,6 +66,44 @@ function PresupuestoDetail() {
     });
     const body = await res.json();
     if (res.ok && body.ok) setPresupuesto(body.presupuesto);
+  }
+
+  async function downloadPdf() {
+    if (!presupuesto) return;
+    const p = presupuesto;
+    const compania = p.eleccion?.compania || "Asegurados Ventajon";
+    const precio = p.eleccion?.precio ?? p.precioAprox ?? 0;
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/presupuesto/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          producto: p.producto,
+          compania,
+          quote: {
+            id: p.leadId, nombre: p.nombre, telefono: p.telefono, email: p.email,
+            codigoPostal: p.data.codigoPostal, fechaNacimiento: p.data.fechaNacimiento,
+            numAsegurados: p.data.numAsegurados, motivo: p.data.motivo, fumador: p.data.fumador,
+          },
+          precio: p.producto === "vida" ? { precio } : { conCopago: precio, sinCopago: p.eleccion?.precio ?? precio },
+          servicios: p.eleccion?.servicios ?? [],
+          condiciones: p.eleccion?.condiciones ?? "",
+        }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `presupuesto-${quoteNumber(p.id)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   if (loading) {
@@ -119,6 +161,30 @@ function PresupuestoDetail() {
                 <p className="mt-1.5 text-[12px] text-slate2">Sin lead vinculado.</p>
               )}
             </div>
+
+            {p.eleccion && (
+              <div className="mt-5 border-t border-hair pt-4">
+                <p className="text-[12px] font-semibold text-ink">Elección del cliente</p>
+                <dl className="mt-1.5 flex flex-col gap-1.5 text-[13px]">
+                  <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Aseguradora</dt><dd className="text-right font-semibold text-ink">{p.eleccion.compania}</dd></div>
+                  {p.eleccion.precio != null && (
+                    <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Precio</dt><dd className="text-right font-semibold tnums text-navy">{p.eleccion.precio.toFixed(2)} €/mes</dd></div>
+                  )}
+                  <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Elegido</dt><dd className="text-right font-medium text-ink">{fmt(p.eleccion.at)}</dd></div>
+                </dl>
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-2 border-t border-hair pt-4">
+              <button type="button" onClick={() => setWaOpen(true)}
+                className="flex items-center justify-center rounded-card bg-brand-red px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+                Enviar WhatsApp de seguimiento
+              </button>
+              <button type="button" onClick={downloadPdf} disabled={downloading}
+                className="flex items-center justify-center rounded-card border border-navy px-4 py-2.5 text-[13px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
+                {downloading ? "Generando…" : "Descargar presupuesto en PDF"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
@@ -172,6 +238,18 @@ function PresupuestoDetail() {
           </CollapsiblePanel>
         </div>
       </div>
+
+      {waOpen && (
+        <WhatsAppFollowupModal
+          telefono={p.telefono}
+          ctx={{
+            nombre: p.nombre, producto: p.producto, precioAprox: p.precioAprox,
+            quoteNumber: quoteNumber(p.id), compania: p.eleccion?.compania,
+            precioElegido: p.eleccion?.precio, status: p.status,
+          }}
+          onClose={() => setWaOpen(false)}
+        />
+      )}
     </main>
   );
 }

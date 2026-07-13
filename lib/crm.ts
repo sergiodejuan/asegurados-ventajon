@@ -123,18 +123,31 @@ export const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
 
 export type PresupuestoNote = { id: string; at: string; texto: string };
 
+// Elección real del cliente: aseguradora, precio y (si aplica) coberturas
+// concretas que se le van a proponer/confirmar — se rellena cuando pide que
+// le llamen sobre una compañía concreta desde la comparativa, o cuando un
+// agente prepara un presupuesto a medida desde /admin/presupuestos.
+export type PresupuestoEleccion = {
+  compania: string;
+  precio: number | null;
+  condiciones?: string;
+  servicios?: string[];
+  at: string;
+};
+
 export type Presupuesto = {
   id: string;
   leadId: string;
   createdAt: string;
   updatedAt: string;
   closedAt: string;
-  source: string; // tarificador-salud | tarificador-vida
+  source: string; // tarificador-salud | tarificador-vida | admin-manual
   producto: string; // salud | vida
   status: PresupuestoStatus;
   data: Record<string, unknown>; // datos del tarificador (mismo shape que LeadSubmission.data)
   precioAprox: number | null;
   notas: PresupuestoNote[];
+  eleccion: PresupuestoEleccion | null;
   // Contacto denormalizado del lead en el momento de crear el presupuesto,
   // para poder listar/exportar sin tener que resolver cada lead.
   nombre: string;

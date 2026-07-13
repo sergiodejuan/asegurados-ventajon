@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callRequestSchema } from "@/lib/schema";
-import { upsertLead } from "@/lib/store";
+import { upsertLead, setPresupuestoEleccion } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 
@@ -33,6 +33,10 @@ export async function POST(request: Request) {
     "quiero-que-me-llamen",
     consent
   );
+
+  if (d.compania) {
+    await setPresupuestoEleccion(id, d.producto ?? "salud", { compania: d.compania, precio: d.precioElegido ?? null }).catch(() => {});
+  }
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {

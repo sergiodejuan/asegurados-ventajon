@@ -1,7 +1,7 @@
 import { normalizePhone } from "./schema";
 import {
   SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status,
-  type Presupuesto, type PresupuestoStatus, type PresupuestoNote,
+  type Presupuesto, type PresupuestoStatus, type PresupuestoNote, type PresupuestoEleccion,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_CAMPAIGN_BANNER, type CampaignBanner } from "./campaign";
@@ -406,13 +406,67 @@ export async function createPresupuesto(input: {
   const presupuesto: Presupuesto = {
     id: input.id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
     source: input.source, producto: input.producto, status: "nuevo",
-    data: input.data, precioAprox, notas: [],
+    data: input.data, precioAprox, notas: [], eleccion: null,
     nombre: input.nombre, telefono: input.telefono, email: input.email,
   };
   await jset(`presupuesto:${input.id}`, presupuesto);
   await zadd("presupuestos:index", Date.parse(now), input.id);
   await zadd(`presupuestos:byLead:${input.leadId}`, Date.parse(now), input.id);
   return presupuesto;
+}
+
+// Presupuesto preparado a medida por un agente desde /admin/presupuestos
+// (elige un producto del catálogo o escribe uno personalizado). Se vincula
+// siempre a un lead ya existente.
+export async function createManualPresupuesto(input: {
+  leadId: string;
+  producto: string;
+  compania: string;
+  precio: number | null;
+  condiciones?: string;
+  servicios?: string[];
+}): Promise<Presupuesto | null> {
+  const lead = await getLead(input.leadId);
+  if (!lead) return null;
+  const now = new Date().toISOString();
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const eleccion: PresupuestoEleccion = {
+    compania: input.compania, precio: input.precio,
+    condiciones: input.condiciones, servicios: input.servicios, at: now,
+  };
+  const presupuesto: Presupuesto = {
+    id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
+    source: "admin-manual", producto: input.producto, status: "enviado",
+    data: { codigoPostal: lead.codigoPostal }, precioAprox: input.precio, notas: [], eleccion,
+    nombre: lead.nombre, telefono: lead.telefono, email: lead.email,
+  };
+  await jset(`presupuesto:${id}`, presupuesto);
+  await zadd("presupuestos:index", Date.parse(now), id);
+  await zadd(`presupuestos:byLead:${input.leadId}`, Date.parse(now), id);
+  return presupuesto;
+}
+
+// Registra qué compañía y precio eligió realmente el cliente (al pedir que
+// le llamen sobre una compañía concreta desde la comparativa): se aplica al
+// presupuesto más reciente de ese lead para el mismo producto.
+export async function setPresupuestoEleccion(
+  leadId: string,
+  producto: string,
+  eleccion: { compania: string; precio: number | null }
+): Promise<Presupuesto | null> {
+  const list = await listPresupuestosByLead(leadId);
+  const target = list.find((p) => p.producto === producto) ?? list[0];
+  if (!target) return null;
+  const now = new Date().toISOString();
+  target.eleccion = { compania: eleccion.compania, precio: eleccion.precio, at: now };
+  target.updatedAt = now;
+  await jset(`presupuesto:${target.id}`, target);
+  await zadd("presupuestos:index", Date.parse(now), target.id);
+  await zadd(`presupuestos:byLead:${leadId}`, Date.parse(now), target.id);
+  return target;
 }
 
 export async function listPresupuestos(): Promise<Presupuesto[]> {

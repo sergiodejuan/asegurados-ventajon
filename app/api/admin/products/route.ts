@@ -6,6 +6,9 @@ import { makeProductId, type Product } from "@/lib/catalog";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// El cliente ya comprime el logo antes de subirlo (ver /admin/productos).
+const MAX_LOGO_LENGTH = 400_000;
+
 export async function GET(request: Request) {
   const denied = adminAuthFail(request);
   if (denied) return denied;
@@ -27,6 +30,9 @@ export async function POST(request: Request) {
   if (body.producto !== "salud" && body.producto !== "vida") {
     return NextResponse.json({ ok: false, error: "Producto no válido." }, { status: 400 });
   }
+  if (typeof body.logoUrl === "string" && body.logoUrl.length > MAX_LOGO_LENGTH) {
+    return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+  }
 
   const id = makeProductId(body.producto, body.compania);
   const product: Omit<Product, "updatedAt"> = {
@@ -36,6 +42,7 @@ export async function POST(request: Request) {
     activo: body.activo ?? true,
     destacado: body.destacado ?? false,
     orden: body.orden ?? 99,
+    logoUrl: body.logoUrl,
     precioConCopago: body.precioConCopago,
     precioSinCopago: body.precioSinCopago,
     precio: body.precio,

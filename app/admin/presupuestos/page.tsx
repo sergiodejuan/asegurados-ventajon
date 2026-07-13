@@ -4,12 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 import { fmt } from "@/lib/adminFormat";
+import { quoteNumber } from "@/lib/quote";
 import { StatTile, ViewToggle, FilterTab } from "@/components/admin/Widgets";
+import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
+import { CreatePresupuestoModal } from "@/components/admin/CreatePresupuestoModal";
+import { WhatsApp } from "@/components/icons";
 
+type PresupuestoEleccion = { compania: string; precio: number | null } | null;
 type Presupuesto = {
   id: string; leadId: string; createdAt: string; updatedAt: string; closedAt: string;
   source: string; producto: string; status: string; data: Record<string, unknown>;
   precioAprox: number | null; notas: { id: string; at: string; texto: string }[];
+  eleccion: PresupuestoEleccion;
   nombre: string; telefono: string; email: string;
 };
 
@@ -48,6 +54,8 @@ function PresupuestosCrm() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"lista" | "pipeline">("pipeline");
+  const [waTarget, setWaTarget] = useState<Presupuesto | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setError(null); setLoading(true);
@@ -128,6 +136,9 @@ function PresupuestosCrm() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[22px] font-extrabold text-navy">Presupuestos</h1>
         <div className="flex items-center gap-2">
+          <button onClick={() => setCreating(true)} className="rounded-pill bg-navy px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-navy-deep">
+            + Crear presupuesto
+          </button>
           <button onClick={exportCsv} className="rounded-pill border border-navy px-3 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white">
             Exportar CSV (filtro actual)
           </button>
@@ -216,21 +227,45 @@ function PresupuestosCrm() {
         <ul className="mt-4 flex flex-col gap-2">
           {visible.length === 0 && <li className="rounded-card border border-hair bg-white p-5 text-center text-[14px] text-slate2">No hay presupuestos con estos filtros.</li>}
           {visible.map((p) => (
-            <li key={p.id}>
-              <Link href={`/admin/presupuestos/${p.id}`} className="flex w-full items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
+            <li key={p.id} className="flex items-stretch gap-2">
+              <Link href={`/admin/presupuestos/${p.id}`} className="flex flex-1 items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-ink">{p.nombre || "Sin nombre"}</p>
                   <p className="truncate text-[13px] text-slate2 tnums capitalize">
-                    {p.telefono} · {p.producto}{p.precioAprox != null ? ` · ≈${Math.round(p.precioAprox)}€/mes` : ""} · {fmt(p.updatedAt)}
+                    {p.telefono} · {p.producto}{p.precioAprox != null ? ` · ≈${Math.round(p.precioAprox)}€/mes` : ""}{p.eleccion ? ` · ${p.eleccion.compania}` : ""} · {fmt(p.updatedAt)}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${STATUS_COLORS[p.status] ?? "bg-slate-200"}`}>
                   {statusLabels[p.status] ?? p.status}
                 </span>
               </Link>
+              <button type="button" onClick={() => setWaTarget(p)} title="Enviar WhatsApp de seguimiento"
+                className="grid w-12 shrink-0 place-items-center rounded-card border border-hair bg-white text-[#25D366] transition-colors hover:bg-mist">
+                <WhatsApp width={20} height={20} />
+              </button>
             </li>
           ))}
         </ul>
+      )}
+
+      {waTarget && (
+        <WhatsAppFollowupModal
+          telefono={waTarget.telefono}
+          ctx={{
+            nombre: waTarget.nombre, producto: waTarget.producto, precioAprox: waTarget.precioAprox,
+            quoteNumber: quoteNumber(waTarget.id),
+            compania: waTarget.eleccion?.compania, precioElegido: waTarget.eleccion?.precio,
+            status: waTarget.status,
+          }}
+          onClose={() => setWaTarget(null)}
+        />
+      )}
+
+      {creating && (
+        <CreatePresupuestoModal
+          onClose={() => setCreating(false)}
+          onCreated={() => { setCreating(false); load(); }}
+        />
       )}
     </main>
   );

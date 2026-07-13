@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
-import { ChevronDown } from "@/components/icons";
+import { ChevronDown, WhatsApp } from "@/components/icons";
 import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/adminFormat";
 import { StatTile, ViewToggle, FilterTab, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
+import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 
 type Activity = { at: string; type: string; note: string };
 type ConsentRecord = {
@@ -177,7 +178,6 @@ function LeadsCrm() {
   if (selected) {
     const l = selected;
     const latestConsent = l.consents?.[0];
-    const numPresupuestos = (l.submissions ?? []).filter((s) => s.source === "tarificador-salud" || s.source === "tarificador-vida").length;
 
     return (
       <main className="mx-auto max-w-6xl px-5 py-6">
@@ -266,8 +266,8 @@ function LeadsCrm() {
               <NotesPanel activity={l.activity} onSave={(txt) => patch(l.id, { note: txt })} />
             </CollapsiblePanel>
 
-            <CollapsiblePanel title={`Presupuestos (${numPresupuestos})`}>
-              <PresupuestosPanel submissions={l.submissions ?? []} />
+            <CollapsiblePanel title="Presupuestos">
+              <PresupuestosPanel leadId={l.id} />
             </CollapsiblePanel>
           </div>
         </div>
@@ -461,37 +461,59 @@ function NotesPanel({ activity, onSave }: { activity: Activity[]; onSave: (txt: 
   );
 }
 
-function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
+type PresupuestoEleccion = { compania: string; precio: number | null } | null;
+type PresupuestoFull = {
+  id: string; producto: string; status: string; data: Record<string, unknown>;
+  precioAprox: number | null; eleccion: PresupuestoEleccion; nombre: string; telefono: string; updatedAt: string;
+};
+
+function PresupuestosPanel({ leadId }: { leadId: string }) {
+  const { token } = useAdminToken();
+  const [items, setItems] = useState<PresupuestoFull[]>([]);
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [waTarget, setWaTarget] = useState<PresupuestoFull | null>(null);
 
-  const presupuestos = useMemo(
-    () => submissions
-      .filter((s) => s.source === "tarificador-salud" || s.source === "tarificador-vida")
-      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),
-    [submissions]
-  );
+  useEffect(() => {
+    fetch(`/api/admin/presupuestos?leadId=${leadId}`, { headers: { "x-admin-token": token } })
+      .then((r) => r.json())
+      .then((body) => { if (body.ok) { setItems(body.presupuestos); setStatusLabels(body.statusLabels); } })
+      .finally(() => setLoaded(true));
+  }, [leadId, token]);
 
-  if (presupuestos.length === 0) return <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>;
+  if (!loaded) return <p className="text-[13px] text-slate2">Cargando…</p>;
+  if (items.length === 0) return <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>;
 
   return (
     <ol className="flex flex-col gap-2">
-      {presupuestos.map((s) => {
+      {items.map((s) => {
         const open = expandedId === s.id;
         const fields = Object.entries(s.data).filter(([k, v]) => SUBMISSION_FIELD_LABELS[k] && v !== "" && v !== null && v !== undefined);
         return (
           <li key={s.id} className="rounded-card border border-hair">
-            <button type="button" onClick={() => setExpandedId(open ? null : s.id)} className="flex w-full items-center justify-between gap-3 p-3.5 text-left">
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold tnums text-ink">#{quoteNumber(s.id)} <span className="font-normal capitalize text-slate2">· {s.producto}</span></p>
-                <p className="text-[12px] text-slate2">{fmt(s.at)}</p>
-              </div>
+            <div className="flex w-full items-center justify-between gap-3 p-3.5">
+              <button type="button" onClick={() => setExpandedId(open ? null : s.id)} className="min-w-0 flex-1 text-left">
+                <p className="truncate text-[13px] font-semibold tnums text-ink">
+                  #{quoteNumber(s.id)} <span className="font-normal capitalize text-slate2">· {s.producto}</span>
+                  {s.eleccion && <span className="font-normal text-slate2"> · {s.eleccion.compania}</span>}
+                </p>
+                <p className="text-[12px] text-slate2">{statusLabels[s.status] ?? s.status} · {fmt(s.updatedAt)}</p>
+              </button>
               <div className="flex shrink-0 items-center gap-2">
-                {s.precioAprox != null && <span className="text-[13px] font-bold tnums text-navy">≈ {s.precioAprox.toFixed(2)} €/mes</span>}
-                <span aria-hidden="true" className={`text-navy transition-transform ${open ? "rotate-180" : ""}`}>
-                  <ChevronDown width={16} height={16} />
-                </span>
+                {(s.eleccion?.precio ?? s.precioAprox) != null && (
+                  <span className="text-[13px] font-bold tnums text-navy">≈ {(s.eleccion?.precio ?? s.precioAprox)!.toFixed(2)} €/mes</span>
+                )}
+                <button type="button" onClick={() => setWaTarget(s)} title="Enviar WhatsApp de seguimiento" className="text-[#25D366] hover:opacity-70">
+                  <WhatsApp width={18} height={18} />
+                </button>
+                <button type="button" onClick={() => setExpandedId(open ? null : s.id)} aria-label="Expandir" className="text-navy">
+                  <span aria-hidden="true" className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>
+                    <ChevronDown width={16} height={16} />
+                  </span>
+                </button>
               </div>
-            </button>
+            </div>
             {open && (
               <div className="border-t border-hair p-3.5">
                 {fields.length > 0 ? (
@@ -504,11 +526,6 @@ function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
                     ))}
                   </dl>
                 ) : <p className="text-[12px] text-slate2">Sin detalles adicionales.</p>}
-                {s.precioAprox != null && (
-                  <p className="mt-2 text-[11px] leading-relaxed text-slate2">
-                    Precio orientativo según la compañía recomendada del catálogo; no es una cotización en firme.
-                  </p>
-                )}
                 <Link href={`/admin/presupuestos/${s.id}`} className="mt-3 inline-block text-[12px] font-semibold text-navy underline">
                   Ver ficha de presupuesto (estado, notas, cierre) →
                 </Link>
@@ -517,6 +534,18 @@ function PresupuestosPanel({ submissions }: { submissions: LeadSubmission[] }) {
           </li>
         );
       })}
+
+      {waTarget && (
+        <WhatsAppFollowupModal
+          telefono={waTarget.telefono}
+          ctx={{
+            nombre: waTarget.nombre, producto: waTarget.producto, precioAprox: waTarget.precioAprox,
+            quoteNumber: quoteNumber(waTarget.id), compania: waTarget.eleccion?.compania,
+            precioElegido: waTarget.eleccion?.precio, status: waTarget.status,
+          }}
+          onClose={() => setWaTarget(null)}
+        />
+      )}
     </ol>
   );
 }

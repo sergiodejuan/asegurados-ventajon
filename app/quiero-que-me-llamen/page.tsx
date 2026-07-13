@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CallRequestForm } from "@/components/CallRequestForm";
 import { PromoBanner } from "@/components/PromoBanner";
+import { MinimalTopBar } from "@/components/MinimalTopBar";
 import { Check, IconByName } from "@/components/icons";
 import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, SELLING_POINTS, VENTAJAS } from "@/lib/brand";
 
@@ -17,10 +18,7 @@ export default function QuieroQueMeLlamen({ searchParams }: { searchParams?: { p
   return (
     <main className="safe-top min-h-screen bg-mist">
       <div className="mx-auto max-w-app px-5 py-8 md:max-w-5xl md:py-16 lg:max-w-6xl">
-        {/* Marca mínima, sin enlaces de navegación (no hay salida del funnel) */}
-        <p className="mb-6 text-center font-display text-[16px] font-extrabold text-navy md:mb-10" translate="no">
-          {BRAND_NAME}
-        </p>
+        <MinimalTopBar />
 
         <div className="md:grid md:grid-cols-[1fr_1.1fr] md:items-start md:gap-14">
           <div className="md:order-2">
