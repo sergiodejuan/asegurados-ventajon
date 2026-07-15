@@ -19,35 +19,45 @@ function formatDate(iso: string) {
   catch { return iso; }
 }
 
+// Sin presupuestos ni datos guardados en este navegador no hay nada que
+// mostrar todavía: se pide primero identificarse (nº de presupuesto +
+// correo + teléfono) en vez de aterrizar en una página vacía sin sentido.
+type Vista = "acceso" | "transicion" | "area";
+
 export function AreaClienteContent() {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
+  const [vista, setVista] = useState<Vista>("acceso");
+  const [greeting, setGreeting] = useState("");
   const [profile, setProfile] = useState<ClientProfile>({});
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
+  const [showRecoverBox, setShowRecoverBox] = useState(false);
   const lookupRef = useRef<{ telefono?: string; email?: string }>({});
 
   const PRESUPUESTOS_POR_PAGINA = 3;
   const [page, setPage] = useState(1);
 
-  // Recuperar presupuestos desde otro dispositivo: el resto de esta página
-  // vive solo en localStorage, así que si el cliente entra desde el móvil
-  // después de tarificar en el ordenador, no ve nada hasta que se identifica
-  // con su número de presupuesto + correo + teléfono.
+  // Formulario de acceso: nº de presupuesto + correo + teléfono usados al
+  // tarificar. Es el mismo formulario tanto para la pantalla de entrada
+  // inicial como para añadir presupuestos de otro dispositivo una vez ya
+  // dentro del área.
   const [loginCodigo, setLoginCodigo] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginTelefono, setLoginTelefono] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginOk, setLoginOk] = useState(false);
 
   useEffect(() => {
     const p = loadClientProfile() ?? {};
     lookupRef.current = { telefono: p.telefono, email: p.email };
     setProfile(p);
-    setQuotes(loadClientQuotes());
+    const qs = loadClientQuotes();
+    setQuotes(qs);
+    const yaTieneDatos = qs.length > 0 || !!(p.nombre || p.telefono || p.email);
+    setVista(yaTieneDatos ? "area" : "acceso");
     setChecked(true);
   }, []);
 
@@ -88,7 +98,6 @@ export function AreaClienteContent() {
     }
     setLoginLoading(true);
     setLoginError(null);
-    setLoginOk(false);
     try {
       const res = await fetch("/api/client/presupuestos", {
         method: "POST",
@@ -101,12 +110,24 @@ export function AreaClienteContent() {
         setLoginLoading(false);
         return;
       }
-      for (const q of body.presupuestos as QuoteProfile[]) addClientQuote(q);
+      const found = body.presupuestos as QuoteProfile[];
+      for (const q of found) addClientQuote(q);
+      const first = found[0];
+      if (first) {
+        const patch = { nombre: first.nombre, telefono: first.telefono, email: first.email };
+        saveClientProfile(patch);
+        setProfile((p) => ({ ...p, ...patch }));
+        lookupRef.current = { telefono: first.telefono, email: first.email };
+      }
       setQuotes(loadClientQuotes());
       setPage(1);
+      setShowRecoverBox(false);
       setLoginCodigo(""); setLoginEmail(""); setLoginTelefono("");
-      setLoginOk(true);
-      setTimeout(() => setLoginOk(false), 2500);
+      setLoginLoading(false);
+      setGreeting(first?.nombre?.trim().split(/\s+/)[0] ?? "");
+      setVista("transicion");
+      setTimeout(() => setVista("area"), 1800);
+      return;
     } catch {
       setLoginError("Error de conexión. Inténtalo de nuevo.");
     }
@@ -114,6 +135,88 @@ export function AreaClienteContent() {
   }
 
   if (!checked) return null;
+
+  // Pantalla de transición tras identificarse: breve y personalizada, antes
+  // de revelar el área completa.
+  if (vista === "transicion") {
+    return (
+      <div
+        role="status" aria-live="polite"
+        className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-gradient-to-br from-navy to-navy-deep px-6 text-center text-white"
+      >
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 motion-safe:animate-pulse">
+          <Spinner width={32} height={32} />
+        </div>
+        <h2 className="mt-6 max-w-sm text-[22px] font-extrabold leading-snug md:text-[26px]">
+          Estamos recuperando tus datos y presupuestos{greeting ? `, ${greeting}` : ""}
+        </h2>
+      </div>
+    );
+  }
+
+  const loginFields = (
+    <>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <label>
+          <span className="mb-1 block text-[13px] font-semibold text-ink">Nº de presupuesto</span>
+          <input
+            value={loginCodigo} onChange={(e) => setLoginCodigo(e.target.value)}
+            placeholder="p.ej. E97AED9D"
+            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] uppercase text-ink placeholder:text-slate2/60 placeholder:normal-case"
+          />
+        </label>
+        <label>
+          <span className="mb-1 block text-[13px] font-semibold text-ink">Correo electrónico</span>
+          <input
+            inputMode="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+            placeholder="maria@correo.com…"
+            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
+          />
+        </label>
+        <label>
+          <span className="mb-1 block text-[13px] font-semibold text-ink">Teléfono móvil</span>
+          <input
+            inputMode="tel" value={loginTelefono} onChange={(e) => setLoginTelefono(e.target.value)}
+            placeholder="600 000 000…"
+            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60"
+          />
+        </label>
+      </div>
+      {loginError && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{loginError}</p>}
+    </>
+  );
+
+  // Sin presupuestos ni datos guardados en este navegador: pantalla de
+  // acceso a pantalla completa en vez de aterrizar en un área vacía.
+  if (vista === "acceso") {
+    return (
+      <>
+        <Header />
+        <main id="contenido" className="mx-auto flex max-w-app flex-col items-center px-5 py-10 md:py-16">
+          <div className="w-full max-w-lg rounded-[24px] border border-hair bg-white p-6 shadow-card md:p-8">
+            <h1 className="text-[24px] font-extrabold leading-tight text-navy">Tu área de cliente</h1>
+            <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+              Introduce el número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF), tu correo y tu
+              teléfono para traer aquí tus presupuestos.
+            </p>
+            {loginFields}
+            <button
+              type="button" onClick={handleLogin} disabled={loginLoading}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+            >
+              {loginLoading && <Spinner />}
+              {loginLoading ? "Buscando…" : "Entrar a mi área"}
+            </button>
+            <p className="mt-4 text-center text-[13px] text-slate2">
+              ¿Aún no has tarificado con nosotros?{" "}
+              <a href="/tarificador" className="font-semibold text-brand-red underline">Calcula tu precio</a>
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
@@ -125,47 +228,29 @@ export function AreaClienteContent() {
           cambiar tus datos de contacto o reprogramar tu llamada cuando quieras.
         </p>
 
-        {/* Recuperar desde otro dispositivo */}
+        {/* Añadir presupuestos de otro dispositivo (compacto, plegado) */}
         <section aria-labelledby="acceso" className="mt-8 rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <h2 id="acceso" className="text-[18px] font-bold text-navy">¿Tarificaste desde otro dispositivo?</h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Introduce el número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF), tu correo y tu
-            teléfono para traer aquí tus presupuestos.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <label>
-              <span className="mb-1 block text-[13px] font-semibold text-ink">Nº de presupuesto</span>
-              <input
-                value={loginCodigo} onChange={(e) => setLoginCodigo(e.target.value)}
-                placeholder="p.ej. E97AED9D"
-                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] uppercase text-ink placeholder:text-slate2/60 placeholder:normal-case"
-              />
-            </label>
-            <label>
-              <span className="mb-1 block text-[13px] font-semibold text-ink">Correo electrónico</span>
-              <input
-                inputMode="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="maria@correo.com…"
-                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
-              />
-            </label>
-            <label>
-              <span className="mb-1 block text-[13px] font-semibold text-ink">Teléfono móvil</span>
-              <input
-                inputMode="tel" value={loginTelefono} onChange={(e) => setLoginTelefono(e.target.value)}
-                placeholder="600 000 000…"
-                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60"
-              />
-            </label>
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="acceso" className="text-[15px] font-bold text-navy">¿Tarificaste también desde otro dispositivo?</h2>
+            <button type="button" onClick={() => setShowRecoverBox((v) => !v)} className="shrink-0 text-[13px] font-semibold text-brand-red underline">
+              {showRecoverBox ? "Ocultar" : "Añadir presupuestos"}
+            </button>
           </div>
-          {loginError && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{loginError}</p>}
-          <button
-            type="button" onClick={handleLogin} disabled={loginLoading}
-            className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
-          >
-            {loginLoading && <Spinner />}
-            {loginLoading ? "Buscando…" : loginOk ? "Encontrado ✓" : "Recuperar mis presupuestos"}
-          </button>
+          {showRecoverBox && (
+            <>
+              <p className="mt-2 text-[13px] leading-relaxed text-slate2">
+                Introduce el número de presupuesto, tu correo y tu teléfono de ese otro tarificador.
+              </p>
+              {loginFields}
+              <button
+                type="button" onClick={handleLogin} disabled={loginLoading}
+                className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+              >
+                {loginLoading && <Spinner />}
+                {loginLoading ? "Buscando…" : "Añadir a mi área"}
+              </button>
+            </>
+          )}
         </section>
 
         {/* Datos de contacto */}
