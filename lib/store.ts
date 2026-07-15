@@ -726,24 +726,38 @@ async function getPresupuestoByCode(code: string): Promise<Presupuesto | null> {
   return getPresupuesto(id);
 }
 
-// Área de cliente sin registro: localiza los presupuestos de un lead a
-// partir de su número de presupuesto (código corto, único), su correo y su
-// teléfono — los tres deben coincidir con el presupuesto de ese código. Si
-// coincide, devuelve TODOS los presupuestos de ese lead (no solo el que dio
-// el código), para que un cliente con varios tarificadores los vea todos
-// entrando con cualquiera de sus números. Sin correspondencia exacta,
-// devuelve null (mensaje de error genérico, sin filtrar qué dato falló).
-export async function findClientPresupuestos(input: {
-  codigo: string; email: string; telefono: string;
-}): Promise<Presupuesto[] | null> {
-  const code = input.codigo.trim().toUpperCase();
-  if (!code) return null;
-  const match = await getPresupuestoByCode(code);
-  if (!match) return null;
-  const email = input.email.trim().toLowerCase();
-  const telefono = normalizePhone(input.telefono);
-  if (match.email.trim().toLowerCase() !== email || normalizePhone(match.telefono) !== telefono) return null;
-  return listPresupuestosByLead(match.leadId);
+// Área de cliente sin registro: localiza al lead a partir de UN solo dato
+// (el que el cliente tenga a mano) — su correo, su móvil (con o sin
+// prefijo +34) o su número de presupuesto (código corto). Se detecta el
+// tipo de dato por su forma: con "@" se busca por correo, si son dígitos de
+// móvil español se busca por teléfono, y en cualquier otro caso se
+// interpreta como número de presupuesto.
+async function findLeadIdByIdentifier(raw: string): Promise<string | null> {
+  const value = raw.trim();
+  if (!value) return null;
+
+  if (value.includes("@")) {
+    return (await jget<string>(`idx:email:${value.toLowerCase()}`)) ?? null;
+  }
+
+  const digits = value.replace(/[\s.\-()]/g, "");
+  if (/^(\+?34)?[6-9]\d{8}$/.test(digits)) {
+    return (await jget<string>(`idx:phone:${normalizePhone(digits)}`)) ?? null;
+  }
+
+  const code = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const presupuesto = code ? await getPresupuestoByCode(code) : null;
+  return presupuesto?.leadId ?? null;
+}
+
+// Devuelve TODOS los presupuestos del lead encontrado (no solo el que dio
+// pie a la búsqueda), para que un cliente con varios tarificadores los vea
+// todos entrando con cualquiera de sus datos. Sin correspondencia, null.
+export async function findClientPresupuestos(identifier: string): Promise<Presupuesto[] | null> {
+  const leadId = await findLeadIdByIdentifier(identifier);
+  if (!leadId) return null;
+  const list = await listPresupuestosByLead(leadId);
+  return list.length ? list : null;
 }
 
 export async function updatePresupuesto(

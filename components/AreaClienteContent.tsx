@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/Header";
+import { Header, Wordmark } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
+import { useSiteTheme } from "@/lib/useTheme";
 import { saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile } from "@/lib/quote";
 
 type Profile = { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string };
@@ -16,16 +17,23 @@ function formatDate(iso: string) {
   catch { return iso; }
 }
 
+const TARIFICADORES = [
+  { href: "/tarificador", icon: "flower", label: "Seguro de salud", desc: "Compara precio en 2 minutos." },
+  { href: "/tarificador-vida", icon: "life", label: "Seguro de vida", desc: "Protege a los tuyos, a tu medida." },
+  { href: "/tarificador-auto", icon: "car", label: "Seguro de auto", desc: "Coche o moto, con tu matrícula." },
+];
+
 // Tus tarificaciones se guardan en nuestra base de datos, no en el
-// navegador: el acceso va por sesión (cookie tras identificarte con tu nº
-// de presupuesto + correo + teléfono, o automático justo después de
-// tarificar en este mismo dispositivo), y los datos siempre se piden en
-// vivo al servidor — así funciona desde cualquier dispositivo, como en la
-// web de una aseguradora real.
+// navegador: el acceso va por sesión (cookie tras identificarte con un
+// solo dato — correo, teléfono o nº de presupuesto —, o automático justo
+// después de tarificar en este mismo dispositivo), y los datos siempre se
+// piden en vivo al servidor — así funciona desde cualquier dispositivo,
+// como en la web de una aseguradora real.
 type Vista = "comprobando" | "acceso" | "transicion" | "area";
 
 export function AreaClienteContent() {
   const router = useRouter();
+  const theme = useSiteTheme();
   const [vista, setVista] = useState<Vista>("comprobando");
   const [greeting, setGreeting] = useState("");
   const [profile, setProfile] = useState<Profile>({});
@@ -39,13 +47,11 @@ export function AreaClienteContent() {
   const PRESUPUESTOS_POR_PAGINA = 3;
   const [page, setPage] = useState(1);
 
-  // Formulario de acceso: nº de presupuesto + correo + teléfono usados al
-  // tarificar. Es el mismo formulario tanto para la pantalla de entrada
-  // inicial como para añadir presupuestos de otro dispositivo una vez ya
-  // dentro del área.
-  const [loginCodigo, setLoginCodigo] = useState("");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginTelefono, setLoginTelefono] = useState("");
+  // Formulario de acceso: un único dato (correo, teléfono o nº de
+  // presupuesto) usado al tarificar. Es el mismo formulario tanto para la
+  // pantalla de entrada inicial como para añadir presupuestos de otro
+  // dispositivo una vez ya dentro del área.
+  const [loginValue, setLoginValue] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -99,8 +105,8 @@ export function AreaClienteContent() {
   const pageQuotes = quotes.slice((currentPage - 1) * PRESUPUESTOS_POR_PAGINA, currentPage * PRESUPUESTOS_POR_PAGINA);
 
   async function handleLogin() {
-    if (!loginCodigo.trim() || !loginEmail.trim() || !loginTelefono.trim()) {
-      setLoginError("Rellena el número de presupuesto, el correo y el teléfono.");
+    if (!loginValue.trim()) {
+      setLoginError("Introduce tu correo, tu teléfono o tu número de presupuesto.");
       return;
     }
     setLoginLoading(true);
@@ -109,7 +115,7 @@ export function AreaClienteContent() {
       const res = await fetch("/api/client/presupuestos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo: loginCodigo, email: loginEmail, telefono: loginTelefono }),
+        body: JSON.stringify({ identifier: loginValue }),
       });
       const body = await res.json();
       if (!res.ok || !body.ok) {
@@ -123,7 +129,7 @@ export function AreaClienteContent() {
       setQuotes(found);
       setPage(1);
       setShowRecoverBox(false);
-      setLoginCodigo(""); setLoginEmail(""); setLoginTelefono("");
+      setLoginValue("");
       setLoginLoading(false);
       setGreeting(first?.nombre?.trim().split(/\s+/)[0] ?? "");
       setVista("transicion");
@@ -155,52 +161,36 @@ export function AreaClienteContent() {
     );
   }
 
-  const loginFields = (
+  const loginField = (
     <>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label>
-          <span className="mb-1 block text-[13px] font-semibold text-ink">Nº de presupuesto</span>
-          <input
-            value={loginCodigo} onChange={(e) => setLoginCodigo(e.target.value)}
-            placeholder="p.ej. E97AED9D"
-            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] uppercase text-ink placeholder:text-slate2/60 placeholder:normal-case"
-          />
-        </label>
-        <label>
-          <span className="mb-1 block text-[13px] font-semibold text-ink">Correo electrónico</span>
-          <input
-            inputMode="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
-            placeholder="maria@correo.com…"
-            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
-          />
-        </label>
-        <label>
-          <span className="mb-1 block text-[13px] font-semibold text-ink">Teléfono móvil</span>
-          <input
-            inputMode="tel" value={loginTelefono} onChange={(e) => setLoginTelefono(e.target.value)}
-            placeholder="600 000 000…"
-            className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60"
-          />
-        </label>
-      </div>
+      <label className="mt-5 block">
+        <span className="sr-only">Correo, teléfono o número de presupuesto</span>
+        <input
+          value={loginValue} onChange={(e) => setLoginValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+          placeholder="Correo, teléfono o nº de presupuesto"
+          className="w-full rounded-card border border-hair bg-white px-4 py-3.5 text-[16px] text-ink placeholder:text-slate2/60"
+        />
+      </label>
       {loginError && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{loginError}</p>}
     </>
   );
 
-  // Sin sesión válida: pantalla de acceso a pantalla completa en vez de
-  // aterrizar en un área vacía sin sentido.
+  // Sin sesión válida: pantalla de acceso a pantalla completa, sin cabecera
+  // ni pie con enlaces de salida — como el login de un área de clientes real.
   if (vista === "acceso") {
     return (
-      <>
-        <Header />
-        <main id="contenido" className="mx-auto flex max-w-app flex-col items-center px-5 py-10 md:py-16">
-          <div className="w-full max-w-lg rounded-[24px] border border-hair bg-white p-6 shadow-card md:p-8">
-            <h1 className="text-[24px] font-extrabold leading-tight text-navy">Tu área de cliente</h1>
+      <div className="flex min-h-screen flex-col md:flex-row">
+        <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 md:px-16 lg:px-20">
+          <a href="/" aria-label={`${BRAND_NAME} · Inicio`} className="inline-block w-fit">
+            <Wordmark logoUrl={theme.logoUrl} />
+          </a>
+          <div className="mt-8 w-full max-w-sm sm:mt-12">
+            <h1 className="text-[26px] font-extrabold leading-tight text-navy">Hola, entra en tu área de cliente</h1>
             <p className="mt-2 text-[14px] leading-relaxed text-slate2">
-              Introduce el número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF), tu correo y tu
-              teléfono para traer aquí tus presupuestos.
+              Con tu correo, tu teléfono o tu número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF).
             </p>
-            {loginFields}
+            {loginField}
             <button
               type="button" onClick={handleLogin} disabled={loginLoading}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
@@ -208,14 +198,32 @@ export function AreaClienteContent() {
               {loginLoading && <Spinner />}
               {loginLoading ? "Buscando…" : "Entrar a mi área"}
             </button>
-            <p className="mt-4 text-center text-[13px] text-slate2">
-              ¿Aún no has tarificado con nosotros?{" "}
-              <a href="/tarificador" className="font-semibold text-brand-red underline">Calcula tu precio</a>
-            </p>
           </div>
-        </main>
-        <Footer />
-      </>
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center bg-mist px-6 py-10 sm:px-10 md:px-16 lg:px-20">
+          <div className="w-full max-w-sm">
+            <h2 className="text-[22px] font-extrabold leading-tight text-navy">¿Aún no has tarificado?</h2>
+            <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+              Calcula tu precio en menos de 2 minutos, sin compromiso, y tu presupuesto se guardará aquí automáticamente.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              {TARIFICADORES.map((t) => (
+                <a key={t.href} href={t.href}
+                  className="flex items-center gap-3 rounded-card border border-hair bg-white p-4 shadow-soft transition-colors hover:bg-white/80">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red">
+                    <IconByName name={t.icon} width={20} height={20} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-bold text-ink">{t.label}</span>
+                    <span className="block text-[12px] text-slate2">{t.desc}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -225,7 +233,7 @@ export function AreaClienteContent() {
       <main id="contenido" className="mx-auto max-w-app px-5 py-10 md:max-w-3xl md:py-16">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[28px] font-extrabold leading-tight text-navy">Tu área de cliente</h1>
+            <h1 className="text-[28px] font-extrabold leading-tight text-navy">Mi área de cliente</h1>
             <p className="mt-2 text-[15px] leading-relaxed text-slate2">
               Tus presupuestos se guardan de forma segura con nosotros: accede desde cualquier dispositivo,
               cambia tus datos de contacto o reprograma tu llamada cuando quieras.
@@ -248,9 +256,9 @@ export function AreaClienteContent() {
           {showRecoverBox && (
             <>
               <p className="mt-2 text-[13px] leading-relaxed text-slate2">
-                Introduce el número de presupuesto, tu correo y tu teléfono de ese otro tarificador.
+                Introduce el correo, el teléfono o el número de ese otro tarificador.
               </p>
-              {loginFields}
+              {loginField}
               <button
                 type="button" onClick={handleLogin} disabled={loginLoading}
                 className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
@@ -426,7 +434,7 @@ export function AreaClienteContent() {
         )}
 
         <ul className="mt-8 flex flex-col gap-2">
-          {["Tus datos y presupuestos se guardan de forma segura en nuestros sistemas, no solo en este navegador.", "Accede desde cualquier dispositivo con tu número de presupuesto, tu correo y tu teléfono."].map((c) => (
+          {["Tus datos y presupuestos se guardan de forma segura en nuestros sistemas, no solo en este navegador.", "Accede desde cualquier dispositivo con tu correo, tu teléfono o tu número de presupuesto."].map((c) => (
             <li key={c} className="flex items-start gap-2.5">
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-navy/10 text-navy"><Check width={13} height={13} /></span>
               <span className="text-[13px] leading-relaxed text-slate2">{c}</span>
