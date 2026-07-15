@@ -77,13 +77,49 @@ async function manychatFetch<T>(path: string, body: Record<string, unknown>): Pr
   }
 }
 
+async function manychatGet<T>(path: string, params: Record<string, string>): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const url = new URL(`${API_BASE}${path}`);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { Authorization: `Bearer ${process.env.MANYCHAT_API_TOKEN}` },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, error: `ManyChat ${path} ${res.status}: ${text.slice(0, 300)}` };
+    }
+    const json = (await res.json().catch(() => null)) as { data?: T } | null;
+    return { ok: true, data: json?.data };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error de conexión con ManyChat." };
+  }
+}
+
+// Busca un suscriptor ya sincronizado antes por nuestro propio sistema (solo
+// funciona si en su día se creó con el campo "phone" relleno, como hace
+// createSubscriber más abajo). No sirve para encontrar contactos que ya
+// existían en ManyChat por otra vía (p.ej. Meta Ads) sin haber pasado antes
+// por nuestra web, porque findBySystemField solo busca por "phone"/"email",
+// no por "whatsapp_phone".
+async function findSubscriberByPhone(e164Phone: string): Promise<{ ok: boolean; subscriberId?: string }> {
+  const result = await manychatGet<{ id?: string | number } | null>("/fb/subscriber/findBySystemField", { phone: e164Phone });
+  const id = result.ok ? result.data?.id : undefined;
+  if (!id) return { ok: false };
+  return { ok: true, subscriberId: String(id) };
+}
+
 // Crea el suscriptor de WhatsApp a partir del teléfono. Requiere que el lead
 // haya autorizado el contacto (se usa como consent_phrase, que ManyChat pide
-// para crear un suscriptor solo con whatsapp_phone).
+// para crear un suscriptor solo con whatsapp_phone). Se rellena también el
+// campo de sistema "phone" (además de "whatsapp_phone") para poder
+// encontrarlo con findBySystemField en futuras sincronizaciones.
 async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string; alreadyExists?: boolean }> {
   const [firstName, ...rest] = (nombre || "").trim().split(/\s+/);
+  const e164 = toE164Spain(toNumber);
   const result = await manychatFetch<{ id: string | number }>("/fb/subscriber/createSubscriber", {
-    whatsapp_phone: toE164Spain(toNumber),
+    whatsapp_phone: e164,
+    phone: e164,
     first_name: firstName || undefined,
     last_name: rest.join(" ") || undefined,
     consent_phrase: "El usuario ha autorizado el contacto por WhatsApp al enviar un formulario en asegurados-ventajon.com.",
@@ -95,21 +131,27 @@ async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok:
   return { ok: true, subscriberId: String(result.data.id) };
 }
 
-// ManyChat no ofrece una forma fiable de buscar un suscriptor por
-// whatsapp_phone directamente (limitación documentada de su API). Si el
-// contacto ya existía (típico si venía de una campaña de Meta Ads antes de
-// pasar por la web), no podemos recuperar su id de forma automática: se
-// registra el motivo en el log y esa sincronización concreta se da por no
-// disponible, sin bloquear el alta del lead en el resto del sistema.
+// Primero busca por el campo de sistema "phone" (por si este lead ya pasó
+// antes por nuestra web) y solo si no lo encuentra intenta crearlo. Si
+// ManyChat responde que ya existe pero no lo habíamos encontrado por
+// "phone" (típico de contactos que llegaron por Meta Ads con solo
+// "whatsapp_phone" relleno), no hay forma fiable de recuperar su id por API
+// — limitación documentada de ManyChat, no un fallo de este código — así
+// que se registra el motivo en el log y esa sincronización concreta se
+// salta, sin bloquear el alta del lead en el resto del sistema.
 async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string }> {
+  const e164 = toE164Spain(toNumber);
+  const found = await findSubscriberByPhone(e164);
+  if (found.ok && found.subscriberId) return { ok: true, subscriberId: found.subscriberId };
+
   const created = await createSubscriber(toNumber, nombre);
   if (created.ok) return created;
   if (created.alreadyExists) {
     return {
       ok: false,
       error:
-        "El contacto ya existía en ManyChat (p.ej. de Meta Ads) y la API no permite recuperar su id por whatsapp_phone. " +
-        "No se puede sincronizar este lead concreto sin una búsqueda manual en ManyChat.",
+        "El contacto ya existía en ManyChat (probablemente de Meta Ads, con solo whatsapp_phone relleno) y no se pudo " +
+        "encontrar por el campo phone. La API de ManyChat no permite recuperar su id por whatsapp_phone directamente.",
     };
   }
   return created;
