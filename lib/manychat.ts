@@ -19,8 +19,8 @@ import { quoteNumber } from "./quote";
 //
 // ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
 // los campos de texto: nombre, telefono, producto, email, codigo_postal,
-// precio_aprox, id_presupuesto, utm_source, utm_campaign, utm_medium,
-// fuente_web — la API de ManyChat no crea campos nuevos sobre la marcha,
+// precio_aprox, id_presupuesto, servicio_adicional, utm_source, utm_campaign,
+// utm_medium, fuente_web — la API de ManyChat no crea campos nuevos sobre la marcha,
 // solo rellena los que ya existen. Usa {{nombre}} en tus plantillas/Flows
 // para el nombre del
 // formulario web: el first_name/last_name "de sistema" de ManyChat NO sirve
@@ -189,6 +189,7 @@ export async function syncManychatLead(opts: {
   codigoPostal?: string;
   precioAprox?: number | null;
   presupuestoId?: string | null;
+  servicioAdicional?: string;
   utm?: Record<string, string | undefined>;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!manychatConfigured()) return { ok: false, error: "ManyChat no configurado." };
@@ -205,11 +206,18 @@ export async function syncManychatLead(opts: {
     ["codigo_postal", opts.codigoPostal],
     ["precio_aprox", opts.precioAprox != null ? String(Math.round(opts.precioAprox)) : undefined],
     ["id_presupuesto", opts.presupuestoId ? quoteNumber(opts.presupuestoId) : undefined],
+    ["servicio_adicional", opts.servicioAdicional],
     ["utm_source", opts.utm?.source],
     ["utm_campaign", opts.utm?.campaign],
     ["utm_medium", opts.utm?.medium],
     ["fuente_web", opts.source],
   ];
+  if (opts.precioAprox == null) {
+    // No es un fallo de esta integración: significa que estimatePrecio() no
+    // encontró ningún producto activo con precio para ese producto en el
+    // catálogo (/admin/productos) en el momento de crear el presupuesto.
+    console.error(`[manychat] precio_aprox no disponible para source=${opts.source} — revisa que haya un producto activo con precio en /admin/productos.`);
+  }
   for (const [name, value] of fields) {
     if (value) await setCustomField(id, name, value);
   }

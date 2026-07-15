@@ -100,6 +100,10 @@ export async function POST(request: Request) {
       codigoPostal: d.codigoPostal,
       precioAprox: presupuesto?.precioAprox,
       presupuestoId: submissionId,
+      // El tarificador de vida no tiene un extra opcional equivalente al
+      // dental de salud o la cobertura de auto: se deja un valor fijo para
+      // que la variable de la plantilla nunca llegue vacía.
+      servicioAdicional: "Sin extras adicionales",
       utm: d.utm,
     });
     if (!sync.ok) console.error("[vida] manychat sync error", sync.error);

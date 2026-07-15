@@ -8,7 +8,7 @@ import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { Check, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import {
-  loadClientProfile, saveClientProfile, loadClientQuotes, removeClientQuote, type ClientProfile,
+  loadClientProfile, saveClientProfile, loadClientQuotes, removeClientQuote, addClientQuote, type ClientProfile,
 } from "@/lib/clientArea";
 import {
   saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile,
@@ -28,6 +28,17 @@ export function AreaClienteContent() {
   const [saved, setSaved] = useState(false);
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
   const lookupRef = useRef<{ telefono?: string; email?: string }>({});
+
+  // Recuperar presupuestos desde otro dispositivo: el resto de esta página
+  // vive solo en localStorage, así que si el cliente entra desde el móvil
+  // después de tarificar en el ordenador, no ve nada hasta que se identifica
+  // con su número de presupuesto + correo + teléfono.
+  const [loginCodigo, setLoginCodigo] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginTelefono, setLoginTelefono] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginOk, setLoginOk] = useState(false);
 
   useEffect(() => {
     const p = loadClientProfile() ?? {};
@@ -63,6 +74,37 @@ export function AreaClienteContent() {
     setQuotes(loadClientQuotes());
   }
 
+  async function handleLogin() {
+    if (!loginCodigo.trim() || !loginEmail.trim() || !loginTelefono.trim()) {
+      setLoginError("Rellena el número de presupuesto, el correo y el teléfono.");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError(null);
+    setLoginOk(false);
+    try {
+      const res = await fetch("/api/client/presupuestos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: loginCodigo, email: loginEmail, telefono: loginTelefono }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setLoginError(body.error ?? "No se ha podido verificar. Inténtalo de nuevo.");
+        setLoginLoading(false);
+        return;
+      }
+      for (const q of body.presupuestos as QuoteProfile[]) addClientQuote(q);
+      setQuotes(loadClientQuotes());
+      setLoginCodigo(""); setLoginEmail(""); setLoginTelefono("");
+      setLoginOk(true);
+      setTimeout(() => setLoginOk(false), 2500);
+    } catch {
+      setLoginError("Error de conexión. Inténtalo de nuevo.");
+    }
+    setLoginLoading(false);
+  }
+
   if (!checked) return null;
 
   return (
@@ -74,6 +116,49 @@ export function AreaClienteContent() {
           Sin registro ni contraseña: todo se guarda en este navegador. Aquí puedes recuperar tus presupuestos,
           cambiar tus datos de contacto o reprogramar tu llamada cuando quieras.
         </p>
+
+        {/* Recuperar desde otro dispositivo */}
+        <section aria-labelledby="acceso" className="mt-8 rounded-[24px] border border-hair bg-white p-6 shadow-card">
+          <h2 id="acceso" className="text-[18px] font-bold text-navy">¿Tarificaste desde otro dispositivo?</h2>
+          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
+            Introduce el número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF), tu correo y tu
+            teléfono para traer aquí tus presupuestos.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label>
+              <span className="mb-1 block text-[13px] font-semibold text-ink">Nº de presupuesto</span>
+              <input
+                value={loginCodigo} onChange={(e) => setLoginCodigo(e.target.value)}
+                placeholder="p.ej. E97AED9D"
+                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] uppercase text-ink placeholder:text-slate2/60 placeholder:normal-case"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-[13px] font-semibold text-ink">Correo electrónico</span>
+              <input
+                inputMode="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="maria@correo.com…"
+                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-[13px] font-semibold text-ink">Teléfono móvil</span>
+              <input
+                inputMode="tel" value={loginTelefono} onChange={(e) => setLoginTelefono(e.target.value)}
+                placeholder="600 000 000…"
+                className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60"
+              />
+            </label>
+          </div>
+          {loginError && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{loginError}</p>}
+          <button
+            type="button" onClick={handleLogin} disabled={loginLoading}
+            className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+          >
+            {loginLoading && <Spinner />}
+            {loginLoading ? "Buscando…" : loginOk ? "Encontrado ✓" : "Recuperar mis presupuestos"}
+          </button>
+        </section>
 
         {/* Datos de contacto */}
         <section aria-labelledby="datos" className="mt-8 rounded-[24px] border border-hair bg-white p-6 shadow-card">
@@ -166,7 +251,7 @@ export function AreaClienteContent() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <span className="inline-flex items-center rounded-pill bg-brand-red/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-red">
-                          {q.producto === "vida" ? "Seguro de vida" : "Seguro de salud"}
+                          {q.producto === "vida" ? "Seguro de vida" : q.producto === "auto" ? "Seguro de auto" : "Seguro de salud"}
                         </span>
                         <p className="mt-1.5 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(q.id)}</p>
                         <p className="text-[12px] text-slate2">{formatDate(q.createdAt)}</p>
@@ -181,6 +266,8 @@ export function AreaClienteContent() {
                       {age !== null && <><dt className="text-slate2">Edad</dt><dd className="text-right font-semibold tnums text-ink">{age} años</dd></>}
                       {q.numAsegurados != null && <><dt className="text-slate2">Asegurados</dt><dd className="text-right font-semibold tnums text-ink">{q.numAsegurados}</dd></>}
                       {q.fumador != null && <><dt className="text-slate2">Fumador</dt><dd className="text-right font-semibold text-ink">{q.fumador ? "Sí" : "No"}</dd></>}
+                      {q.tipoVehiculo && <><dt className="text-slate2">Vehículo</dt><dd className="text-right font-semibold text-ink">{q.tipoVehiculo === "moto" ? "Moto" : "Coche"}</dd></>}
+                      {q.matricula && <><dt className="text-slate2">Matrícula</dt><dd className="text-right font-semibold tnums text-ink">{q.matricula}</dd></>}
                     </dl>
 
                     {(q.diaLlamada || q.turnoLlamada) && (

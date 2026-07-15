@@ -7,7 +7,7 @@ import {
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
-import { saludPrice, vidaPrice, autoPrice } from "./quote";
+import { saludPrice, vidaPrice, autoPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
 function makeSubmissionId() {
@@ -637,6 +637,7 @@ export async function createPresupuesto(input: {
   await jset(`presupuesto:${input.id}`, presupuesto);
   await zadd("presupuestos:index", Date.parse(now), input.id);
   await zadd(`presupuestos:byLead:${input.leadId}`, Date.parse(now), input.id);
+  await jset(`presupuesto:byCode:${quoteNumber(input.id)}`, input.id);
   return presupuesto;
 }
 
@@ -671,6 +672,7 @@ export async function createManualPresupuesto(input: {
   await jset(`presupuesto:${id}`, presupuesto);
   await zadd("presupuestos:index", Date.parse(now), id);
   await zadd(`presupuestos:byLead:${input.leadId}`, Date.parse(now), id);
+  await jset(`presupuesto:byCode:${quoteNumber(id)}`, id);
   return presupuesto;
 }
 
@@ -716,6 +718,32 @@ export async function listPresupuestosByLead(leadId: string): Promise<Presupuest
 
 export async function getPresupuesto(id: string): Promise<Presupuesto | null> {
   return jget<Presupuesto>(`presupuesto:${id}`);
+}
+
+async function getPresupuestoByCode(code: string): Promise<Presupuesto | null> {
+  const id = await jget<string>(`presupuesto:byCode:${code}`);
+  if (!id) return null;
+  return getPresupuesto(id);
+}
+
+// Área de cliente sin registro: localiza los presupuestos de un lead a
+// partir de su número de presupuesto (código corto, único), su correo y su
+// teléfono — los tres deben coincidir con el presupuesto de ese código. Si
+// coincide, devuelve TODOS los presupuestos de ese lead (no solo el que dio
+// el código), para que un cliente con varios tarificadores los vea todos
+// entrando con cualquiera de sus números. Sin correspondencia exacta,
+// devuelve null (mensaje de error genérico, sin filtrar qué dato falló).
+export async function findClientPresupuestos(input: {
+  codigo: string; email: string; telefono: string;
+}): Promise<Presupuesto[] | null> {
+  const code = input.codigo.trim().toUpperCase();
+  if (!code) return null;
+  const match = await getPresupuestoByCode(code);
+  if (!match) return null;
+  const email = input.email.trim().toLowerCase();
+  const telefono = normalizePhone(input.telefono);
+  if (match.email.trim().toLowerCase() !== email || normalizePhone(match.telefono) !== telefono) return null;
+  return listPresupuestosByLead(match.leadId);
 }
 
 export async function updatePresupuesto(

@@ -109,6 +109,7 @@ export async function POST(request: Request) {
       codigoPostal: d.codigoPostal,
       precioAprox: presupuesto?.precioAprox,
       presupuestoId: submissionId,
+      servicioAdicional: (() => { const c = humanizeCobertura(d.coberturaDeseada); return c.charAt(0).toUpperCase() + c.slice(1); })(),
       utm: d.utm,
     });
     if (!sync.ok) console.error("[auto] manychat sync error", sync.error);

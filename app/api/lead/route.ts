@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       codigoPostal: d.codigoPostal,
       precioAprox: presupuesto?.precioAprox,
       presupuestoId: submissionId,
+      servicioAdicional: d.coberturaDental ? "Cobertura dental" : "Sin cobertura dental",
       utm: d.utm,
     });
     if (!sync.ok) console.error("[lead] manychat sync error", sync.error);
