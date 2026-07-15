@@ -120,6 +120,7 @@ async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok:
   const result = await manychatFetch<{ id: string | number }>("/fb/subscriber/createSubscriber", {
     whatsapp_phone: e164,
     phone: e164,
+    has_opt_in_sms: true, // ManyChat lo exige en cuanto se rellena "phone"
     first_name: firstName || undefined,
     last_name: rest.join(" ") || undefined,
     consent_phrase: "El usuario ha autorizado el contacto por WhatsApp al enviar un formulario en asegurados-ventajon.com.",
