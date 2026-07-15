@@ -37,9 +37,18 @@ import { quoteNumber } from "./quote";
 // aprobación por Meta; 2) crear un Flow en ManyChat que envíe esa plantilla;
 // 3) copiar el flow_ns de ese Flow y ponerlo en MANYCHAT_THANKYOU_FLOW_NS.
 //
-// Verifica también los nombres exactos de los endpoints contra la documentación
-// vigente en api.manychat.com antes de dar por hecho que coinciden con los de
-// aquí: la API de ManyChat ha ido cambiando de superficie con el tiempo.
+// ⚠️ Limitación conocida y confirmada de la API de ManyChat: si el número de
+// WhatsApp ya existía como suscriptor antes de pasar por la web (típico si
+// venía de una campaña de Meta Ads), createSubscriber devuelve un error de
+// "ya existe" y no hay ningún endpoint público fiable para recuperar su id a
+// partir del whatsapp_phone (es una limitación reportada en la comunidad de
+// ManyChat, no un fallo de este código). En ese caso, esta sincronización
+// concreta se salta con un aviso en el log — el resto del alta del lead no
+// se ve afectado. Si esto ocurre a menudo, la única solución del lado de
+// ManyChat es crear una Automatización con una regla "Nuevo contacto" que
+// copie whatsapp_phone a un campo personalizado propio y buscar por ahí con
+// /fb/subscriber/findByCustomField — pero solo cubre contactos creados desde
+// que esa regla exista, no los ya existentes.
 
 const API_BASE = "https://api.manychat.com";
 
@@ -68,17 +77,42 @@ async function manychatFetch<T>(path: string, body: Record<string, unknown>): Pr
   }
 }
 
-// Crea (o recupera, si ya existía) el suscriptor de WhatsApp a partir del
-// teléfono. Requiere que el lead haya autorizado el contacto.
-async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string }> {
+// Crea el suscriptor de WhatsApp a partir del teléfono. Requiere que el lead
+// haya autorizado el contacto (se usa como consent_phrase, que ManyChat pide
+// para crear un suscriptor solo con whatsapp_phone).
+async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string; alreadyExists?: boolean }> {
   const [firstName, ...rest] = (nombre || "").trim().split(/\s+/);
-  const result = await manychatFetch<{ id: string | number }>("/whatsapp/subscriber/createSubscriber", {
+  const result = await manychatFetch<{ id: string | number }>("/fb/subscriber/createSubscriber", {
     whatsapp_phone: toE164Spain(toNumber),
     first_name: firstName || undefined,
     last_name: rest.join(" ") || undefined,
+    consent_phrase: "El usuario ha autorizado el contacto por WhatsApp al enviar un formulario en asegurados-ventajon.com.",
   });
-  if (!result.ok || !result.data) return { ok: false, error: result.error };
+  if (!result.ok || !result.data) {
+    const alreadyExists = /already exist/i.test(result.error ?? "");
+    return { ok: false, error: result.error, alreadyExists };
+  }
   return { ok: true, subscriberId: String(result.data.id) };
+}
+
+// ManyChat no ofrece una forma fiable de buscar un suscriptor por
+// whatsapp_phone directamente (limitación documentada de su API). Si el
+// contacto ya existía (típico si venía de una campaña de Meta Ads antes de
+// pasar por la web), no podemos recuperar su id de forma automática: se
+// registra el motivo en el log y esa sincronización concreta se da por no
+// disponible, sin bloquear el alta del lead en el resto del sistema.
+async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string }> {
+  const created = await createSubscriber(toNumber, nombre);
+  if (created.ok) return created;
+  if (created.alreadyExists) {
+    return {
+      ok: false,
+      error:
+        "El contacto ya existía en ManyChat (p.ej. de Meta Ads) y la API no permite recuperar su id por whatsapp_phone. " +
+        "No se puede sincronizar este lead concreto sin una búsqueda manual en ManyChat.",
+    };
+  }
+  return created;
 }
 
 async function setCustomField(subscriberId: string, fieldName: string, fieldValue: string): Promise<void> {
