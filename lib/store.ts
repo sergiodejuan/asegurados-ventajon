@@ -5,6 +5,7 @@ import {
   type Task, type TaskDraft,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
+import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { saludPrice, vidaPrice, autoPrice } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
@@ -438,6 +439,104 @@ export async function deleteProduct(id: string): Promise<boolean> {
   const next = all.filter((p) => p.id !== id);
   if (next.length === all.length) return false;
   await jset(PRODUCTS_KEY, next);
+  return true;
+}
+
+/* -------------------------- Blog ("Actualidad") ----------------------------- */
+// Entradas del blog, editables desde /admin/blog. Mismo patrón que el
+// catálogo de productos: un único documento JSON, con semilla aditiva.
+
+const POSTS_KEY = "posts:all";
+
+async function readPosts(): Promise<Post[]> {
+  const stored = await jget<Post[]>(POSTS_KEY);
+  if (!stored || !stored.length) {
+    await jset(POSTS_KEY, DEFAULT_POSTS);
+    return DEFAULT_POSTS;
+  }
+  const knownIds = new Set(stored.map((p) => p.id));
+  const missing = DEFAULT_POSTS.filter((p) => !knownIds.has(p.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(POSTS_KEY, next);
+    return next;
+  }
+  return stored;
+}
+
+function sortPosts(posts: Post[]): Post[] {
+  return [...posts].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+}
+
+export async function listPosts(opts?: { onlyPublished?: boolean }): Promise<Post[]> {
+  let all = await readPosts();
+  if (opts?.onlyPublished) all = all.filter((p) => p.status === "publicado");
+  return sortPosts(all);
+}
+
+export async function getPost(id: string): Promise<Post | null> {
+  const all = await readPosts();
+  return all.find((p) => p.id === id) ?? null;
+}
+
+export async function getPostBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Post | null> {
+  const all = await readPosts();
+  const post = all.find((p) => p.slug === slug) ?? null;
+  if (post && opts?.onlyPublished && post.status !== "publicado") return null;
+  return post;
+}
+
+export async function otherPosts(id: string, limit = 3): Promise<Post[]> {
+  const all = await listPosts({ onlyPublished: true });
+  return all.filter((p) => p.id !== id).slice(0, limit);
+}
+
+// true si el slug ya está en uso por OTRA entrada (excludeId = la que se está editando).
+export async function slugTaken(slug: string, excludeId?: string): Promise<boolean> {
+  const all = await readPosts();
+  return all.some((p) => p.slug === slug && p.id !== excludeId);
+}
+
+export async function createPost(draft: PostDraft): Promise<Post> {
+  const all = await readPosts();
+  const now = new Date().toISOString();
+  const post: Post = {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: draft.slug ?? "",
+    status: draft.status ?? "borrador",
+    category: draft.category ?? "",
+    title: draft.title ?? "",
+    dek: draft.dek ?? "",
+    featuredImageUrl: draft.featuredImageUrl ?? "",
+    headerImageUrl: draft.headerImageUrl ?? "",
+    metaTitle: draft.metaTitle ?? "",
+    metaDescription: draft.metaDescription ?? "",
+    readMinutes: draft.readMinutes ?? 5,
+    publishedAt: draft.publishedAt ?? now.slice(0, 10),
+    updatedAt: now,
+    cta: draft.cta ?? { label: "Calcula tu precio", href: "/tarificador" },
+    intro: draft.intro ?? "",
+    blocks: draft.blocks ?? [],
+  };
+  all.push(post);
+  await jset(POSTS_KEY, all);
+  return post;
+}
+
+export async function updatePost(id: string, patch: PostDraft): Promise<Post | null> {
+  const all = await readPosts();
+  const idx = all.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(POSTS_KEY, all);
+  return all[idx];
+}
+
+export async function deletePost(id: string): Promise<boolean> {
+  const all = await readPosts();
+  const next = all.filter((p) => p.id !== id);
+  if (next.length === all.length) return false;
+  await jset(POSTS_KEY, next);
   return true;
 }
 

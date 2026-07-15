@@ -1,39 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { ImageField } from "@/components/admin/ImageField";
 import {
   DEFAULT_THEME, COLOR_LABELS, DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, HERO_PAGE_KEYS,
-  type SiteTheme, type SiteColors, type CookieConsentConfig,
+  type SiteTheme, type SiteColors,
 } from "@/lib/theme";
 import { PARTNERS } from "@/lib/brand";
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-
-function resizeImageFile(file: File, maxWidth: number, mime: "image/png" | "image/jpeg", quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("No se pudo procesar la imagen."));
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(reader.result as string); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL(mime, mime === "image/jpeg" ? quality : undefined));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function AdminDisenoPage() {
   return (
@@ -76,10 +50,6 @@ function DisenoAdmin() {
     setTheme((t) => ({ ...t, partnerLogos: { ...t.partnerLogos, [name]: value } }));
   }
 
-  function setCookie<K extends keyof CookieConsentConfig>(key: K, value: CookieConsentConfig[K]) {
-    setTheme((t) => ({ ...t, cookieConsent: { ...t.cookieConsent, [key]: value } }));
-  }
-
   async function save() {
     setSaving(true); setSaved(false); setError(null);
     try {
@@ -109,6 +79,8 @@ function DisenoAdmin() {
       <h1 className="text-[22px] font-extrabold text-navy">Diseño del sitio</h1>
       <p className="mt-1 text-[13px] leading-relaxed text-slate2">
         Colores, tipografías, logos, favicon y fotos de portada. Los cambios se aplican a toda la web (incluido este panel) al guardar.
+        El módulo de cookies y el seguimiento (GTM) se configuran ahora en{" "}
+        <a href="/admin/configuracion/cookies" className="font-semibold text-navy underline">Configuración</a>.
       </p>
 
       {error && <p role="alert" className="mt-4 text-[13px] font-medium text-brand-red">{error}</p>}
@@ -225,116 +197,6 @@ function DisenoAdmin() {
               ))}
             </div>
           </section>
-
-          {/* Módulo de cookies */}
-          <section className="rounded-[20px] border border-hair bg-white p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[15px] font-bold text-navy">Módulo de cookies</h2>
-              <label className="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-ink">
-                <input type="checkbox" checked={theme.cookieConsent.enabled}
-                  onChange={(e) => setCookie("enabled", e.target.checked)}
-                  className="h-4 w-4 cursor-pointer accent-navy" />
-                Activo
-              </label>
-            </div>
-            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
-              Aviso a pantalla completa que se muestra a cada visitante nuevo (una vez por navegador) en todo
-              el sitio público. No aparece dentro de este panel de administración.
-            </p>
-
-            <label className="mt-4 block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Título</span>
-              <input value={theme.cookieConsent.heading} onChange={(e) => setCookie("heading", e.target.value)}
-                className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
-            </label>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Texto explicativo</span>
-              <textarea value={theme.cookieConsent.body} onChange={(e) => setCookie("body", e.target.value)} rows={5}
-                className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px] leading-relaxed" />
-            </label>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <label>
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón aceptar</span>
-                <input value={theme.cookieConsent.acceptLabel} onChange={(e) => setCookie("acceptLabel", e.target.value)}
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-              </label>
-              <label>
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón rechazar</span>
-                <input value={theme.cookieConsent.rejectLabel} onChange={(e) => setCookie("rejectLabel", e.target.value)}
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-              </label>
-              <label>
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón configurar</span>
-                <input value={theme.cookieConsent.configureLabel} onChange={(e) => setCookie("configureLabel", e.target.value)}
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-              </label>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label>
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Enlace política de privacidad</span>
-                <input value={theme.cookieConsent.privacyHref} onChange={(e) => setCookie("privacyHref", e.target.value)}
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-              </label>
-              <label>
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Enlace política de cookies</span>
-                <input value={theme.cookieConsent.cookiesHref} onChange={(e) => setCookie("cookiesHref", e.target.value)}
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-              </label>
-            </div>
-
-            <details className="mt-4">
-              <summary className="cursor-pointer text-[12px] font-semibold text-navy">Textos de las categorías (panel &ldquo;Configurar cookies&rdquo;)</summary>
-              <div className="mt-3 flex flex-col gap-3">
-                {(["necessary", "analytics", "marketing"] as const).map((cat) => {
-                  const labelKey = `${cat}Label` as keyof CookieConsentConfig;
-                  const descKey = `${cat}Desc` as keyof CookieConsentConfig;
-                  return (
-                    <div key={cat} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <label>
-                        <span className="mb-1 block text-[11px] font-semibold text-ink">Nombre</span>
-                        <input value={theme.cookieConsent[labelKey] as string} onChange={(e) => setCookie(labelKey, e.target.value)}
-                          className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-                      </label>
-                      <label>
-                        <span className="mb-1 block text-[11px] font-semibold text-ink">Descripción</span>
-                        <input value={theme.cookieConsent[descKey] as string} onChange={(e) => setCookie(descKey, e.target.value)}
-                          className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          </section>
-
-          {/* Analítica */}
-          <section className="rounded-[20px] border border-hair bg-white p-5">
-            <h2 className="text-[15px] font-bold text-navy">Analítica (Google Tag Manager)</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
-              Pega aquí el ID de tu contenedor de Google Tag Manager (formato GTM-XXXXXXX) para conectar
-              GA4 u otras etiquetas. Solo se carga para visitantes que hayan aceptado cookies analíticas
-              o de marketing en el aviso de cookies.
-            </p>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[13px] font-semibold text-ink">ID de contenedor GTM</span>
-              <input
-                value={theme.gtmId}
-                onChange={(e) => setTheme((t) => ({ ...t, gtmId: e.target.value.trim() }))}
-                placeholder="GTM-XXXXXXX"
-                className="w-full max-w-xs rounded-card border border-hair bg-white px-4 py-3 text-[14px] tnums"
-              />
-            </label>
-            <p className="mt-3 text-[12px] leading-relaxed text-slate2">
-              El sitio ya envía eventos a <code className="rounded bg-mist px-1 py-0.5">dataLayer</code> listos para
-              configurar en GTM/GA4: <code className="rounded bg-mist px-1 py-0.5">page_view</code> (navegación),{" "}
-              <code className="rounded bg-mist px-1 py-0.5">generate_lead</code> (tarificador y &ldquo;quiero que me
-              llamen&rdquo;) y <code className="rounded bg-mist px-1 py-0.5">whatsapp_click</code>. El{" "}
-              <a href="/admin/utm" className="font-semibold text-navy underline">dashboard de UTM</a> del panel
-              muestra la atribución interna (origen, campaña, página de aterrizaje) de cada lead.
-            </p>
-          </section>
         </div>
       )}
 
@@ -347,51 +209,5 @@ function DisenoAdmin() {
         </div>
       </div>
     </main>
-  );
-}
-
-function ImageField({
-  label, hint, value, onChange, maxWidth, mime, preview, wide,
-}: {
-  label: string; hint?: string; value: string; onChange: (v: string) => void;
-  maxWidth: number; mime: "image/png" | "image/jpeg"; preview: string; wide?: boolean;
-}) {
-  const [processing, setProcessing] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setErr(null);
-    if (file.size > MAX_FILE_BYTES) { setErr("El archivo pesa demasiado (máx. 10 MB)."); return; }
-    setProcessing(true);
-    try { onChange(await resizeImageFile(file, maxWidth, mime)); }
-    catch { setErr("No se pudo procesar la imagen."); }
-    setProcessing(false);
-  }
-
-  return (
-    <label className="mt-3 block first:mt-0">
-      <span className="mb-1.5 block text-[13px] font-semibold text-ink">{label}</span>
-      <div className={`flex items-center gap-3 ${wide ? "" : ""}`}>
-        {value && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={value} alt="" className={`shrink-0 rounded border border-hair bg-mist object-contain p-1 ${preview}`} />
-        )}
-        <div className="min-w-0 flex-1">
-          <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} className="text-[13px]" />
-          {processing && <span className="ml-2 text-[12px] text-slate2">Procesando…</span>}
-        </div>
-        {value && (
-          <button type="button" onClick={() => { onChange(""); if (fileRef.current) fileRef.current.value = ""; }}
-            className="shrink-0 text-[12px] font-semibold text-brand-red underline">
-            Quitar
-          </button>
-        )}
-      </div>
-      {hint && <p className="mt-1 text-[11px] leading-relaxed text-slate2">{hint}</p>}
-      {err && <p role="alert" className="mt-1 text-[11px] font-medium text-brand-red">{err}</p>}
-    </label>
   );
 }

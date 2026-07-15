@@ -2,20 +2,18 @@ import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { StickyMobileCta } from "@/components/StickyMobileCta";
-import { IconByName, ArrowRight } from "@/components/icons";
+import { PostCard } from "@/components/PostCard";
 import { BRAND_NAME } from "@/lib/brand";
-import { POSTS } from "@/lib/posts";
+import { listPosts } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: `Actualidad — ${BRAND_NAME}`,
   description: "Educación financiera y de seguros: copago, seguros de vida, correduría vs. aseguradora y mucho más, explicado sin letra pequeña.",
 };
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
-}
+export default async function Actualidad() {
+  const posts = await listPosts({ onlyPublished: true });
 
-export default function Actualidad() {
   return (
     <>
       <Header showProgress />
@@ -36,22 +34,13 @@ export default function Actualidad() {
 
         {/* Listado de artículos */}
         <section aria-label="Artículos" className="mx-auto mt-14 max-w-app px-5 pb-14 md:mt-24 md:max-w-5xl lg:max-w-6xl">
-          <ul className="grid gap-5 md:grid-cols-3">
-            {POSTS.map((p) => (
-              <li key={p.slug} className="flex flex-col rounded-card border border-hair bg-white p-5 shadow-soft">
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-red/10 text-brand-red">
-                  <IconByName name={p.category.includes("vida") ? "life" : p.category.includes("salud") ? "shield" : "doc"} width={20} height={20} />
-                </span>
-                <p className="mt-4 text-[12px] font-bold uppercase tracking-wide text-brand-red">{p.category}</p>
-                <p className="mt-1 text-[17px] font-bold leading-snug text-ink">{p.title}</p>
-                <p className="mt-2 flex-1 text-[14px] leading-relaxed text-slate2">{p.dek}</p>
-                <p className="mt-4 text-[12px] text-slate2">{formatDate(p.publishedAt)} · {p.readMinutes} min de lectura</p>
-                <a href={`/actualidad/${p.slug}`} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-navy">
-                  Leer más <ArrowRight width={14} height={14} />
-                </a>
-              </li>
-            ))}
-          </ul>
+          {posts.length === 0 ? (
+            <p className="text-center text-[14px] text-slate2">Todavía no hay artículos publicados.</p>
+          ) : (
+            <ul className="grid gap-5 md:grid-cols-3">
+              {posts.map((p) => <PostCard key={p.id} post={p} />)}
+            </ul>
+          )}
         </section>
 
         {/* CTA final */}
