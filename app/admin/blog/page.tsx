@@ -65,24 +65,26 @@ function BlogAdmin() {
 
       <ul className="mt-5 flex flex-col gap-3">
         {posts.map((p) => (
-          <li key={p.id} className="flex items-center gap-4 rounded-card border border-hair bg-white p-4 shadow-soft">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {p.featuredImageUrl ? (
-              <img src={p.featuredImageUrl} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
-            ) : (
-              <div className="grid h-14 w-20 shrink-0 place-items-center rounded-lg bg-mist text-[11px] font-semibold text-slate2">Sin foto</div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className={`rounded-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.status === "publicado" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {p.status === "publicado" ? "Publicado" : "Borrador"}
-                </span>
-                <p className="truncate text-[12px] font-medium text-slate2">{p.category || "Sin categoría"}</p>
+          <li key={p.id} className="flex flex-col gap-3 rounded-card border border-hair bg-white p-4 shadow-soft sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {p.featuredImageUrl ? (
+                <img src={p.featuredImageUrl} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
+              ) : (
+                <div className="grid h-14 w-20 shrink-0 place-items-center rounded-lg bg-mist text-[11px] font-semibold text-slate2">Sin foto</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.status === "publicado" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {p.status === "publicado" ? "Publicado" : "Borrador"}
+                  </span>
+                  <p className="truncate text-[12px] font-medium text-slate2">{p.category || "Sin categoría"}</p>
+                </div>
+                <p className="mt-1 truncate text-[15px] font-bold text-ink">{p.title || "(sin título)"}</p>
+                <p className="mt-0.5 truncate text-[12px] text-slate2">/actualidad/{p.slug || "—"} · {fmt(p.publishedAt)}</p>
               </div>
-              <p className="mt-1 truncate text-[15px] font-bold text-ink">{p.title || "(sin título)"}</p>
-              <p className="mt-0.5 text-[12px] text-slate2">/actualidad/{p.slug || "—"} · {fmt(p.publishedAt)}</p>
             </div>
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
               <a href={`/actualidad/${p.slug}`} target="_blank" rel="noopener noreferrer"
                 className="rounded-pill border border-hair bg-white px-3 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-mist">
                 Ver
