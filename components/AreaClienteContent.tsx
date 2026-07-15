@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
-import { Check, IconByName, Spinner } from "@/components/icons";
+import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import {
   loadClientProfile, saveClientProfile, loadClientQuotes, removeClientQuote, addClientQuote, type ClientProfile,
@@ -28,6 +28,9 @@ export function AreaClienteContent() {
   const [saved, setSaved] = useState(false);
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
   const lookupRef = useRef<{ telefono?: string; email?: string }>({});
+
+  const PRESUPUESTOS_POR_PAGINA = 3;
+  const [page, setPage] = useState(1);
 
   // Recuperar presupuestos desde otro dispositivo: el resto de esta página
   // vive solo en localStorage, así que si el cliente entra desde el móvil
@@ -74,6 +77,10 @@ export function AreaClienteContent() {
     setQuotes(loadClientQuotes());
   }
 
+  const totalPages = Math.max(1, Math.ceil(quotes.length / PRESUPUESTOS_POR_PAGINA));
+  const currentPage = Math.min(page, totalPages);
+  const pageQuotes = quotes.slice((currentPage - 1) * PRESUPUESTOS_POR_PAGINA, currentPage * PRESUPUESTOS_POR_PAGINA);
+
   async function handleLogin() {
     if (!loginCodigo.trim() || !loginEmail.trim() || !loginTelefono.trim()) {
       setLoginError("Rellena el número de presupuesto, el correo y el teléfono.");
@@ -96,6 +103,7 @@ export function AreaClienteContent() {
       }
       for (const q of body.presupuestos as QuoteProfile[]) addClientQuote(q);
       setQuotes(loadClientQuotes());
+      setPage(1);
       setLoginCodigo(""); setLoginEmail(""); setLoginTelefono("");
       setLoginOk(true);
       setTimeout(() => setLoginOk(false), 2500);
@@ -243,7 +251,7 @@ export function AreaClienteContent() {
             </div>
           ) : (
             <ul className="mt-4 flex flex-col gap-3">
-              {quotes.map((q) => {
+              {pageQuotes.map((q) => {
                 const age = ageFromDob(q.fechaNacimiento);
                 const waText = buildWhatsAppText({ producto: q.producto, quote: q, origen: "área de cliente" });
                 return (
@@ -296,6 +304,24 @@ export function AreaClienteContent() {
                 );
               })}
             </ul>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button
+                type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1}
+                className="flex items-center gap-1 rounded-card border border-hair bg-white px-3.5 py-2 text-[13px] font-semibold text-navy transition-colors hover:bg-mist disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft width={16} height={16} /> Anterior
+              </button>
+              <p className="text-[13px] font-medium tnums text-slate2">Página {currentPage} de {totalPages}</p>
+              <button
+                type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}
+                className="flex items-center gap-1 rounded-card border border-hair bg-white px-3.5 py-2 text-[13px] font-semibold text-navy transition-colors hover:bg-mist disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Siguiente <ChevronRight width={16} height={16} />
+              </button>
+            </div>
           )}
         </section>
 
