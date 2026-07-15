@@ -1,4 +1,5 @@
 import { toE164Spain } from "./phone";
+import { quoteNumber } from "./quote";
 
 // Integración con ManyChat: cuando un lead completa un tarificador o pide que
 // le llamemos (y ha dado autorización de contacto), se sincroniza como
@@ -18,9 +19,10 @@ import { toE164Spain } from "./phone";
 //
 // ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
 // los campos de texto: nombre, telefono, producto, email, codigo_postal,
-// precio_aprox, utm_source, utm_campaign, utm_medium, fuente_web — la API de
-// ManyChat no crea campos nuevos sobre la marcha, solo rellena los que ya
-// existen. Usa {{nombre}} en tus plantillas/Flows para el nombre del
+// precio_aprox, id_presupuesto, utm_source, utm_campaign, utm_medium,
+// fuente_web — la API de ManyChat no crea campos nuevos sobre la marcha,
+// solo rellena los que ya existen. Usa {{nombre}} en tus plantillas/Flows
+// para el nombre del
 // formulario web: el first_name/last_name "de sistema" de ManyChat NO sirve
 // aquí, porque solo se rellena al crear el suscriptor por primera vez — si el
 // número ya existía como suscriptor (típico si venía de Meta Ads), ManyChat
@@ -109,6 +111,7 @@ export async function syncManychatLead(opts: {
   email?: string;
   codigoPostal?: string;
   precioAprox?: number | null;
+  presupuestoId?: string | null;
   utm?: Record<string, string | undefined>;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!manychatConfigured()) return { ok: false, error: "ManyChat no configurado." };
@@ -124,6 +127,7 @@ export async function syncManychatLead(opts: {
     ["email", opts.email],
     ["codigo_postal", opts.codigoPostal],
     ["precio_aprox", opts.precioAprox != null ? String(Math.round(opts.precioAprox)) : undefined],
+    ["id_presupuesto", opts.presupuestoId ? quoteNumber(opts.presupuestoId) : undefined],
     ["utm_source", opts.utm?.source],
     ["utm_campaign", opts.utm?.campaign],
     ["utm_medium", opts.utm?.medium],

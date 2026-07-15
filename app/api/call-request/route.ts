@@ -73,6 +73,7 @@ export async function POST(request: Request) {
       producto: d.producto ?? "salud",
       codigoPostal: d.codigoPostal,
       precioAprox: d.precioElegido ?? null,
+      presupuestoId: d.presupuestoId ?? null,
       utm: d.utm,
     });
     if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);

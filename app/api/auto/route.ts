@@ -108,6 +108,7 @@ export async function POST(request: Request) {
       email: d.email,
       codigoPostal: d.codigoPostal,
       precioAprox: presupuesto?.precioAprox,
+      presupuestoId: submissionId,
       utm: d.utm,
     });
     if (!sync.ok) console.error("[auto] manychat sync error", sync.error);
