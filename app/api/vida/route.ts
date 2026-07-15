@@ -4,6 +4,7 @@ import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeMotivo } from "@/lib/bland";
+import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { ageFromDob } from "@/lib/quote";
 
 export const runtime = "nodejs";
@@ -87,6 +88,19 @@ export async function POST(request: Request) {
       },
     });
     if (!call.ok) console.error("[vida] bland call error", call.error);
+  }
+
+  if (manychatConfigured() && d.autorizaContacto) {
+    const sync = await syncManychatLead({
+      toNumber: d.telefono,
+      nombre: d.nombre,
+      source: "tarificador-vida",
+      producto: "seguro de vida",
+      email: d.email,
+      codigoPostal: d.codigoPostal,
+      utm: d.utm,
+    });
+    if (!sync.ok) console.error("[vida] manychat sync error", sync.error);
   }
 
   return NextResponse.json({ ok: true, id, deduped });

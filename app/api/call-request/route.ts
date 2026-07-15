@@ -3,6 +3,7 @@ import { callRequestSchema } from "@/lib/schema";
 import { upsertLead, setPresupuestoEleccion } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
+import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,19 @@ export async function POST(request: Request) {
       },
     });
     if (!call.ok) console.error("[call-request] bland call error", call.error);
+  }
+
+  if (manychatConfigured() && d.autorizaContacto) {
+    const sync = await syncManychatLead({
+      toNumber: d.telefono,
+      nombre: d.nombre ?? "",
+      source: "quiero-que-me-llamen",
+      producto: d.producto ?? "salud",
+      codigoPostal: d.codigoPostal,
+      precioAprox: d.precioElegido ?? null,
+      utm: d.utm,
+    });
+    if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);
   }
 
   return NextResponse.json({ ok: true, id, deduped });

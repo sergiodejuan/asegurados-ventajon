@@ -4,6 +4,7 @@ import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeUsoVehiculo, humanizeCobertura } from "@/lib/bland";
+import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { ageFromDob } from "@/lib/quote";
 
 export const runtime = "nodejs";
@@ -96,6 +97,19 @@ export async function POST(request: Request) {
       },
     });
     if (!call.ok) console.error("[auto] bland call error", call.error);
+  }
+
+  if (manychatConfigured() && d.autorizaContacto) {
+    const sync = await syncManychatLead({
+      toNumber: d.telefono,
+      nombre: d.nombre,
+      source: "tarificador-auto",
+      producto: "seguro de auto",
+      email: d.email,
+      codigoPostal: d.codigoPostal,
+      utm: d.utm,
+    });
+    if (!sync.ok) console.error("[auto] manychat sync error", sync.error);
   }
 
   return NextResponse.json({ ok: true, id, deduped });
