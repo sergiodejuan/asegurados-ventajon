@@ -17,9 +17,15 @@ import { toE164Spain } from "./phone";
 //     de la sincronización sigue funcionando igual).
 //
 // ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
-// los campos de texto: producto, email, codigo_postal, precio_aprox,
-// utm_source, utm_campaign, utm_medium, fuente_web — la API de ManyChat no
-// crea campos nuevos sobre la marcha, solo rellena los que ya existen.
+// los campos de texto: nombre, telefono, producto, email, codigo_postal,
+// precio_aprox, utm_source, utm_campaign, utm_medium, fuente_web — la API de
+// ManyChat no crea campos nuevos sobre la marcha, solo rellena los que ya
+// existen. Usa {{nombre}} en tus plantillas/Flows para el nombre del
+// formulario web: el first_name/last_name "de sistema" de ManyChat NO sirve
+// aquí, porque solo se rellena al crear el suscriptor por primera vez — si el
+// número ya existía como suscriptor (típico si venía de Meta Ads), ManyChat
+// no lo actualiza, así que el nombre del tarificador se guarda siempre como
+// este campo personalizado en vez de depender de eso.
 //
 // ⚠️ Para el mensaje de agradecimiento con el resumen: WhatsApp exige que un
 // mensaje que abre conversación (el lead no te ha escrito antes) use una
@@ -112,6 +118,8 @@ export async function syncManychatLead(opts: {
   const id = created.subscriberId;
 
   const fields: [string, string | undefined][] = [
+    ["nombre", opts.nombre],
+    ["telefono", toE164Spain(opts.toNumber)],
     ["producto", opts.producto],
     ["email", opts.email],
     ["codigo_postal", opts.codigoPostal],
