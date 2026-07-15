@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header, Wordmark } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Modal } from "@/components/Modal";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
@@ -22,6 +23,25 @@ const TARIFICADORES = [
   { href: "/tarificador-vida", icon: "life", label: "Seguro de vida", desc: "Protege a los tuyos, a tu medida." },
   { href: "/tarificador-auto", icon: "car", label: "Seguro de auto", desc: "Coche o moto, con tu matrícula." },
 ];
+
+// Mismo contenido (aún placeholder, pendiente de redacción legal) que
+// app/legal/page.tsx — aquí en modal para no hacer salir de la pantalla de
+// acceso, que no tiene cabecera ni pie de página con enlaces de navegación.
+type LegalKey = "privacidad" | "condiciones" | "aviso";
+const LEGAL_CONTENT: Record<LegalKey, { title: string; body: string }> = {
+  privacidad: {
+    title: "Política de privacidad",
+    body: "[Responsable del tratamiento, finalidad, base jurídica (consentimiento), destinatarios, plazo de conservación, derechos del interesado y forma de ejercerlos. Pendiente de redacción.]",
+  },
+  condiciones: {
+    title: "Condiciones de uso",
+    body: "[Condiciones del servicio de comparación y del formulario de solicitud de contacto. Pendiente de redacción.]",
+  },
+  aviso: {
+    title: "Aviso legal",
+    body: `[Datos identificativos de ${BRAND_NAME} como correduría de seguros. Pendiente de redacción.]`,
+  },
+};
 
 // Tus tarificaciones se guardan en nuestra base de datos, no en el
 // navegador: el acceso va por sesión (cookie tras identificarte con un
@@ -42,6 +62,7 @@ export function AreaClienteContent() {
   const [saved, setSaved] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
+  const [legalModal, setLegalModal] = useState<LegalKey | null>(null);
   const [showRecoverBox, setShowRecoverBox] = useState(false);
 
   const PRESUPUESTOS_POR_PAGINA = 3;
@@ -180,49 +201,71 @@ export function AreaClienteContent() {
   // ni pie con enlaces de salida — como el login de un área de clientes real.
   if (vista === "acceso") {
     return (
-      <div className="flex min-h-screen flex-col md:flex-row">
-        <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 md:px-16 lg:px-20">
-          <a href="/" aria-label={`${BRAND_NAME} · Inicio`} className="inline-block w-fit">
-            <Wordmark logoUrl={theme.logoUrl} />
-          </a>
-          <div className="mt-8 w-full max-w-sm sm:mt-12">
-            <h1 className="text-[26px] font-extrabold leading-tight text-navy">Hola, entra en tu área de cliente</h1>
-            <p className="mt-2 text-[14px] leading-relaxed text-slate2">
-              Con tu correo, tu teléfono o tu número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF).
-            </p>
-            {loginField}
-            <button
-              type="button" onClick={handleLogin} disabled={loginLoading}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
-            >
-              {loginLoading && <Spinner />}
-              {loginLoading ? "Buscando…" : "Entrar a mi área"}
-            </button>
+      <div className="flex min-h-screen flex-col">
+        <div className="flex flex-1 flex-col md:flex-row">
+          <div className="flex flex-1 flex-col justify-center bg-white px-6 py-10 sm:px-10 md:px-16 lg:px-20">
+            <a href="/" aria-label={`${BRAND_NAME} · Inicio`} className="inline-block w-fit">
+              <Wordmark logoUrl={theme.logoUrl} />
+            </a>
+            <div className="mt-8 w-full max-w-sm sm:mt-12">
+              <h1 className="text-[26px] font-extrabold leading-tight text-navy">Hola, entra en tu área de cliente</h1>
+              <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+                Con tu correo, tu teléfono o tu número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF).
+              </p>
+              {loginField}
+              <button
+                type="button" onClick={handleLogin} disabled={loginLoading}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+              >
+                {loginLoading && <Spinner />}
+                {loginLoading ? "Buscando…" : "Entrar a mi área"}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-1 flex-col justify-center bg-mist px-6 py-10 sm:px-10 md:px-16 lg:px-20">
-          <div className="w-full max-w-sm">
-            <h2 className="text-[22px] font-extrabold leading-tight text-navy">¿Aún no has tarificado?</h2>
-            <p className="mt-2 text-[14px] leading-relaxed text-slate2">
-              Calcula tu precio en menos de 2 minutos, sin compromiso, y tu presupuesto se guardará aquí automáticamente.
-            </p>
-            <div className="mt-6 flex flex-col gap-3">
-              {TARIFICADORES.map((t) => (
-                <a key={t.href} href={t.href}
-                  className="flex items-center gap-3 rounded-card border border-hair bg-white p-4 shadow-soft transition-colors hover:bg-white/80">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red">
-                    <IconByName name={t.icon} width={20} height={20} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold text-ink">{t.label}</span>
-                    <span className="block text-[12px] text-slate2">{t.desc}</span>
-                  </span>
-                </a>
-              ))}
+          <div className="flex flex-1 flex-col justify-center bg-mist px-6 py-10 sm:px-10 md:px-16 lg:px-20">
+            <div className="w-full max-w-sm">
+              <h2 className="text-[22px] font-extrabold leading-tight text-navy">¿Aún no has tarificado?</h2>
+              <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+                Calcula tu precio en menos de 2 minutos, sin compromiso, y tu presupuesto se guardará aquí automáticamente.
+              </p>
+              <div className="mt-6 flex flex-col gap-3">
+                {TARIFICADORES.map((t) => (
+                  <a key={t.href} href={t.href}
+                    className="flex items-center gap-3 rounded-card border border-hair bg-white p-4 shadow-soft transition-colors hover:bg-white/80">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red">
+                      <IconByName name={t.icon} width={20} height={20} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-bold text-ink">{t.label}</span>
+                      <span className="block text-[12px] text-slate2">{t.desc}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </div>
+
+        <footer className="safe-bottom border-t border-hair bg-white px-6 py-4 sm:px-10 md:px-16 lg:px-20">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+            <p className="text-[12px] text-slate2">© {new Date().getFullYear()} {BRAND_NAME} · Todos los derechos reservados</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              {(Object.keys(LEGAL_CONTENT) as LegalKey[]).map((key) => (
+                <button key={key} type="button" onClick={() => setLegalModal(key)}
+                  className="text-[12px] font-medium text-slate2 underline transition-colors hover:text-navy">
+                  {LEGAL_CONTENT[key].title}
+                </button>
+              ))}
+            </div>
+          </div>
+        </footer>
+
+        {legalModal && (
+          <Modal open onClose={() => setLegalModal(null)} title={LEGAL_CONTENT[legalModal].title}>
+            <p>{LEGAL_CONTENT[legalModal].body}</p>
+          </Modal>
+        )}
       </div>
     );
   }
