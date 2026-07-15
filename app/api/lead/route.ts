@@ -5,6 +5,7 @@ import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
+import { setClientSessionCookie } from "@/lib/clientSession";
 import { ageFromDob } from "@/lib/quote";
 
 export const runtime = "nodejs";
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[lead] manychat sync error", sync.error);
   }
 
+  setClientSessionCookie(id);
   return NextResponse.json({ ok: true, id, deduped });
 }
 

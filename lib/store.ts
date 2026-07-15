@@ -212,14 +212,14 @@ export async function upsertLead(
 // se crea una nueva (evita altas fantasma desde un endpoint sin autenticar).
 
 export async function updateLeadContactByLookup(
-  lookup: { telefono?: string; email?: string },
+  lookup: { leadId?: string; telefono?: string; email?: string },
   patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string }
 ): Promise<Lead | null> {
   const lookupPhone = lookup.telefono ? normalizePhone(lookup.telefono) : "";
   const lookupEmail = lookup.email ? lookup.email.trim().toLowerCase() : "";
 
-  let id: string | null = null;
-  if (lookupPhone) id = await jget<string>(`idx:phone:${lookupPhone}`);
+  let id: string | null = lookup.leadId ?? null;
+  if (!id && lookupPhone) id = await jget<string>(`idx:phone:${lookupPhone}`);
   if (!id && lookupEmail) id = await jget<string>(`idx:email:${lookupEmail}`);
   if (!id) return null;
 

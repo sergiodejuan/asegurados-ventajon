@@ -4,6 +4,7 @@ import { upsertLead, setPresupuestoEleccion } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
+import { setClientSessionCookie } from "@/lib/clientSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);
   }
 
+  setClientSessionCookie(id);
   return NextResponse.json({ ok: true, id, deduped });
 }
 

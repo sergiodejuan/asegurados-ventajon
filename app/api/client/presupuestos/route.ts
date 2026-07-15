@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { findClientPresupuestos } from "@/lib/store";
-import type { Presupuesto } from "@/lib/crm";
+import { presupuestoToClientQuote } from "@/lib/clientQuote";
+import { setClientSessionCookie } from "@/lib/clientSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +10,9 @@ export const dynamic = "force-dynamic";
 // presupuestos desde cualquier dispositivo, identificándose con tres datos
 // que solo él conoce: el número de presupuesto (id único y corto), el
 // correo y el teléfono usados al tarificar. No se expone información
-// interna del CRM (notas del agente, quién lo cerró, etc.).
+// interna del CRM (notas del agente, quién lo cerró, etc.). Al verificar
+// correctamente, deja una sesión (cookie httpOnly) para que en próximas
+// visitas desde ese mismo navegador no haga falta volver a identificarse.
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await request.json(); }
@@ -24,42 +27,13 @@ export async function POST(request: Request) {
   }
 
   const presupuestos = await findClientPresupuestos({ codigo, email, telefono });
-  if (!presupuestos) {
+  if (!presupuestos || !presupuestos.length) {
     return NextResponse.json({ ok: false, error: "No encontramos ningún presupuesto con esos datos. Revisa el número, el correo y el teléfono." });
   }
 
-  return NextResponse.json({ ok: true, presupuestos: presupuestos.map(toClientQuote) });
-}
+  setClientSessionCookie(presupuestos[0].leadId);
 
-// Solo los campos que el propio cliente ya nos dio al tarificar, en el
-// mismo formato que usa el área de cliente para los presupuestos guardados
-// localmente (QuoteProfile) — así el frontend los mezcla sin transformar.
-function toClientQuote(p: Presupuesto) {
-  const d = p.data ?? {};
-  return {
-    id: p.id,
-    producto: p.producto,
-    createdAt: p.createdAt,
-    codigoPostal: d.codigoPostal,
-    numAsegurados: d.numAsegurados,
-    coberturaDental: d.coberturaDental,
-    fechaNacimiento: d.fechaNacimiento,
-    sexo: d.sexo,
-    motivo: d.motivo,
-    fumador: d.fumador,
-    inicio: d.inicio,
-    tipoVehiculo: d.tipoVehiculo,
-    matricula: d.matricula,
-    marcaVehiculo: d.marcaVehiculo,
-    modeloVehiculo: d.modeloVehiculo,
-    anioVehiculo: d.anioVehiculo,
-    usoVehiculo: d.usoVehiculo,
-    antiguedadCarnet: d.antiguedadCarnet,
-    coberturaDeseada: d.coberturaDeseada,
-    nombre: p.nombre,
-    telefono: p.telefono,
-    email: p.email,
-  };
+  return NextResponse.json({ ok: true, presupuestos: presupuestos.map(presupuestoToClientQuote) });
 }
 
 export function GET() {

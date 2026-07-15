@@ -1,41 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
-import {
-  loadClientProfile, saveClientProfile, loadClientQuotes, removeClientQuote, addClientQuote, type ClientProfile,
-} from "@/lib/clientArea";
-import {
-  saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile,
-} from "@/lib/quote";
+import { saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile } from "@/lib/quote";
+
+type Profile = { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string };
 
 function formatDate(iso: string) {
   try { return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(iso)); }
   catch { return iso; }
 }
 
-// Sin presupuestos ni datos guardados en este navegador no hay nada que
-// mostrar todavía: se pide primero identificarse (nº de presupuesto +
-// correo + teléfono) en vez de aterrizar en una página vacía sin sentido.
-type Vista = "acceso" | "transicion" | "area";
+// Tus tarificaciones se guardan en nuestra base de datos, no en el
+// navegador: el acceso va por sesión (cookie tras identificarte con tu nº
+// de presupuesto + correo + teléfono, o automático justo después de
+// tarificar en este mismo dispositivo), y los datos siempre se piden en
+// vivo al servidor — así funciona desde cualquier dispositivo, como en la
+// web de una aseguradora real.
+type Vista = "comprobando" | "acceso" | "transicion" | "area";
 
 export function AreaClienteContent() {
   const router = useRouter();
-  const [checked, setChecked] = useState(false);
-  const [vista, setVista] = useState<Vista>("acceso");
+  const [vista, setVista] = useState<Vista>("comprobando");
   const [greeting, setGreeting] = useState("");
-  const [profile, setProfile] = useState<ClientProfile>({});
+  const [profile, setProfile] = useState<Profile>({});
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
   const [showRecoverBox, setShowRecoverBox] = useState(false);
-  const lookupRef = useRef<{ telefono?: string; email?: string }>({});
 
   const PRESUPUESTOS_POR_PAGINA = 3;
   const [page, setPage] = useState(1);
@@ -51,27 +50,30 @@ export function AreaClienteContent() {
   const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
-    const p = loadClientProfile() ?? {};
-    lookupRef.current = { telefono: p.telefono, email: p.email };
-    setProfile(p);
-    const qs = loadClientQuotes();
-    setQuotes(qs);
-    const yaTieneDatos = qs.length > 0 || !!(p.nombre || p.telefono || p.email);
-    setVista(yaTieneDatos ? "area" : "acceso");
-    setChecked(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/client/session");
+        const body = await res.json();
+        if (body.ok) {
+          setProfile(body.profile ?? {});
+          setQuotes(body.presupuestos ?? []);
+          setVista("area");
+          return;
+        }
+      } catch { /* sin sesión válida: pasa a la pantalla de acceso */ }
+      setVista("acceso");
+    })();
   }, []);
 
   async function handleSaveProfile() {
     setSaving(true);
-    saveClientProfile(profile);
     try {
       await fetch("/api/client/update-contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lookupPhone: lookupRef.current.telefono, lookupEmail: lookupRef.current.email, patch: profile }),
+        body: JSON.stringify({ lookupPhone: profile.telefono, lookupEmail: profile.email, patch: profile }),
       });
-    } catch { /* el guardado local ya se ha hecho; el sync remoto es best-effort */ }
-    lookupRef.current = { telefono: profile.telefono, email: profile.email };
+    } catch { /* red: el usuario puede reintentar */ }
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
@@ -82,9 +84,14 @@ export function AreaClienteContent() {
     router.push(`/comparativa?producto=${q.producto}`);
   }
 
-  function handleRemove(id: string) {
-    removeClientQuote(id);
-    setQuotes(loadClientQuotes());
+  async function handleLogout() {
+    setLoggingOut(true);
+    try { await fetch("/api/client/logout", { method: "POST" }); } catch { /* noop */ }
+    setProfile({});
+    setQuotes([]);
+    setPage(1);
+    setLoggingOut(false);
+    setVista("acceso");
   }
 
   const totalPages = Math.max(1, Math.ceil(quotes.length / PRESUPUESTOS_POR_PAGINA));
@@ -111,15 +118,9 @@ export function AreaClienteContent() {
         return;
       }
       const found = body.presupuestos as QuoteProfile[];
-      for (const q of found) addClientQuote(q);
       const first = found[0];
-      if (first) {
-        const patch = { nombre: first.nombre, telefono: first.telefono, email: first.email };
-        saveClientProfile(patch);
-        setProfile((p) => ({ ...p, ...patch }));
-        lookupRef.current = { telefono: first.telefono, email: first.email };
-      }
-      setQuotes(loadClientQuotes());
+      setProfile((p) => ({ ...p, nombre: first?.nombre, telefono: first?.telefono, email: first?.email }));
+      setQuotes(found);
       setPage(1);
       setShowRecoverBox(false);
       setLoginCodigo(""); setLoginEmail(""); setLoginTelefono("");
@@ -134,7 +135,7 @@ export function AreaClienteContent() {
     setLoginLoading(false);
   }
 
-  if (!checked) return null;
+  if (vista === "comprobando") return null;
 
   // Pantalla de transición tras identificarse: breve y personalizada, antes
   // de revelar el área completa.
@@ -186,8 +187,8 @@ export function AreaClienteContent() {
     </>
   );
 
-  // Sin presupuestos ni datos guardados en este navegador: pantalla de
-  // acceso a pantalla completa en vez de aterrizar en un área vacía.
+  // Sin sesión válida: pantalla de acceso a pantalla completa en vez de
+  // aterrizar en un área vacía sin sentido.
   if (vista === "acceso") {
     return (
       <>
@@ -222,11 +223,19 @@ export function AreaClienteContent() {
     <>
       <Header />
       <main id="contenido" className="mx-auto max-w-app px-5 py-10 md:max-w-3xl md:py-16">
-        <h1 className="text-[28px] font-extrabold leading-tight text-navy">Tu área de cliente</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-slate2">
-          Sin registro ni contraseña: todo se guarda en este navegador. Aquí puedes recuperar tus presupuestos,
-          cambiar tus datos de contacto o reprogramar tu llamada cuando quieras.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[28px] font-extrabold leading-tight text-navy">Tu área de cliente</h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-slate2">
+              Tus presupuestos se guardan de forma segura con nosotros: accede desde cualquier dispositivo,
+              cambia tus datos de contacto o reprograma tu llamada cuando quieras.
+            </p>
+          </div>
+          <button type="button" onClick={handleLogout} disabled={loggingOut}
+            className="shrink-0 rounded-card border border-hair bg-white px-3.5 py-2 text-[13px] font-semibold text-navy transition-colors hover:bg-mist disabled:opacity-50">
+            {loggingOut ? "Saliendo…" : "Cerrar sesión"}
+          </button>
+        </div>
 
         {/* Añadir presupuestos de otro dispositivo (compacto, plegado) */}
         <section aria-labelledby="acceso" className="mt-8 rounded-[24px] border border-hair bg-white p-6 shadow-card">
@@ -312,8 +321,7 @@ export function AreaClienteContent() {
               {saving ? "Guardando…" : saved ? "Guardado ✓" : "Guardar cambios"}
             </button>
             <p className="text-[12px] leading-relaxed text-slate2">
-              Si ya tienes una solicitud en curso con {BRAND_NAME}, estos cambios se actualizan también en tu ficha
-              con tu asesor, al momento.
+              Estos cambios se actualizan también en tu ficha con tu asesor de {BRAND_NAME}, al momento.
             </p>
           </div>
         </section>
@@ -328,7 +336,7 @@ export function AreaClienteContent() {
                 <IconByName name="doc" width={22} height={22} />
               </span>
               <p className="mt-3 text-[14px] leading-relaxed text-slate2">
-                Todavía no tienes presupuestos guardados en este navegador. Calcula tu precio y aparecerá aquí.
+                Todavía no tienes presupuestos. Calcula tu precio y aparecerá aquí.
               </p>
               <a href="/tarificador" className="mt-4 inline-flex items-center justify-center rounded-card bg-brand-red px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
                 Calcula tu precio
@@ -349,9 +357,6 @@ export function AreaClienteContent() {
                         <p className="mt-1.5 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(q.id)}</p>
                         <p className="text-[12px] text-slate2">{formatDate(q.createdAt)}</p>
                       </div>
-                      <button type="button" onClick={() => handleRemove(q.id)} className="text-[12px] font-medium text-slate2 underline hover:text-brand-red">
-                        Eliminar
-                      </button>
                     </div>
 
                     <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">
@@ -421,7 +426,7 @@ export function AreaClienteContent() {
         )}
 
         <ul className="mt-8 flex flex-col gap-2">
-          {["Guardado solo en este navegador: si cambias de dispositivo, no verás este historial.", "Puedes borrar un presupuesto cuando quieras, sin que afecte a tu solicitud ya enviada."].map((c) => (
+          {["Tus datos y presupuestos se guardan de forma segura en nuestros sistemas, no solo en este navegador.", "Accede desde cualquier dispositivo con tu número de presupuesto, tu correo y tu teléfono."].map((c) => (
             <li key={c} className="flex items-start gap-2.5">
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-navy/10 text-navy"><Check width={13} height={13} /></span>
               <span className="text-[13px] leading-relaxed text-slate2">{c}</span>
