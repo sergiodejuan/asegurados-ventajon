@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     consent
   );
 
-  await createPresupuesto({
+  const presupuesto = await createPresupuesto({
     id: submissionId, leadId: id, source: "tarificador-auto", producto: "auto",
     data: {
       codigoPostal: d.codigoPostal, tipoVehiculo: d.tipoVehiculo, matricula: d.matricula,
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       seguroActualPeriodo: d.seguroActualPeriodo, seguroActualServicios: d.seguroActualServicios,
     },
     nombre: d.nombre, telefono: d.telefono, email: d.email,
-  }).catch((err) => console.error("[auto] presupuesto error", err));
+  }).catch((err) => { console.error("[auto] presupuesto error", err); return null; });
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
@@ -107,6 +107,7 @@ export async function POST(request: Request) {
       producto: "seguro de auto",
       email: d.email,
       codigoPostal: d.codigoPostal,
+      precioAprox: presupuesto?.precioAprox,
       utm: d.utm,
     });
     if (!sync.ok) console.error("[auto] manychat sync error", sync.error);

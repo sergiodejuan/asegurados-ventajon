@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     consent
   );
 
-  await createPresupuesto({
+  const presupuesto = await createPresupuesto({
     id: submissionId, leadId: id, source: "tarificador-vida", producto: "vida",
     data: {
       codigoPostal: d.codigoPostal, motivo: d.motivo, fechaNacimiento: d.fechaNacimiento, sexo: d.sexo,
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       seguroActualPeriodo: d.seguroActualPeriodo, seguroActualServicios: d.seguroActualServicios,
     },
     nombre: d.nombre, telefono: d.telefono, email: d.email,
-  }).catch((err) => console.error("[vida] presupuesto error", err));
+  }).catch((err) => { console.error("[vida] presupuesto error", err); return null; });
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
       producto: "seguro de vida",
       email: d.email,
       codigoPostal: d.codigoPostal,
+      precioAprox: presupuesto?.precioAprox,
       utm: d.utm,
     });
     if (!sync.ok) console.error("[vida] manychat sync error", sync.error);
