@@ -6,6 +6,7 @@ import { StepForm } from "@/components/StepForm";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
 import { getAttribution } from "@/lib/attribution";
+import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Close, IconByName, Spinner, ChevronLeft } from "@/components/icons";
 import {
@@ -13,14 +14,45 @@ import {
   getAssistantContext,
   DECESOS_FLOW,
   HOGAR_FLOW,
-  DUDA_FLOW,
   summarizeAnswers,
+  TICKET_TOPICS,
+  productoDisplay,
+  summarizeTicket,
   type MiniFlowQuestion,
   type AssistantProducto,
 } from "@/lib/assistantConfig";
 
 type Intent = "salud" | "vida" | "auto" | "decesos" | "hogar" | "llamada" | "duda";
-type Stage = "menu" | "tarificador" | "miniflow" | "contact" | "done";
+type Stage =
+  | "name"
+  | "menu"
+  | "tarificador"
+  | "miniflow"
+  | "contact"
+  | "duda-contact"
+  | "duda-select"
+  | "duda-topic"
+  | "duda-confirm"
+  | "done";
+
+type TicketPresupuesto = {
+  id: string;
+  producto: string;
+  createdAt: string;
+  nombre?: string;
+  telefono?: string;
+  email?: string;
+  codigoPostal?: string;
+};
+
+// A partir de qué scroll (px) se revela la burbuja: evita que aparezca de
+// golpe nada más cargar la página, cuando el visitante ni siquiera ha
+// empezado a leer — una vez revelada (tras cruzar el umbral una vez), se
+// queda visible aunque se vuelva a subir arriba.
+const SCROLL_REVEAL_PX = 240;
+const TEASER_DELAY_MS = 1200;
+const TEASER_AUTOHIDE_MS = 10000;
+const TEASER_SEEN_KEY = "ventajon:assistantTeaserSeen";
 
 const MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
   { intent: "salud", label: "Seguro de salud", icon: "shield" },
@@ -43,7 +75,6 @@ const LLAMADA_PRODUCTO_OPTIONS = [
 const MINIFLOWS: Partial<Record<Intent, MiniFlowQuestion[]>> = {
   decesos: DECESOS_FLOW,
   hogar: HOGAR_FLOW,
-  duda: DUDA_FLOW,
 };
 
 const PRODUCTO_LABELS: Record<Intent, string> = {
@@ -63,20 +94,72 @@ function orderedMenu(suggested?: AssistantProducto) {
   return [suggestedItem, ...MENU_ITEMS.filter((m) => m.intent !== suggested)];
 }
 
+function formatDate(iso: string): string {
+  try { return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }); }
+  catch { return ""; }
+}
+
 // Widget flotante presente en (casi) toda la web: triaje por botones (nunca
 // texto libre), tarificadores completos embebidos para salud/vida/auto con
-// el mismo formulario y campos que sus páginas dedicadas, y un mini-flujo +
-// captura de contacto propios para decesos/hogar/dudas, que no tienen
-// tarificador. Montado una única vez en el layout raíz: al vivir fuera de
+// el mismo formulario y campos que sus páginas dedicadas, un mini-flujo +
+// captura de contacto propios para decesos/hogar (que no tienen
+// tarificador), y un flujo de "abrir ticket" para dudas sobre un presupuesto
+// ya existente. Montado una única vez en el layout raíz: al vivir fuera de
 // cada página, el estado de la conversación no se pierde al navegar entre
 // páginas donde el asistente está disponible.
 export function AssistantWidget() {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [showTeaser, setShowTeaser] = useState(false);
+  const [userName, setUserName] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return loadClientProfile()?.nombre ?? "";
+  });
   const [intent, setIntent] = useState<Intent | null>(null);
-  const [stage, setStage] = useState<Stage>("menu");
+  const [stage, setStage] = useState<Stage>(() => {
+    if (typeof window === "undefined") return "menu";
+    return loadClientProfile()?.nombre ? "menu" : "name";
+  });
   const [miniflowIdx, setMiniflowIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  // Flujo de "tengo una duda": localizar el presupuesto y abrir un ticket.
+  const [ticketIdentifier, setTicketIdentifier] = useState("");
+  const [ticketSearching, setTicketSearching] = useState(false);
+  const [ticketSearchError, setTicketSearchError] = useState<string | null>(null);
+  const [ticketPresupuestos, setTicketPresupuestos] = useState<TicketPresupuesto[] | null>(null);
+  const [ticketSelected, setTicketSelected] = useState<TicketPresupuesto | null>(null);
+  const [ticketTopic, setTicketTopic] = useState<string | null>(null);
+  const [ticketComment, setTicketComment] = useState("");
+
+  useEffect(() => {
+    function onScroll() { if (window.scrollY > SCROLL_REVEAL_PX) setScrolled(true); }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Mensaje proactivo (bocadillo junto al icono) antes de abrir el widget,
+  // una sola vez por sesión de navegador — igual que hacen los asistentes de
+  // las grandes aseguradoras, invita a abrir sin ser intrusivo.
+  useEffect(() => {
+    if (!scrolled || open) return;
+    let alreadySeen = false;
+    try { alreadySeen = sessionStorage.getItem(TEASER_SEEN_KEY) === "1"; } catch { /* noop */ }
+    if (alreadySeen) return;
+    const showTimer = setTimeout(() => {
+      setShowTeaser(true);
+      try { sessionStorage.setItem(TEASER_SEEN_KEY, "1"); } catch { /* noop */ }
+    }, TEASER_DELAY_MS);
+    return () => clearTimeout(showTimer);
+  }, [scrolled, open]);
+
+  useEffect(() => {
+    if (!showTeaser) return;
+    const hideTimer = setTimeout(() => setShowTeaser(false), TEASER_AUTOHIDE_MS);
+    return () => clearTimeout(hideTimer);
+  }, [showTeaser]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +170,7 @@ export function AssistantWidget() {
 
   const allowed = isAssistantAllowed(pathname);
   const context = getAssistantContext(pathname);
+  const firstName = userName.trim().split(/\s+/)[0] || undefined;
 
   if (!allowed) return null;
 
@@ -107,7 +191,20 @@ export function AssistantWidget() {
     setIntent(i);
     setAnswers({});
     setMiniflowIdx(0);
-    setStage(i === "salud" || i === "vida" || i === "auto" ? "tarificador" : "miniflow");
+    if (i === "salud" || i === "vida" || i === "auto") {
+      setStage("tarificador");
+    } else if (i === "duda") {
+      setTicketIdentifier("");
+      setTicketSearching(false);
+      setTicketSearchError(null);
+      setTicketPresupuestos(null);
+      setTicketSelected(null);
+      setTicketTopic(null);
+      setTicketComment("");
+      setStage("duda-contact");
+    } else {
+      setStage("miniflow");
+    }
   }
 
   function answerMiniflow(key: string, value: string) {
@@ -116,21 +213,89 @@ export function AssistantWidget() {
     else setMiniflowIdx((n) => n + 1);
   }
 
+  function handleNameSubmit(name: string) {
+    saveClientProfile({ nombre: name });
+    setUserName(name);
+    setStage("menu");
+  }
+
+  async function searchTicket(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ticketIdentifier.trim()) return;
+    setTicketSearching(true);
+    setTicketSearchError(null);
+    try {
+      const res = await fetch("/api/client/presupuestos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: ticketIdentifier.trim() }),
+      });
+      const body = (await res.json().catch(() => null)) as { ok: boolean; presupuestos?: TicketPresupuesto[]; error?: string } | null;
+      if (res.ok && body?.ok && body.presupuestos?.length) {
+        setTicketPresupuestos(body.presupuestos);
+        if (body.presupuestos.length === 1) {
+          setTicketSelected(body.presupuestos[0]);
+          setStage("duda-topic");
+        } else {
+          setStage("duda-select");
+        }
+      } else {
+        setTicketSearchError(body?.error || "No hemos encontrado ningún presupuesto con ese dato.");
+      }
+    } catch {
+      setTicketSearchError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+    } finally {
+      setTicketSearching(false);
+    }
+  }
+
+  function skipTicketSearch() {
+    setTicketPresupuestos([]);
+    setTicketSelected(null);
+    setTicketSearchError(null);
+    setStage("duda-topic");
+  }
+
+  function openWidget() {
+    setOpen(true);
+    setShowTeaser(false);
+  }
+
   return (
     <>
       {!open && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={openWidget}
           aria-label="Abrir el asistente de Ventajon"
-          className="fixed bottom-28 left-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-navy text-white shadow-card transition-transform hover:scale-105 lg:bottom-6 lg:left-6"
+          aria-hidden={!scrolled}
+          tabIndex={scrolled ? 0 : -1}
+          className={`fixed bottom-28 left-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-navy text-white shadow-card transition-all duration-500 ease-out hover:scale-105 lg:bottom-6 lg:left-6 ${
+            scrolled ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-4 scale-75 opacity-0"
+          }`}
         >
           <ChatIcon />
         </button>
       )}
 
-      {open && (
-        <div role="presentation" onClick={() => setOpen(false)} aria-hidden="true" className="fixed inset-0 z-40 bg-navy-deep/40 lg:hidden" />
+      {!open && showTeaser && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={openWidget}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") openWidget(); }}
+          className="fixed bottom-[184px] left-4 z-40 max-w-[240px] cursor-pointer rounded-2xl rounded-bl-sm border border-hair bg-white px-4 py-3 text-[13px] leading-relaxed text-ink shadow-[0_8px_28px_-8px_rgba(18,32,79,0.35)] motion-safe:animate-fade-up lg:bottom-24 lg:left-6"
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowTeaser(false); }}
+            aria-label="Cerrar sugerencia"
+            className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-hair bg-white text-slate2 shadow-soft transition-colors hover:text-navy"
+          >
+            <Close width={11} height={11} />
+          </button>
+          <span className="font-semibold text-navy">¡Hola! 👋</span> Soy el asistente de {BRAND_NAME}. ¿Necesitas ayuda?
+        </div>
       )}
 
       {open && (
@@ -138,12 +303,11 @@ export function AssistantWidget() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="assistant-heading"
-          onClick={(e) => e.stopPropagation()}
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-card motion-safe:animate-fade-up lg:inset-x-auto lg:bottom-6 lg:left-6 lg:h-[600px] lg:max-h-[calc(100vh-3rem)] lg:w-[380px] lg:rounded-[24px]"
+          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white motion-safe:animate-fade-up lg:inset-auto lg:bottom-6 lg:left-6 lg:h-[600px] lg:max-h-[calc(100vh-3rem)] lg:w-[380px] lg:rounded-[24px] lg:border lg:border-hair lg:shadow-[0_8px_40px_-6px_rgba(18,32,79,0.35)]"
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-hair px-5 py-4">
+          <div className="safe-top flex shrink-0 items-center justify-between border-b border-hair px-5 py-4">
             <div className="flex min-w-0 items-center gap-2">
-              {stage !== "menu" && stage !== "done" && (
+              {stage !== "menu" && stage !== "done" && stage !== "name" && (
                 <button type="button" onClick={resetToMenu} aria-label="Volver al menú" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-navy transition-colors hover:bg-mist">
                   <ChevronLeft width={18} height={18} />
                 </button>
@@ -155,17 +319,24 @@ export function AssistantWidget() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="safe-bottom min-h-0 flex-1 overflow-y-auto p-5">
+            {stage === "name" && (
+              <NameStep onSubmit={handleNameSubmit} onSkip={() => setStage("menu")} />
+            )}
+
             {stage === "menu" && (
               <div>
-                <p className="text-[14px] leading-relaxed text-ink">{context.greeting}</p>
+                <BotBubble>
+                  <p className="font-semibold text-navy">{firstName ? `¡Hola, ${firstName}! 👋` : "Hola 👋"}</p>
+                  <p className="mt-1">{context.greeting}</p>
+                </BotBubble>
                 <div className="mt-4 flex flex-col gap-2">
                   {orderedMenu(context.suggestedProducto).map((item) => (
                     <button
                       key={item.intent}
                       type="button"
                       onClick={() => chooseIntent(item.intent)}
-                      className="flex items-center gap-3 rounded-card border border-hair bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy/40 hover:bg-mist"
+                      className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy hover:bg-navy/5"
                     >
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
                         <IconByName name={item.icon} width={17} height={17} />
@@ -189,13 +360,51 @@ export function AssistantWidget() {
               <ContactCapture intent={intent} answers={answers} onDone={() => setStage("done")} />
             )}
 
+            {stage === "duda-contact" && (
+              <TicketSearch
+                identifier={ticketIdentifier}
+                onChangeIdentifier={setTicketIdentifier}
+                onSubmit={searchTicket}
+                searching={ticketSearching}
+                error={ticketSearchError}
+                onSkip={skipTicketSearch}
+              />
+            )}
+
+            {stage === "duda-select" && ticketPresupuestos && (
+              <TicketPresupuestoSelect
+                presupuestos={ticketPresupuestos}
+                onSelect={(p) => { setTicketSelected(p); setStage("duda-topic"); }}
+              />
+            )}
+
+            {stage === "duda-topic" && (
+              <TicketTopicStep
+                topic={ticketTopic}
+                onSelectTopic={setTicketTopic}
+                comment={ticketComment}
+                onChangeComment={setTicketComment}
+                presupuesto={ticketSelected}
+                onContinue={() => setStage("duda-confirm")}
+              />
+            )}
+
+            {stage === "duda-confirm" && (
+              <TicketConfirm
+                presupuesto={ticketSelected}
+                topic={ticketTopic}
+                comment={ticketComment}
+                onDone={() => setStage("done")}
+              />
+            )}
+
             {stage === "done" && (
-              <div className="motion-safe:animate-fade-up py-6 text-center">
-                <p className="text-[16px] font-bold text-navy">¡Gracias!</p>
-                <p className="mt-2 text-[14px] leading-relaxed text-slate2">
-                  Hemos recibido tus datos. Un asesor se pondrá en contacto contigo en breve.
-                </p>
-                <button type="button" onClick={resetToMenu} className="mt-5 rounded-card border border-hair px-5 py-2.5 text-[14px] font-semibold text-navy transition-colors hover:bg-mist">
+              <div className="motion-safe:animate-fade-up">
+                <BotBubble>
+                  <p className="font-semibold text-navy">¡Gracias{firstName ? `, ${firstName}` : ""}! 🎉</p>
+                  <p className="mt-1">Hemos recibido tus datos. Un asesor se pondrá en contacto contigo en breve.</p>
+                </BotBubble>
+                <button type="button" onClick={resetToMenu} className="mt-4 rounded-2xl border border-navy/15 px-5 py-2.5 text-[14px] font-semibold text-navy transition-colors hover:border-navy hover:bg-navy/5">
                   Volver al menú
                 </button>
               </div>
@@ -207,17 +416,43 @@ export function AssistantWidget() {
   );
 }
 
+function NameStep({ onSubmit, onSkip }: { onSubmit: (name: string) => void; onSkip: () => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="motion-safe:animate-fade-up">
+      <BotBubble>¡Hola! 👋 Antes de nada, ¿cómo te llamas?</BotBubble>
+      <form
+        onSubmit={(e) => { e.preventDefault(); const v = value.trim(); if (v) onSubmit(v); else onSkip(); }}
+        className="mt-4"
+      >
+        <label htmlFor="a-userName" className="sr-only">Tu nombre</label>
+        <input
+          id="a-userName" autoComplete="given-name" value={value} onChange={(e) => setValue(e.target.value)}
+          placeholder="Tu nombre…" autoFocus
+          className="w-full rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
+        />
+        <button type="submit" className="mt-3 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+          Continuar
+        </button>
+      </form>
+      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+        Prefiero no decirlo
+      </button>
+    </div>
+  );
+}
+
 function MiniFlowStep({ question, onAnswer }: { question: MiniFlowQuestion; onAnswer: (v: string) => void }) {
   return (
     <div className="motion-safe:animate-fade-up">
-      <h3 className="text-[16px] font-bold leading-snug text-navy">{question.title}</h3>
+      <BotBubble><span className="font-semibold text-navy">{question.title}</span></BotBubble>
       <div className="mt-4 flex flex-col gap-2">
         {question.options.map((o) => (
           <button
             key={o.value}
             type="button"
             onClick={() => onAnswer(o.value)}
-            className="rounded-card border border-hair bg-white px-4 py-3 text-left text-[14px] font-medium text-ink transition-colors hover:border-navy/40 hover:bg-mist"
+            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-medium text-ink transition-colors hover:border-navy hover:bg-navy/5"
           >
             {o.label}
           </button>
@@ -227,7 +462,274 @@ function MiniFlowStep({ question, onAnswer }: { question: MiniFlowQuestion; onAn
   );
 }
 
+/* ------------------------------ "Tengo una duda" ------------------------------ */
+
+function TicketSearch({
+  identifier, onChangeIdentifier, onSubmit, searching, error, onSkip,
+}: {
+  identifier: string; onChangeIdentifier: (v: string) => void; onSubmit: (e: React.FormEvent) => void;
+  searching: boolean; error: string | null; onSkip: () => void;
+}) {
+  return (
+    <div className="motion-safe:animate-fade-up">
+      <BotBubble>
+        <p className="font-semibold text-navy">Vamos a localizar tu presupuesto</p>
+        <p className="mt-1">Escribe tu correo, tu teléfono o tu número de presupuesto para abrir un ticket sobre tu caso.</p>
+      </BotBubble>
+      <form onSubmit={onSubmit} className="mt-4">
+        <label htmlFor="a-identifier" className="sr-only">Correo, teléfono o nº de presupuesto</label>
+        <input
+          id="a-identifier" value={identifier} onChange={(e) => onChangeIdentifier(e.target.value)}
+          placeholder="Correo, teléfono o nº de presupuesto"
+          className="w-full rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
+        />
+        {error && <p role="alert" className="mt-2 text-[12px] font-medium text-brand-red">{error}</p>}
+        <button
+          type="submit" disabled={searching || !identifier.trim()} aria-busy={searching || undefined}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40"
+        >
+          {searching && <Spinner />}
+          {searching ? "Buscando…" : "Buscar mi presupuesto"}
+        </button>
+      </form>
+      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+        No tengo presupuesto, quiero contarlo directamente
+      </button>
+    </div>
+  );
+}
+
+function TicketPresupuestoSelect({
+  presupuestos, onSelect,
+}: { presupuestos: TicketPresupuesto[]; onSelect: (p: TicketPresupuesto) => void }) {
+  return (
+    <div className="motion-safe:animate-fade-up">
+      <BotBubble>
+        <p className="font-semibold text-navy">Hemos encontrado varios presupuestos</p>
+        <p className="mt-1">¿Sobre cuál es tu duda?</p>
+      </BotBubble>
+      <div className="mt-4 flex flex-col gap-2">
+        {presupuestos.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onSelect(p)}
+            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] transition-colors hover:border-navy hover:bg-navy/5"
+          >
+            <span className="block font-semibold text-navy">{PRODUCTO_LABELS[p.producto as Intent] ?? p.producto}</span>
+            <span className="block text-[12px] text-slate2">{formatDate(p.createdAt)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TicketTopicStep({
+  topic, onSelectTopic, comment, onChangeComment, presupuesto, onContinue,
+}: {
+  topic: string | null; onSelectTopic: (v: string | null) => void; comment: string; onChangeComment: (v: string) => void;
+  presupuesto: TicketPresupuesto | null; onContinue: () => void;
+}) {
+  const canContinue = !!topic || comment.trim().length > 0;
+  return (
+    <div className="motion-safe:animate-fade-up">
+      <BotBubble>
+        <p className="font-semibold text-navy">¿Sobre qué es tu duda?</p>
+        {presupuesto && (
+          <p className="mt-1">Sobre {productoDisplay(presupuesto.producto)} del {formatDate(presupuesto.createdAt)}.</p>
+        )}
+      </BotBubble>
+      <div className="mt-4 flex flex-col gap-2">
+        {TICKET_TOPICS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={topic === o.value}
+            onClick={() => onSelectTopic(topic === o.value ? null : o.value)}
+            className={`rounded-2xl border px-4 py-3 text-left text-[14px] font-medium transition-colors ${topic === o.value ? "border-navy bg-navy text-white" : "border-navy/15 bg-white text-ink hover:border-navy hover:bg-navy/5"}`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4">
+        <label htmlFor="a-comment" className="mb-1.5 block text-[13px] font-semibold text-ink">
+          {topic ? "Añade más detalles (opcional)" : "O cuéntanoslo con tus palabras"}
+        </label>
+        <textarea
+          id="a-comment" value={comment} onChange={(e) => onChangeComment(e.target.value.slice(0, 400))} rows={3}
+          placeholder="Escribe aquí tu duda…"
+          className="w-full resize-none rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[14px] text-ink placeholder:text-slate2/60"
+        />
+      </div>
+      <button
+        type="button" disabled={!canContinue} onClick={onContinue}
+        className="mt-4 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:cursor-not-allowed disabled:bg-slate2/40"
+      >
+        Continuar
+      </button>
+    </div>
+  );
+}
+
 type FieldErrors = Partial<Record<string, string>>;
+
+function TicketConfirm({
+  presupuesto, topic, comment, onDone,
+}: { presupuesto: TicketPresupuesto | null; topic: string | null; comment: string; onDone: () => void }) {
+  const hasContact = !!presupuesto?.telefono;
+  const [nombre, setNombre] = useState(presupuesto?.nombre ?? "");
+  const [telefono, setTelefono] = useState(presupuesto?.telefono ?? "");
+  const [codigoPostal, setCp] = useState(presupuesto?.codigoPostal ?? "");
+  const [priv, setPriv] = useState(false);
+  const [contacto, setContacto] = useState(false);
+  const [comercial, setComercial] = useState(false);
+  const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const producto = presupuesto?.producto ?? "general";
+  const detalleConsulta = summarizeTicket(topic, comment, presupuesto?.producto);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitError(null);
+    const payload = {
+      nombre, telefono, codigoPostal, producto,
+      detalleConsulta,
+      presupuestoId: presupuesto?.id,
+      aceptaPrivacidad: priv, autorizaContacto: contacto, aceptaComercial: comercial,
+      company: "", consent: consentTimes, utm: getAttribution(), origen: "asistente" as const,
+    };
+    const parsed = callRequestSchema.safeParse(payload);
+    if (!parsed.success) {
+      const fe = parsed.error.flatten().fieldErrors;
+      const mapped: FieldErrors = {};
+      for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
+      setErrors(mapped);
+      const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
+      if (first) document.getElementById(`a-${first}`)?.focus();
+      return;
+    }
+    setErrors({});
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/call-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      if (res.ok) {
+        pushDataLayerEvent("generate_lead", { producto, form: "asistente-ticket" });
+        onDone();
+        return;
+      }
+      const body = (await res.json().catch(() => null)) as { errors?: Record<string, string[]> } | null;
+      if (body?.errors) {
+        const mapped: FieldErrors = {};
+        for (const [k, v] of Object.entries(body.errors)) if (v && v[0]) mapped[k] = v[0];
+        setErrors(mapped);
+      } else {
+        setSubmitError("No hemos podido enviar tu consulta. Inténtalo de nuevo.");
+      }
+    } catch {
+      setSubmitError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="relative motion-safe:animate-fade-up">
+      <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+        <label htmlFor="a-company">No rellenar</label>
+        <input id="a-company" tabIndex={-1} autoComplete="off" onChange={() => {}} />
+      </div>
+
+      {hasContact ? (
+        <BotBubble>
+          <p className="font-semibold text-navy">Ya casi está</p>
+          <p className="mt-1">
+            Vamos a pasar tu duda sobre {productoDisplay(presupuesto!.producto)} a un agente. Te contactaremos en el{" "}
+            <span className="font-semibold text-ink">{presupuesto!.telefono}</span>.
+          </p>
+        </BotBubble>
+      ) : (
+        <>
+          <BotBubble>
+            <p className="font-semibold text-navy">Ya casi está</p>
+            <p className="mt-1">Déjanos tus datos para que un agente pueda ayudarte.</p>
+          </BotBubble>
+          <div className="mt-4">
+            <label htmlFor="a-nombre" className="mb-1.5 block text-[13px] font-semibold text-ink">
+              Nombre <span className="font-normal text-slate2">(opcional)</span>
+            </label>
+            <input id="a-nombre" name="name" autoComplete="name" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="María…"
+              className="w-full rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60" />
+          </div>
+          <div className="mt-3">
+            <label htmlFor="a-telefono" className="mb-1.5 block text-[13px] font-semibold text-ink">Teléfono móvil</label>
+            <input id="a-telefono" name="tel" type="tel" inputMode="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="600 000 000…"
+              aria-invalid={!!errors.telefono} aria-describedby={errors.telefono ? "a-telefono-err" : undefined}
+              className={`w-full rounded-2xl border bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 ${errors.telefono ? "border-brand-red" : "border-navy/15"}`} />
+            {errors.telefono && <p id="a-telefono-err" role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{errors.telefono}</p>}
+          </div>
+          <div className="mt-3">
+            <label htmlFor="a-codigoPostal" className="mb-1.5 block text-[13px] font-semibold text-ink">Código postal</label>
+            <input id="a-codigoPostal" name="postal-code" inputMode="numeric" autoComplete="postal-code" maxLength={5} spellCheck={false} value={codigoPostal}
+              onChange={(e) => setCp(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="35001…"
+              aria-invalid={!!errors.codigoPostal} aria-describedby={errors.codigoPostal ? "a-cp-err" : undefined}
+              className={`w-full rounded-2xl border bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 ${errors.codigoPostal ? "border-brand-red" : "border-navy/15"}`} />
+            {errors.codigoPostal && <p id="a-cp-err" role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{errors.codigoPostal}</p>}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 flex flex-col gap-2.5">
+        <label htmlFor="a-aceptaPrivacidad" className="flex cursor-pointer items-start gap-2.5">
+          <input id="a-aceptaPrivacidad" type="checkbox" checked={priv}
+            onChange={(e) => { setPriv(e.target.checked); setConsentTimes((c) => ({ ...c, privacidadAt: e.target.checked ? new Date().toISOString() : undefined })); }}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.aceptaPrivacidad} />
+          <span className="text-[12px] leading-relaxed text-slate2">
+            He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
+          </span>
+        </label>
+        {errors.aceptaPrivacidad && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.aceptaPrivacidad}</p>}
+
+        <label htmlFor="a-autorizaContacto" className="flex cursor-pointer items-start gap-2.5">
+          <input id="a-autorizaContacto" type="checkbox" checked={contacto}
+            onChange={(e) => { setContacto(e.target.checked); setConsentTimes((c) => ({ ...c, contactoAt: e.target.checked ? new Date().toISOString() : undefined })); }}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.autorizaContacto} />
+          <span className="text-[12px] leading-relaxed text-slate2">
+            Autorizo a {BRAND_NAME} a contactarme por teléfono o WhatsApp sobre esta consulta.
+          </span>
+        </label>
+        {errors.autorizaContacto && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.autorizaContacto}</p>}
+
+        <label htmlFor="a-aceptaComercial" className="flex cursor-pointer items-start gap-2.5">
+          <input id="a-aceptaComercial" type="checkbox" checked={comercial}
+            onChange={(e) => { setComercial(e.target.checked); setConsentTimes((c) => ({ ...c, comercialAt: e.target.checked ? new Date().toISOString() : undefined })); }}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" />
+          <span className="text-[12px] leading-relaxed text-slate2">Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).</span>
+        </label>
+      </div>
+
+      {submitError && (
+        <p role="alert" aria-live="polite" className="mt-3 rounded-lg bg-brand-red/10 px-3.5 py-2.5 text-[13px] font-medium text-brand-red-deep">{submitError}</p>
+      )}
+
+      <button type="submit" disabled={submitting} aria-busy={submitting || undefined}
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40">
+        {submitting && <Spinner />}
+        {submitting ? "Enviando…" : "Enviar consulta"}
+      </button>
+    </form>
+  );
+}
+
+/* ------------------------------- Llamada / decesos / hogar ------------------------------- */
 
 function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: Record<string, string>; onDone: () => void }) {
   const [nombre, setNombre] = useState("");
@@ -241,7 +743,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const producto = intent === "llamada" ? (answers.producto ?? "salud") : intent === "duda" ? "general" : intent;
+  const producto = intent === "llamada" ? (answers.producto ?? "salud") : intent;
   const detalleConsulta = intent !== "llamada" && Object.keys(answers).length
     ? summarizeAnswers(PRODUCTO_LABELS[intent], answers)
     : undefined;
@@ -295,8 +797,10 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
 
   return (
     <form onSubmit={onSubmit} noValidate className="relative motion-safe:animate-fade-up">
-      <h3 className="text-[16px] font-bold leading-snug text-navy">Déjanos tus datos</h3>
-      <p className="mt-1 text-[13px] leading-relaxed text-slate2">Un asesor te llama sin coste ni compromiso.</p>
+      <BotBubble>
+        <p className="font-semibold text-navy">Déjanos tus datos</p>
+        <p className="mt-1">Un asesor te llama sin coste ni compromiso.</p>
+      </BotBubble>
 
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
         <label htmlFor="a-company">No rellenar</label>
@@ -308,14 +812,14 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
           Nombre <span className="font-normal text-slate2">(opcional)</span>
         </label>
         <input id="a-nombre" name="name" autoComplete="name" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="María…"
-          className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60" />
+          className="w-full rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60" />
       </div>
 
       <div className="mt-3">
         <label htmlFor="a-telefono" className="mb-1.5 block text-[13px] font-semibold text-ink">Teléfono móvil</label>
         <input id="a-telefono" name="tel" type="tel" inputMode="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="600 000 000…"
           aria-invalid={!!errors.telefono} aria-describedby={errors.telefono ? "a-telefono-err" : undefined}
-          className={`w-full rounded-card border bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 ${errors.telefono ? "border-brand-red" : "border-hair"}`} />
+          className={`w-full rounded-2xl border bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 ${errors.telefono ? "border-brand-red" : "border-navy/15"}`} />
         {errors.telefono && <p id="a-telefono-err" role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{errors.telefono}</p>}
       </div>
 
@@ -324,7 +828,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
         <input id="a-codigoPostal" name="postal-code" inputMode="numeric" autoComplete="postal-code" maxLength={5} spellCheck={false} value={codigoPostal}
           onChange={(e) => setCp(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="35001…"
           aria-invalid={!!errors.codigoPostal} aria-describedby={errors.codigoPostal ? "a-cp-err" : undefined}
-          className={`w-full rounded-card border bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 ${errors.codigoPostal ? "border-brand-red" : "border-hair"}`} />
+          className={`w-full rounded-2xl border bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 ${errors.codigoPostal ? "border-brand-red" : "border-navy/15"}`} />
         {errors.codigoPostal && <p id="a-cp-err" role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{errors.codigoPostal}</p>}
       </div>
 
@@ -362,7 +866,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
       )}
 
       <button type="submit" disabled={submitting} aria-busy={submitting || undefined}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-card bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40">
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40">
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar"}
       </button>
@@ -370,10 +874,26 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
   );
 }
 
-function ChatIcon() {
+function ChatIcon({ width = 26, height = 26 }: { width?: number; height?: number }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
     </svg>
+  );
+}
+
+// Burbuja "tipo chat" para el texto que dice el asistente: mismo avatar en
+// todas las pantallas, para que se lea como una conversación y no como un
+// formulario suelto.
+function BotBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-navy text-white">
+        <ChatIcon width={15} height={15} />
+      </span>
+      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-mist px-4 py-3 text-[14px] leading-relaxed text-ink">
+        {children}
+      </div>
+    </div>
   );
 }

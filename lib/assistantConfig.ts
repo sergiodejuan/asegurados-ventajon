@@ -32,12 +32,12 @@ export function isAssistantAllowed(pathname: string): boolean {
 }
 
 const DEFAULT_CONTEXT: AssistantContext = {
-  greeting: "Hola 👋 Soy el asistente de Ventajon. ¿En qué puedo ayudarte hoy?",
+  greeting: "Soy el asistente de Ventajon. ¿En qué puedo ayudarte hoy?",
 };
 
 const CONTEXTS: { test: (p: string) => boolean; context: AssistantContext }[] = [
   { test: (p) => p === "/", context: {
-    greeting: "Hola 👋 ¿Buscas comparar precios de seguros? Cuéntame qué necesitas y te ayudo ahora mismo.",
+    greeting: "¿Buscas comparar precios de seguros? Cuéntame qué necesitas y te ayudo ahora mismo.",
   } },
   { test: (p) => p.startsWith("/seguro-de-salud"), context: {
     greeting: "¿Quieres ver cuánto pagarías por tu seguro de salud? Puedo calculártelo aquí mismo, sin salir de la página.",
@@ -129,19 +129,42 @@ export const HOGAR_FLOW: MiniFlowQuestion[] = [
   },
 ];
 
-export const DUDA_FLOW: MiniFlowQuestion[] = [
-  {
-    key: "tema",
-    title: "¿Sobre qué quieres que te ayudemos?",
-    options: [
-      { label: "Un seguro que ya tengo contratado", value: "duda sobre un seguro ya contratado" },
-      { label: "Un presupuesto que ya me hicisteis", value: "duda sobre un presupuesto ya recibido" },
-      { label: "Otra cosa", value: "otra duda" },
-    ],
-  },
-];
-
 export function summarizeAnswers(productoLabel: string, answers: Record<string, string>): string {
   const values = Object.values(answers);
   return `${productoLabel} — ${values.join("; ")}.`;
+}
+
+/* --------------------------- "Tengo una duda" ----------------------------- */
+// A diferencia de decesos/hogar, aquí primero se intenta localizar el
+// presupuesto del cliente (mismo dato único que usa el área de cliente:
+// correo, teléfono o nº de presupuesto) para poder "abrir un ticket" sobre
+// esa tarificación concreta. Los temas son botones fijos, pero siempre se
+// puede añadir (o sustituir la selección por) un comentario escrito a mano.
+
+export const TICKET_TOPICS: MiniFlowOption[] = [
+  { label: "Dudas sobre las coberturas", value: "Dudas sobre las coberturas" },
+  { label: "Quiero cambiar algo de mi presupuesto", value: "Quiere cambiar algo del presupuesto" },
+  { label: "Dudas sobre el pago o la contratación", value: "Dudas sobre el pago o la contratación" },
+  { label: "Quiero cancelar mi solicitud", value: "Quiere cancelar la solicitud" },
+];
+
+const PRODUCTO_DISPLAY: Record<string, string> = {
+  salud: "tu seguro de salud",
+  vida: "tu seguro de vida",
+  auto: "tu seguro de auto",
+  decesos: "tu seguro de decesos",
+  hogar: "tu seguro de hogar",
+};
+
+export function productoDisplay(slug: string): string {
+  return PRODUCTO_DISPLAY[slug] ?? "tu presupuesto";
+}
+
+export function summarizeTicket(topic: string | null, comment: string, presupuestoProducto?: string): string {
+  const parts: string[] = [];
+  if (presupuestoProducto) parts.push(`Sobre ${productoDisplay(presupuestoProducto)}`);
+  if (topic) parts.push(topic);
+  const trimmedComment = comment.trim();
+  if (trimmedComment) parts.push(trimmedComment);
+  return parts.length ? parts.join(" — ") : "Duda general";
 }
