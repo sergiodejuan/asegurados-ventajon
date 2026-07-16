@@ -6,6 +6,7 @@ import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { GoogleTagManager } from "@/components/GoogleTagManager";
 import { Analytics } from "@/components/Analytics";
+import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -96,6 +97,7 @@ export default async function RootLayout({
         </a>
         {children}
         <Analytics />
+        <AssistantWidget />
         <CookieConsentBanner />
       </body>
     </html>

@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
 
-  const consent = buildConsent(request, "tarificador-vida", "/tarificador-vida",
+  // Mismo tarificador, pero completado desde el widget asistente en vez de
+  // la página normal: se distingue en el source para poder medirlo aparte.
+  const source = d.origen === "asistente" ? "tarificador-vida-widget" : "tarificador-vida";
+
+  const consent = buildConsent(request, source, "/tarificador-vida",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 
@@ -37,12 +41,12 @@ export async function POST(request: Request) {
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
       utm: d.utm,
     },
-    "tarificador-vida",
+    source,
     consent
   );
 
   const presupuesto = await createPresupuesto({
-    id: submissionId, leadId: id, source: "tarificador-vida", producto: "vida",
+    id: submissionId, leadId: id, source, producto: "vida",
     data: {
       codigoPostal: d.codigoPostal, motivo: d.motivo, fechaNacimiento: d.fechaNacimiento, sexo: d.sexo,
       fumador: d.fumador, yaTieneSeguro: d.yaTieneSeguro, seguroActualImporte: d.seguroActualImporte,
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
-    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source: "tarificador-vida", ...d }) }); }
+    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source, ...d }) }); }
     catch (err) { console.error("[vida] webhook error", err); }
   }
 
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
     const call = await triggerOutboundCall({
       toNumber: d.telefono,
       leadId: id,
-      source: "tarificador-vida",
+      source,
       dynamicVariables: { nombre: d.nombre, producto: "seguro de vida", codigo_postal: d.codigoPostal },
     });
     if (!call.ok) console.error("[vida] retell call error", call.error);
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
     const call = await triggerBlandCall({
       toNumber: d.telefono,
       leadId: id,
-      source: "tarificador-vida",
+      source,
       requestData: {
         nombre: d.nombre,
         producto: "seguro de vida",
@@ -95,7 +99,7 @@ export async function POST(request: Request) {
     const sync = await syncManychatLead({
       toNumber: d.telefono,
       nombre: d.nombre,
-      source: "tarificador-vida",
+      source,
       producto: "seguro de vida",
       email: d.email,
       codigoPostal: d.codigoPostal,

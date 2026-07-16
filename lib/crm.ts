@@ -5,6 +5,13 @@ export const SOURCE_LABELS: Record<string, string> = {
   "tarificador-vida": "Tarificador vida",
   "tarificador-auto": "Tarificador auto",
   "quiero-que-me-llamen": "Quiero que me llamen",
+  // Mismos tarificadores/formulario, pero completados dentro del widget
+  // asistente flotante en vez de la página del tarificador — se distinguen
+  // aquí para poder medir cuánto aporta el asistente sin mezclar los datos.
+  "tarificador-salud-widget": "Tarificador salud (asistente)",
+  "tarificador-vida-widget": "Tarificador vida (asistente)",
+  "tarificador-auto-widget": "Tarificador auto (asistente)",
+  "quiero-que-me-llamen-widget": "Quiero que me llamen (asistente)",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;

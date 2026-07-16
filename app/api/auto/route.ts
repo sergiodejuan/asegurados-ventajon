@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
 
-  const consent = buildConsent(request, "tarificador-auto", "/tarificador-auto",
+  // Mismo tarificador, pero completado desde el widget asistente en vez de
+  // la página normal: se distingue en el source para poder medirlo aparte.
+  const source = d.origen === "asistente" ? "tarificador-auto-widget" : "tarificador-auto";
+
+  const consent = buildConsent(request, source, "/tarificador-auto",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 
@@ -40,12 +44,12 @@ export async function POST(request: Request) {
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
       utm: d.utm,
     },
-    "tarificador-auto",
+    source,
     consent
   );
 
   const presupuesto = await createPresupuesto({
-    id: submissionId, leadId: id, source: "tarificador-auto", producto: "auto",
+    id: submissionId, leadId: id, source, producto: "auto",
     data: {
       codigoPostal: d.codigoPostal, tipoVehiculo: d.tipoVehiculo, matricula: d.matricula,
       marcaVehiculo: d.marcaVehiculo, modeloVehiculo: d.modeloVehiculo, anioVehiculo: d.anioVehiculo,
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
-    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source: "tarificador-auto", ...d }) }); }
+    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source, ...d }) }); }
     catch (err) { console.error("[auto] webhook error", err); }
   }
 
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
     const call = await triggerOutboundCall({
       toNumber: d.telefono,
       leadId: id,
-      source: "tarificador-auto",
+      source,
       dynamicVariables: { nombre: d.nombre, producto: "seguro de auto", codigo_postal: d.codigoPostal },
     });
     if (!call.ok) console.error("[auto] retell call error", call.error);
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
     const call = await triggerBlandCall({
       toNumber: d.telefono,
       leadId: id,
-      source: "tarificador-auto",
+      source,
       requestData: {
         nombre: d.nombre,
         producto: "seguro de auto",
@@ -104,7 +108,7 @@ export async function POST(request: Request) {
     const sync = await syncManychatLead({
       toNumber: d.telefono,
       nombre: d.nombre,
-      source: "tarificador-auto",
+      source,
       producto: "seguro de auto",
       email: d.email,
       codigoPostal: d.codigoPostal,

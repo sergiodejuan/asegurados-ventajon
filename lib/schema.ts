@@ -43,6 +43,11 @@ const consentContacto = z.literal(true, {
 
 const honeypot = z.string().max(0).optional().default("");
 
+// De dónde viene el envío dentro de la propia web: formulario normal de la
+// página, o el widget asistente flotante — para poder distinguirlo en el
+// origen del lead sin tocar la atribución de marketing real (utm).
+const origenField = z.enum(["web", "asistente"]).optional().default("web");
+
 const dobField = z
   .string()
   .regex(/^\d{2}\/\d{2}\/\d{4}$/, "Usa el formato dd/mm/aaaa.")
@@ -85,6 +90,7 @@ export const leadSchema = z.object({
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  origen: origenField,
 });
 export type LeadInput = z.input<typeof leadSchema>;
 
@@ -107,6 +113,7 @@ export const vidaSchema = z.object({
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  origen: origenField,
 });
 export type VidaInput = z.input<typeof vidaSchema>;
 
@@ -135,6 +142,7 @@ export const autoSchema = z.object({
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  origen: origenField,
 });
 export type AutoInput = z.input<typeof autoSchema>;
 
@@ -153,11 +161,16 @@ export const callRequestSchema = z.object({
   diaLlamada: z.string().max(20).optional(),
   turnoLlamada: z.string().max(20).optional(),
   presupuestoId: z.string().max(60).optional(),
+  // Resumen legible de las respuestas del asistente (p.ej. para decesos/hogar,
+  // que no tienen tarificador propio): siempre construido por el widget a
+  // partir de opciones fijas, nunca texto libre tecleado por el usuario.
+  detalleConsulta: z.string().max(400).optional(),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
   aceptaComercial: z.boolean().default(false),
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  origen: origenField,
 });
 export type CallRequestInput = z.input<typeof callRequestSchema>;

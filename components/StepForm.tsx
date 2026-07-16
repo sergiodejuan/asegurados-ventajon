@@ -22,7 +22,7 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida" | "auto"; onStepChange?: (idx: number) => void }) {
+export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto"; onStepChange?: (idx: number) => void; origen?: "asistente" }) {
   const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : SALUD_CONFIG;
   const router = useRouter();
 
@@ -133,6 +133,7 @@ export function StepForm({ variant, onStepChange }: { variant: "salud" | "vida" 
       company: "",
       consent: consentTimes,
       utm: getAttribution(),
+      ...(origen ? { origen } : {}),
     };
 
     setSubmitting(true);

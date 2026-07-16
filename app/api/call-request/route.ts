@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callRequestSchema } from "@/lib/schema";
-import { upsertLead, setPresupuestoEleccion } from "@/lib/store";
+import { upsertLead, setPresupuestoEleccion, updateLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
@@ -21,7 +21,11 @@ export async function POST(request: Request) {
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
 
-  const consent = buildConsent(request, "quiero-que-me-llamen", "/quiero-que-me-llamen",
+  // Mismo formulario, pero completado desde el widget asistente en vez de la
+  // página normal: se distingue en el source para poder medirlo aparte.
+  const source = d.origen === "asistente" ? "quiero-que-me-llamen-widget" : "quiero-que-me-llamen";
+
+  const consent = buildConsent(request, source, "/quiero-que-me-llamen",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
       utm: d.utm,
     },
-    "quiero-que-me-llamen",
+    source,
     consent
   );
 
@@ -40,9 +44,16 @@ export async function POST(request: Request) {
     await setPresupuestoEleccion(id, d.producto ?? "salud", { compania: d.compania, precio: d.precioElegido ?? null }).catch(() => {});
   }
 
+  // Preguntas de decesos/hogar/duda general del asistente: no tienen
+  // tarificador propio, así que su resumen se guarda como nota de actividad
+  // visible en la ficha del lead en /admin.
+  if (d.detalleConsulta) {
+    await updateLead(id, { note: `Detalle del asistente: ${d.detalleConsulta}` }).catch(() => {});
+  }
+
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
-    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source: "quiero-que-me-llamen", ...d }) }); }
+    try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, source, ...d }) }); }
     catch (err) { console.error("[call-request] webhook error", err); }
   }
 
@@ -50,7 +61,7 @@ export async function POST(request: Request) {
     const call = await triggerBlandCall({
       toNumber: d.telefono,
       leadId: id,
-      source: "quiero-que-me-llamen",
+      source,
       requestData: {
         nombre: d.nombre ?? "",
         producto: d.producto ?? "salud",
@@ -70,7 +81,7 @@ export async function POST(request: Request) {
     const sync = await syncManychatLead({
       toNumber: d.telefono,
       nombre: d.nombre ?? "",
-      source: "quiero-que-me-llamen",
+      source,
       producto: d.producto ?? "salud",
       codigoPostal: d.codigoPostal,
       precioAprox: d.precioElegido ?? null,
