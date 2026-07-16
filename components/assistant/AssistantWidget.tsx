@@ -9,6 +9,7 @@ import { getAttribution } from "@/lib/attribution";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Close, IconByName, Spinner, ChevronLeft } from "@/components/icons";
+import { ConsentNudgeModal } from "@/components/ConsentNudgeModal";
 import {
   isAssistantAllowed,
   getAssistantContext,
@@ -589,6 +590,7 @@ function TicketConfirm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showConsentNudge, setShowConsentNudge] = useState(false);
 
   const producto = presupuesto?.producto ?? "general";
   const detalleConsulta = summarizeTicket(topic, comment, presupuesto?.producto);
@@ -609,6 +611,7 @@ function TicketConfirm({
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
+      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
       const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
       if (first) document.getElementById(`a-${first}`)?.focus();
       return;
@@ -725,6 +728,17 @@ function TicketConfirm({
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar consulta"}
       </button>
+
+      <ConsentNudgeModal
+        open={showConsentNudge}
+        onClose={() => setShowConsentNudge(false)}
+        onAccept={() => {
+          setContacto(true);
+          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
+          setErrors({});
+          setShowConsentNudge(false);
+        }}
+      />
     </form>
   );
 }
@@ -742,6 +756,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showConsentNudge, setShowConsentNudge] = useState(false);
 
   const producto = intent === "llamada" ? (answers.producto ?? "salud") : intent;
   const detalleConsulta = intent !== "llamada" && Object.keys(answers).length
@@ -763,6 +778,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
+      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
       const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
       if (first) document.getElementById(`a-${first}`)?.focus();
       return;
@@ -870,6 +886,17 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar"}
       </button>
+
+      <ConsentNudgeModal
+        open={showConsentNudge}
+        onClose={() => setShowConsentNudge(false)}
+        onAccept={() => {
+          setContacto(true);
+          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
+          setErrors({});
+          setShowConsentNudge(false);
+        }}
+      />
     </form>
   );
 }

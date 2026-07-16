@@ -12,6 +12,7 @@ import { saveQuote } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
+import { ConsentNudgeModal } from "./ConsentNudgeModal";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -35,6 +36,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [showConsentNudge, setShowConsentNudge] = useState(false);
   const pendingUrlRef = useRef<string | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
@@ -121,6 +123,10 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     if (!data.autorizaContacto) e.autorizaContacto = "Necesitamos tu autorización para poder llamarte.";
     if (Object.keys(e).length) {
       setErrors(e);
+      // Si es el único motivo por el que no se puede enviar, en vez de solo
+      // el error en rojo explicamos brevemente por qué conviene marcarlo
+      // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
+      if (Object.keys(e).length === 1 && e.autorizaContacto) { setShowConsentNudge(true); return; }
       const first = ["nombre", "telefono", "email", "aceptaPrivacidad", "autorizaContacto"].find((k) => e[k]);
       if (first) document.getElementById(`f-${first}`)?.focus();
       return;
@@ -457,6 +463,16 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       </div>
       <div ref={topRef} tabIndex={-1} className="outline-none" />
       {current && <div key={current.key}>{renderStep(current)}</div>}
+      <ConsentNudgeModal
+        open={showConsentNudge}
+        onClose={() => setShowConsentNudge(false)}
+        onAccept={() => {
+          set({ autorizaContacto: true });
+          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
+          setErrors({});
+          setShowConsentNudge(false);
+        }}
+      />
     </section>
   );
 }

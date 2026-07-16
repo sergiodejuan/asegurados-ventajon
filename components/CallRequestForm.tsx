@@ -10,6 +10,7 @@ import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Spinner } from "./icons";
+import { ConsentNudgeModal } from "./ConsentNudgeModal";
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -42,6 +43,7 @@ export function CallRequestForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showConsentNudge, setShowConsentNudge] = useState(false);
 
   const hasProductoParam = searchParams.has("producto");
 
@@ -127,6 +129,10 @@ export function CallRequestForm({
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
+      // Si es el único motivo por el que no se puede enviar, en vez de solo
+      // el error en rojo explicamos brevemente por qué conviene marcarlo
+      // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
+      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
       const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
       if (first) document.getElementById(`c-${first}`)?.focus();
       return;
@@ -342,6 +348,17 @@ export function CallRequestForm({
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Que me llamen gratis"}
       </button>
+
+      <ConsentNudgeModal
+        open={showConsentNudge}
+        onClose={() => setShowConsentNudge(false)}
+        onAccept={() => {
+          setContacto(true);
+          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
+          setErrors({});
+          setShowConsentNudge(false);
+        }}
+      />
     </form>
   );
 }
