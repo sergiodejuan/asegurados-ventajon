@@ -23,14 +23,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Introduce tu correo, tu teléfono o tu número de presupuesto." }, { status: 400 });
   }
 
-  const presupuestos = await findClientPresupuestos(identifier);
-  if (!presupuestos || !presupuestos.length) {
+  const found = await findClientPresupuestos(identifier);
+  if (!found) {
     return NextResponse.json({ ok: false, error: "No hemos encontrado ningún presupuesto con ese dato. Revisa que esté bien escrito." });
   }
 
-  setClientSessionCookie(presupuestos[0].leadId);
+  setClientSessionCookie(found.leadId);
 
-  return NextResponse.json({ ok: true, presupuestos: presupuestos.map(presupuestoToClientQuote) });
+  return NextResponse.json({ ok: true, presupuestos: found.presupuestos.map(presupuestoToClientQuote) });
 }
 
 export function GET() {

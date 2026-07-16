@@ -25,6 +25,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     children: [
       { href: "/admin", label: "Leads", key: "leads" },
       { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos" },
+      { href: "/admin/llamadas", label: "Llamadas", key: "llamadas" },
       { href: "/admin/tareas", label: "Tareas", key: "tareas" },
     ],
   },
@@ -62,7 +63,7 @@ function groupKeyForActive(active: string): string | null {
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
   | "diseno" | "cookies" | "seguimiento" | "rgpd";
 
 function NavList({

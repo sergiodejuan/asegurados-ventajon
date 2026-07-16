@@ -209,3 +209,72 @@ export type TaskDraft = {
   hora?: string;
   agente?: string;
 };
+
+/* --------------------------------- Llamadas ----------------------------------- */
+// "Quiero que me llamen" pasa de ser solo un par de campos sueltos en el
+// lead (diaLlamada/turnoLlamada) a una entidad propia con su propio
+// seguimiento — igual que Presupuesto —, para poder gestionarla desde su
+// propia sección en /admin (filtrar por ramo/fecha/agente, dejar
+// comentarios, reprogramar, cerrar o marcar como hecha) sin perder la
+// trazabilidad en la ficha del lead.
+
+export const LLAMADA_STATUSES = ["pendiente", "programada", "hecha", "cancelada"] as const;
+export type LlamadaStatus = (typeof LLAMADA_STATUSES)[number];
+
+export const LLAMADA_STATUS_LABELS: Record<LlamadaStatus, string> = {
+  pendiente: "Pendiente",
+  programada: "Programada",
+  hecha: "Hecha",
+  cancelada: "Cancelada",
+};
+
+export type LlamadaNote = { id: string; at: string; texto: string; agente?: string };
+
+export type Llamada = {
+  id: string;
+  leadId: string;
+  createdAt: string;
+  updatedAt: string;
+  status: LlamadaStatus;
+  producto: string; // ramo de seguro
+  source: string; // de dónde vino la solicitud (misma fuente que el lead)
+  presupuestoId: string; // "" si no viene vinculada a un presupuesto concreto
+  motivo: string; // detalle de la consulta (p.ej. el ticket del asistente), "" si no aplica
+  diaLlamada: string; // preferencia original del cliente ("Cuando sea" por defecto)
+  turnoLlamada: string;
+  fechaProgramada: string; // yyyy-mm-dd, la concreta que fija el agente al reprogramar
+  horaProgramada: string; // HH:MM, opcional
+  agente: string; // quien la gestiona actualmente
+  notas: LlamadaNote[];
+  // Contacto denormalizado (para listar/filtrar sin resolver el lead)
+  nombre: string;
+  telefono: string;
+  codigoPostal: string;
+};
+
+export type LlamadaDraft = {
+  leadId: string;
+  producto?: string;
+  source?: string;
+  presupuestoId?: string;
+  motivo?: string;
+  diaLlamada?: string;
+  turnoLlamada?: string;
+  nombre?: string;
+  telefono?: string;
+  codigoPostal?: string;
+};
+
+/* ----------------------------- Notificaciones al cliente ----------------------------- */
+// Aviso visible en el área de cliente (y, si hay suscripción push activa,
+// también como notificación del sistema) cuando gestionamos una de sus
+// llamadas — reprogramada, cerrada o cancelada.
+
+export type ClientNotification = {
+  id: string;
+  leadId: string;
+  llamadaId: string;
+  at: string;
+  texto: string;
+  leido: boolean;
+};

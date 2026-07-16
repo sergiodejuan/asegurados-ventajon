@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { callRequestSchema } from "@/lib/schema";
-import { upsertLead, setPresupuestoEleccion, updateLead } from "@/lib/store";
+import { upsertLead, setPresupuestoEleccion, updateLead, createLlamada, updateLlamada, listLlamadasByLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendPushToLead } from "@/lib/webPush";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +52,26 @@ export async function POST(request: Request) {
   if (d.detalleConsulta) {
     await updateLead(id, { note: `Detalle del asistente: ${d.detalleConsulta}` }).catch(() => {});
   }
+
+  // Cada solicitud de "que me llamen" es su propia llamada gestionable desde
+  // /admin/llamadas. Si viene de reprogramar desde el área de cliente sobre
+  // un presupuesto que ya tenía una llamada abierta, se actualiza esa en vez
+  // de duplicarla.
+  try {
+    const existing = d.presupuestoId
+      ? (await listLlamadasByLead(id)).find((l) => l.presupuestoId === d.presupuestoId && l.status !== "cancelada")
+      : undefined;
+    if (existing) {
+      const result = await updateLlamada(existing.id, { status: "programada", diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada });
+      if (result?.notifyText) sendPushToLead(id, { title: BRAND_NAME, body: result.notifyText, url: "/area-cliente" }).catch(() => {});
+    } else {
+      await createLlamada({
+        leadId: id, producto: d.producto, source, presupuestoId: d.presupuestoId,
+        motivo: d.detalleConsulta, diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada,
+        nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal,
+      });
+    }
+  } catch (err) { console.error("[call-request] llamada error", err); }
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {

@@ -3,6 +3,7 @@ import {
   SOURCE_LABELS, type ConsentRecord, type Lead, type LeadDraft, type LeadSubmission, type Status,
   type Presupuesto, type PresupuestoStatus, type PresupuestoNote, type PresupuestoEleccion,
   type Task, type TaskDraft,
+  type Llamada, type LlamadaDraft, type LlamadaStatus, type LlamadaNote, type ClientNotification,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
@@ -750,14 +751,18 @@ async function findLeadIdByIdentifier(raw: string): Promise<string | null> {
   return presupuesto?.leadId ?? null;
 }
 
-// Devuelve TODOS los presupuestos del lead encontrado (no solo el que dio
-// pie a la búsqueda), para que un cliente con varios tarificadores los vea
-// todos entrando con cualquiera de sus datos. Sin correspondencia, null.
-export async function findClientPresupuestos(identifier: string): Promise<Presupuesto[] | null> {
+// Localiza al lead por su dato único y devuelve TODOS sus presupuestos (no
+// solo el que dio pie a la búsqueda), para que un cliente con varios
+// tarificadores los vea todos entrando con cualquiera de sus datos. Un lead
+// sin ningún presupuesto (p.ej. solo pidió que le llamaran, o su única
+// consulta fue un ticket del asistente) también se identifica correctamente
+// — sigue teniendo llamadas que ver en su área de cliente — devuelve la
+// lista vacía en vez de null. Solo es null si no se encuentra el lead.
+export async function findClientPresupuestos(identifier: string): Promise<{ leadId: string; presupuestos: Presupuesto[] } | null> {
   const leadId = await findLeadIdByIdentifier(identifier);
   if (!leadId) return null;
-  const list = await listPresupuestosByLead(leadId);
-  return list.length ? list : null;
+  const presupuestos = await listPresupuestosByLead(leadId);
+  return { leadId, presupuestos };
 }
 
 export async function updatePresupuesto(
@@ -784,6 +789,189 @@ export async function updatePresupuesto(
   await zadd("presupuestos:index", Date.parse(now), id);
   await zadd(`presupuestos:byLead:${p.leadId}`, Date.parse(now), id);
   return p;
+}
+
+/* ---------------------------------- Llamadas ----------------------------------- */
+// Cada solicitud de "que me llamen" (formulario, quick-confirm, asistente,
+// reprogramación desde el área de cliente) crea una llamada propia — igual
+// que un presupuesto por cada tarificación —, gestionable desde
+// /admin/llamadas con su propio estado, notas y agente, sin perder el
+// vínculo con el lead ni, si aplica, con el presupuesto sobre el que trata.
+
+export async function createLlamada(draft: LlamadaDraft): Promise<Llamada> {
+  const now = new Date().toISOString();
+  const id = makeSubmissionId();
+  const llamada: Llamada = {
+    id, leadId: draft.leadId, createdAt: now, updatedAt: now, status: "pendiente",
+    producto: draft.producto ?? "", source: draft.source ?? "", presupuestoId: draft.presupuestoId ?? "",
+    motivo: draft.motivo ?? "", diaLlamada: draft.diaLlamada ?? "", turnoLlamada: draft.turnoLlamada ?? "",
+    fechaProgramada: "", horaProgramada: "", agente: "", notas: [],
+    nombre: draft.nombre ?? "", telefono: draft.telefono ?? "", codigoPostal: draft.codigoPostal ?? "",
+  };
+  await jset(`llamada:${id}`, llamada);
+  await zadd("llamadas:index", Date.parse(now), id);
+  await zadd(`llamadas:byLead:${draft.leadId}`, Date.parse(now), id);
+  return llamada;
+}
+
+export async function listLlamadas(): Promise<Llamada[]> {
+  const ids = await zrangeRev("llamadas:index");
+  const out: Llamada[] = [];
+  for (const id of ids) {
+    const l = await jget<Llamada>(`llamada:${id}`);
+    if (l) out.push(l);
+  }
+  return out;
+}
+
+export async function listLlamadasByLead(leadId: string): Promise<Llamada[]> {
+  const ids = await zrangeRev(`llamadas:byLead:${leadId}`);
+  const out: Llamada[] = [];
+  for (const id of ids) {
+    const l = await jget<Llamada>(`llamada:${id}`);
+    if (l) out.push(l);
+  }
+  return out;
+}
+
+export async function getLlamada(id: string): Promise<Llamada | null> {
+  return jget<Llamada>(`llamada:${id}`);
+}
+
+const LLAMADA_STATUS_ACTIVITY: Record<LlamadaStatus, string> = {
+  pendiente: "pendiente",
+  programada: "programada",
+  hecha: "marcada como hecha",
+  cancelada: "cancelada",
+};
+
+// Cuándo, en texto legible, según lo que haya fijado el agente (fecha+hora
+// concreta) o, a falta de eso, la preferencia original del cliente.
+function cuandoLlamada(l: Llamada): string {
+  if (l.fechaProgramada) {
+    const d = new Date(`${l.fechaProgramada}T${l.horaProgramada || "00:00"}:00`);
+    const fechaTxt = Number.isNaN(d.getTime())
+      ? l.fechaProgramada
+      : d.toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+    return l.horaProgramada ? `el ${fechaTxt} a las ${l.horaProgramada}` : `el ${fechaTxt}`;
+  }
+  const partes = [l.diaLlamada, l.turnoLlamada].filter(Boolean);
+  return partes.length ? partes.join(" ") : "";
+}
+
+// Actualiza estado/notas/reprogramación de una llamada. Cualquier cambio se
+// refleja también como nota de actividad en la ficha única del lead. Si el
+// cambio es relevante para el cliente (reprogramación, cierre o
+// cancelación), se genera además una notificación pendiente de enviar
+// (`notifyText`) — quien llame a esta función decide si además dispara un
+// push, para no acoplar el almacén de datos con la integración externa.
+export async function updateLlamada(
+  id: string,
+  patch: {
+    status?: LlamadaStatus; note?: string; agente?: string;
+    diaLlamada?: string; turnoLlamada?: string; fechaProgramada?: string; horaProgramada?: string;
+  }
+): Promise<{ llamada: Llamada; notifyText: string | null } | null> {
+  const l = await jget<Llamada>(`llamada:${id}`);
+  if (!l) return null;
+  const now = new Date().toISOString();
+  const agente = patch.agente?.trim() || undefined;
+  if (agente) l.agente = agente;
+
+  const statusChanged = !!patch.status && patch.status !== l.status;
+  const rescheduled = patch.diaLlamada !== undefined || patch.turnoLlamada !== undefined
+    || patch.fechaProgramada !== undefined || patch.horaProgramada !== undefined;
+
+  if (patch.diaLlamada !== undefined) l.diaLlamada = patch.diaLlamada;
+  if (patch.turnoLlamada !== undefined) l.turnoLlamada = patch.turnoLlamada;
+  if (patch.fechaProgramada !== undefined) l.fechaProgramada = patch.fechaProgramada;
+  if (patch.horaProgramada !== undefined) l.horaProgramada = patch.horaProgramada;
+  if (patch.status) l.status = patch.status;
+
+  if (patch.note && patch.note.trim()) {
+    const nota: LlamadaNote = { id: makeSubmissionId(), at: now, texto: patch.note.trim(), agente };
+    l.notas = [nota, ...l.notas];
+  }
+  l.updatedAt = now;
+  await jset(`llamada:${id}`, l);
+  await zadd("llamadas:index", Date.parse(now), id);
+  await zadd(`llamadas:byLead:${l.leadId}`, Date.parse(now), id);
+
+  const activityParts: string[] = [];
+  if (statusChanged) activityParts.push(`Llamada ${LLAMADA_STATUS_ACTIVITY[l.status]}`);
+  if (rescheduled) activityParts.push(`reprogramada${cuandoLlamada(l) ? ` para ${cuandoLlamada(l)}` : ""}`);
+  if (patch.note && patch.note.trim()) activityParts.push(patch.note.trim());
+  if (activityParts.length) await updateLead(l.leadId, { note: activityParts.join(" — "), agente });
+
+  // Solo avisamos al cliente ante eventos que le conciernen de verdad
+  // (nunca por una nota interna suelta).
+  let notifyText: string | null = null;
+  if (rescheduled) {
+    notifyText = `Hemos reprogramado tu llamada${cuandoLlamada(l) ? ` para ${cuandoLlamada(l)}` : ""}.`;
+  } else if (statusChanged && l.status === "hecha") {
+    notifyText = "Hemos completado tu llamada. Gracias por tu tiempo.";
+  } else if (statusChanged && l.status === "cancelada") {
+    notifyText = "Hemos cancelado tu llamada.";
+  }
+  if (notifyText) await createClientNotification({ leadId: l.leadId, llamadaId: l.id, texto: notifyText });
+
+  return { llamada: l, notifyText };
+}
+
+/* ----------------------------- Notificaciones al cliente ----------------------------- */
+
+export async function createClientNotification(input: { leadId: string; llamadaId: string; texto: string }): Promise<ClientNotification> {
+  const now = new Date().toISOString();
+  const id = makeSubmissionId();
+  const n: ClientNotification = { id, leadId: input.leadId, llamadaId: input.llamadaId, at: now, texto: input.texto, leido: false };
+  await jset(`notif:${id}`, n);
+  await zadd(`notifs:byLead:${input.leadId}`, Date.parse(now), id);
+  return n;
+}
+
+export async function listClientNotifications(leadId: string): Promise<ClientNotification[]> {
+  const ids = await zrangeRev(`notifs:byLead:${leadId}`);
+  const out: ClientNotification[] = [];
+  for (const id of ids) {
+    const n = await jget<ClientNotification>(`notif:${id}`);
+    if (n) out.push(n);
+  }
+  return out;
+}
+
+export async function markNotificationsRead(leadId: string, ids?: string[]): Promise<void> {
+  const all = await listClientNotifications(leadId);
+  const targets = ids ? all.filter((n) => ids.includes(n.id)) : all;
+  for (const n of targets) {
+    if (n.leido) continue;
+    n.leido = true;
+    await jset(`notif:${n.id}`, n);
+  }
+}
+
+/* ------------------------- Suscripciones de aviso push ------------------------- */
+// Un lead puede tener varias (uno por dispositivo/navegador donde activó
+// los avisos). Sin integración de pago ni SDK nativo: Web Push estándar,
+// opcional (si no hay claves VAPID configuradas, sencillamente no se envía
+// nada — ver lib/webPush.ts).
+
+export type StoredPushSubscription = { endpoint: string; keys: { p256dh: string; auth: string } };
+
+export async function savePushSubscription(leadId: string, sub: StoredPushSubscription): Promise<void> {
+  const key = `pushSubs:byLead:${leadId}`;
+  const existing = (await jget<StoredPushSubscription[]>(key)) ?? [];
+  const next = [sub, ...existing.filter((s) => s.endpoint !== sub.endpoint)].slice(0, 10);
+  await jset(key, next);
+}
+
+export async function listPushSubscriptions(leadId: string): Promise<StoredPushSubscription[]> {
+  return (await jget<StoredPushSubscription[]>(`pushSubs:byLead:${leadId}`)) ?? [];
+}
+
+export async function removePushSubscription(leadId: string, endpoint: string): Promise<void> {
+  const key = `pushSubs:byLead:${leadId}`;
+  const existing = (await jget<StoredPushSubscription[]>(key)) ?? [];
+  await jset(key, existing.filter((s) => s.endpoint !== endpoint));
 }
 
 /* ---------------------------------- Tareas ------------------------------------ */

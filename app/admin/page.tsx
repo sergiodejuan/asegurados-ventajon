@@ -337,6 +337,10 @@ function LeadsCrm() {
               <PresupuestosPanel leadId={l.id} />
             </CollapsiblePanel>
 
+            <CollapsiblePanel title="Llamadas">
+              <LlamadasPanel leadId={l.id} />
+            </CollapsiblePanel>
+
             <CollapsiblePanel title="Tareas">
               <TasksPanel leadId={l.id} />
             </CollapsiblePanel>
@@ -618,6 +622,89 @@ function PresupuestosPanel({ leadId }: { leadId: string }) {
         />
       )}
     </ol>
+  );
+}
+
+const LLAMADA_STATUS_COLORS: Record<string, string> = {
+  pendiente: "bg-brand-red/10 text-brand-red-deep",
+  programada: "bg-navy/10 text-navy",
+  hecha: "bg-emerald-100 text-emerald-700",
+  cancelada: "bg-slate-200 text-slate-600",
+};
+
+type LlamadaItem = {
+  id: string; status: string; producto: string; motivo: string;
+  diaLlamada: string; turnoLlamada: string; fechaProgramada: string; horaProgramada: string;
+  agente: string; updatedAt: string;
+};
+
+function cuandoLlamada(l: LlamadaItem): string {
+  if (l.fechaProgramada) return `${l.fechaProgramada}${l.horaProgramada ? ` · ${l.horaProgramada}` : ""}`;
+  const partes = [l.diaLlamada, l.turnoLlamada].filter(Boolean);
+  return partes.length ? partes.join(" · ") : "Sin programar";
+}
+
+function LlamadasPanel({ leadId }: { leadId: string }) {
+  const { token, agent } = useAdminToken();
+  const [items, setItems] = useState<LlamadaItem[]>([]);
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [producto, setProducto] = useState("");
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/admin/llamadas?leadId=${leadId}`, { headers: { "x-admin-token": token } });
+    const body = await res.json();
+    if (body.ok) { setItems(body.llamadas); setStatusLabels(body.statusLabels); }
+    setLoaded(true);
+  }, [leadId, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function registrarLlamada() {
+    setCreating(true);
+    await fetch("/api/admin/llamadas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-token": token },
+      body: JSON.stringify({ leadId, producto: producto || undefined, agente: agent }),
+    });
+    setProducto("");
+    setCreating(false);
+    load();
+  }
+
+  if (!loaded) return <p className="text-[13px] text-slate2">Cargando…</p>;
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        <input value={producto} onChange={(e) => setProducto(e.target.value)} placeholder="Ramo (opcional)…"
+          className="min-w-[140px] flex-1 rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+        <button onClick={registrarLlamada} disabled={creating}
+          className="rounded-card bg-navy px-3 py-2 text-[13px] font-semibold text-white disabled:bg-slate2/40">
+          {creating ? "Registrando…" : "+ Registrar llamada"}
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-3 text-[13px] text-slate2">Sin llamadas solicitadas.</p>
+      ) : (
+        <ol className="mt-4 flex flex-col gap-2">
+          {items.map((l) => (
+            <li key={l.id}>
+              <Link href={`/admin/llamadas/${l.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-hair bg-mist px-3 py-2.5 text-left transition-colors hover:bg-hair/60">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold capitalize text-ink">{l.producto || "Sin ramo"} <span className="font-normal text-slate2">· {cuandoLlamada(l)}</span></p>
+                  <p className="truncate text-[11px] text-slate2">{fmt(l.updatedAt)}{l.agente ? ` · ${l.agente}` : ""}</p>
+                </div>
+                <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[10px] font-bold ${LLAMADA_STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
+                  {statusLabels[l.status] ?? l.status}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 

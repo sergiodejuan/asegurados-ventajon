@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getLead, listPresupuestosByLead } from "@/lib/store";
-import { presupuestoToClientQuote } from "@/lib/clientQuote";
+import { getLead, listPresupuestosByLead, listLlamadasByLead } from "@/lib/store";
+import { presupuestoToClientQuote, llamadaToClientView } from "@/lib/clientQuote";
 import { CLIENT_SESSION_COOKIE, verifySessionToken } from "@/lib/clientSession";
 
 export const runtime = "nodejs";
@@ -18,10 +18,14 @@ export async function GET() {
   const lead = await getLead(leadId);
   if (!lead) return NextResponse.json({ ok: false });
 
-  const presupuestos = await listPresupuestosByLead(leadId);
+  const [presupuestos, llamadas] = await Promise.all([
+    listPresupuestosByLead(leadId),
+    listLlamadasByLead(leadId),
+  ]);
   return NextResponse.json({
     ok: true,
     profile: { nombre: lead.nombre, telefono: lead.telefono, email: lead.email, diaLlamada: lead.diaLlamada, turnoLlamada: lead.turnoLlamada },
     presupuestos: presupuestos.map(presupuestoToClientQuote),
+    llamadas: llamadas.map(llamadaToClientView),
   });
 }

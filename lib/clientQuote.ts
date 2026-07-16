@@ -1,4 +1,4 @@
-import type { Presupuesto } from "./crm";
+import type { Presupuesto, Llamada } from "./crm";
 
 // Solo los campos que el propio cliente ya nos dio al tarificar, en el
 // mismo formato que usa el área de cliente (QuoteProfile) — así el frontend
@@ -28,5 +28,22 @@ export function presupuestoToClientQuote(p: Presupuesto) {
     nombre: p.nombre,
     telefono: p.telefono,
     email: p.email,
+  };
+}
+
+// Solo lo que le concierne al cliente sobre una llamada que solicitó: ni
+// notas internas del agente ni su nombre — solo estado y cuándo es.
+export function llamadaToClientView(l: Llamada) {
+  return {
+    id: l.id,
+    producto: l.producto,
+    status: l.status,
+    presupuestoId: l.presupuestoId,
+    diaLlamada: l.diaLlamada,
+    turnoLlamada: l.turnoLlamada,
+    fechaProgramada: l.fechaProgramada,
+    horaProgramada: l.horaProgramada,
+    createdAt: l.createdAt,
+    updatedAt: l.updatedAt,
   };
 }

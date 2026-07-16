@@ -6,12 +6,45 @@ import { Header, Wordmark } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Modal } from "@/components/Modal";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
+import { NotificationBell } from "@/components/NotificationBell";
+import { PushOptIn } from "@/components/PushOptIn";
 import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
 import { saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile } from "@/lib/quote";
 
 type Profile = { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string };
+
+type LlamadaView = {
+  id: string; producto: string; status: string; presupuestoId: string;
+  diaLlamada: string; turnoLlamada: string; fechaProgramada: string; horaProgramada: string;
+  createdAt: string; updatedAt: string;
+};
+
+const LLAMADA_STATUS_LABELS: Record<string, string> = {
+  pendiente: "Pendiente de contactar",
+  programada: "Programada",
+  hecha: "Completada",
+  cancelada: "Cancelada",
+};
+const LLAMADA_STATUS_COLORS: Record<string, string> = {
+  pendiente: "bg-amber-100 text-amber-700",
+  programada: "bg-navy/10 text-navy",
+  hecha: "bg-emerald-100 text-emerald-700",
+  cancelada: "bg-slate-200 text-slate-600",
+};
+
+function cuandoLlamada(l: LlamadaView): string {
+  if (l.fechaProgramada) {
+    const d = new Date(`${l.fechaProgramada}T${l.horaProgramada || "00:00"}:00`);
+    const txt = Number.isNaN(d.getTime())
+      ? l.fechaProgramada
+      : d.toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+    return l.horaProgramada ? `${txt} a las ${l.horaProgramada}` : txt;
+  }
+  const partes = [l.diaLlamada, l.turnoLlamada].filter((v) => v && v !== DIAS_LLAMADA[0] && v !== TURNOS_LLAMADA[0]);
+  return partes.length ? partes.join(" · ") : "Sin concretar todavía";
+}
 
 function formatDate(iso: string) {
   try { return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(iso)); }
@@ -58,6 +91,7 @@ export function AreaClienteContent() {
   const [greeting, setGreeting] = useState("");
   const [profile, setProfile] = useState<Profile>({});
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
+  const [llamadas, setLlamadas] = useState<LlamadaView[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -84,6 +118,7 @@ export function AreaClienteContent() {
         if (body.ok) {
           setProfile(body.profile ?? {});
           setQuotes(body.presupuestos ?? []);
+          setLlamadas(body.llamadas ?? []);
           setVista("area");
           return;
         }
@@ -116,6 +151,7 @@ export function AreaClienteContent() {
     try { await fetch("/api/client/logout", { method: "POST" }); } catch { /* noop */ }
     setProfile({});
     setQuotes([]);
+    setLlamadas([]);
     setPage(1);
     setLoggingOut(false);
     setVista("acceso");
@@ -149,6 +185,15 @@ export function AreaClienteContent() {
       setProfile((p) => ({ ...p, nombre: first?.nombre, telefono: first?.telefono, email: first?.email }));
       setQuotes(found);
       setPage(1);
+      // La búsqueda ya deja la sesión iniciada (cookie); se completa con el
+      // perfil y las llamadas, que ese endpoint no devuelve — imprescindible
+      // además para un lead que solo pidió que le llamaran (sin presupuesto
+      // ninguno), cuyo nombre/teléfono no vienen en `found`.
+      fetch("/api/client/session").then((r) => r.json()).then((s) => {
+        if (!s.ok) return;
+        setProfile((p) => ({ ...p, ...s.profile }));
+        setLlamadas(s.llamadas ?? []);
+      }).catch(() => {});
       setShowRecoverBox(false);
       setLoginValue("");
       setLoginLoading(false);
@@ -282,11 +327,16 @@ export function AreaClienteContent() {
               cambia tus datos de contacto o reprograma tu llamada cuando quieras.
             </p>
           </div>
-          <button type="button" onClick={handleLogout} disabled={loggingOut}
-            className="shrink-0 rounded-card border border-hair bg-white px-3.5 py-2 text-[13px] font-semibold text-navy transition-colors hover:bg-mist disabled:opacity-50">
-            {loggingOut ? "Saliendo…" : "Cerrar sesión"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationBell />
+            <button type="button" onClick={handleLogout} disabled={loggingOut}
+              className="rounded-card border border-hair bg-white px-3.5 py-2 text-[13px] font-semibold text-navy transition-colors hover:bg-mist disabled:opacity-50">
+              {loggingOut ? "Saliendo…" : "Cerrar sesión"}
+            </button>
+          </div>
         </div>
+
+        <PushOptIn />
 
         {/* Añadir presupuestos de otro dispositivo (compacto, plegado) */}
         <section aria-labelledby="acceso" className="mt-8 rounded-[24px] border border-hair bg-white p-6 shadow-card">
@@ -465,6 +515,28 @@ export function AreaClienteContent() {
             </div>
           )}
         </section>
+
+        {/* Llamadas */}
+        {llamadas.length > 0 && (
+          <section aria-labelledby="llamadas" className="mt-8">
+            <h2 id="llamadas" className="text-[18px] font-bold text-navy">Tus llamadas</h2>
+            <ul className="mt-4 flex flex-col gap-3">
+              {llamadas.map((l) => (
+                <li key={l.id} className="flex items-center justify-between gap-3 rounded-[20px] border border-hair bg-white p-5 shadow-soft">
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] font-semibold capitalize text-ink">
+                      {l.producto ? `Seguro de ${l.producto}` : "Consulta general"}
+                    </p>
+                    <p className="mt-0.5 text-[13px] text-slate2">{cuandoLlamada(l)}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${LLAMADA_STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
+                    {LLAMADA_STATUS_LABELS[l.status] ?? l.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {rescheduleQuote && (
           <RescheduleCallModal
