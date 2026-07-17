@@ -12,6 +12,15 @@ export const SOURCE_LABELS: Record<string, string> = {
   "tarificador-vida-widget": "Tarificador vida (asistente)",
   "tarificador-auto-widget": "Tarificador auto (asistente)",
   "quiero-que-me-llamen-widget": "Quiero que me llamen (asistente)",
+  // Se ofrece cuando el usuario está a punto de abandonar un tarificador a
+  // medias (ratón hacia la pestaña/cierre en escritorio, gesto de "atrás" en
+  // móvil): un callback exprés de un solo campo (teléfono) para no perder el lead.
+  "exit-intent": "Exit-intent (abandono)",
+  // Landing de recursos descargables (guías/checklists) para Canarias y
+  // Baleares: solo pide email, no teléfono — el lead se nutre igual para el
+  // CRM y la newsletter, pero sin la fricción de una llamada.
+  "guia-seguro-salud-canarias-baleares": "Guía seguro de salud (Canarias/Baleares)",
+  "checklist-seguro-auto-canarias-baleares": "Checklist seguro de auto (Canarias/Baleares)",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;
@@ -277,4 +286,34 @@ export type ClientNotification = {
   at: string;
   texto: string;
   leido: boolean;
+  // A dónde debe llevar al cliente si toca el aviso. "" = sin destino
+  // específico (el centro de notificaciones usa /area-cliente por defecto).
+  url: string;
 };
+
+/* --------------------------- Valoración (NPS) --------------------------- */
+// Encuesta de satisfacción de una sola pregunta (0-10, estilo Net Promoter
+// Score) que se ofrece justo al cerrar una llamada ("hecha") o al ganar un
+// presupuesto (contratado) — el momento en el que la experiencia está más
+// fresca. Se vincula a UNA llamada o UN presupuesto (nunca ambos), vía el
+// mismo id que ya identifica a esa entidad (aleatorio, impredecible), así
+// que el enlace de la encuesta no necesita sesión ni login.
+
+export type NpsResponse = {
+  id: string;
+  refId: string; // id de la Llamada o el Presupuesto sobre el que se pregunta
+  refType: "llamada" | "presupuesto";
+  leadId: string;
+  producto: string;
+  score: number; // 0-10
+  comentario: string;
+  quiereResena: boolean; // true si score >= 9 y llegó a ver el enlace a la reseña
+  createdAt: string;
+};
+
+export type NpsCategory = "promotor" | "pasivo" | "detractor";
+export function npsCategory(score: number): NpsCategory {
+  if (score >= 9) return "promotor";
+  if (score >= 7) return "pasivo";
+  return "detractor";
+}

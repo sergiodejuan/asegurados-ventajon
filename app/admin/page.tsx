@@ -442,7 +442,7 @@ function LeadsCrm() {
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
                   <p className="truncate text-[13px] text-slate2 tnums">
-                    {l.telefono} · {sources[l.source] ?? l.source}{l.producto ? ` · ${l.producto}` : ""} · {fmt(l.updatedAt)}
+                    {[l.telefono || l.email, sources[l.source] ?? l.source, l.producto || null, fmt(l.updatedAt)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>

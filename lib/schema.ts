@@ -174,3 +174,37 @@ export const callRequestSchema = z.object({
   origen: origenField,
 });
 export type CallRequestInput = z.input<typeof callRequestSchema>;
+
+/* ------------------------- Exit-intent (callback exprés) ------------------- */
+// Se ofrece justo cuando el usuario va a abandonar un tarificador a medias:
+// a propósito solo pide el teléfono (sin código postal ni el resto de datos)
+// para que la fricción sea mínima — es, literalmente, la última oportunidad
+// antes de perder el lead.
+export const exitIntentSchema = z.object({
+  nombre: z.string().trim().max(120).optional().default(""),
+  telefono: phoneField,
+  codigoPostal: z.union([z.string().regex(/^\d{5}$/), z.literal("")]).optional().default(""),
+  producto: z.string().max(40).optional().default(""),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+});
+export type ExitIntentInput = z.input<typeof exitIntentSchema>;
+
+/* --------------------- Recurso descargable (lead magnet) ------------------- */
+// Landing de guías/checklists: solo email a cambio de la descarga, sin pedir
+// teléfono — la contrapartida es más ligera y el objetivo es nutrir la
+// newsletter, no necesariamente una llamada.
+export const leadMagnetSchema = z.object({
+  nombre: z.string().trim().max(120).optional().default(""),
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
+  guia: z.enum(["salud", "auto"]),
+  aceptaPrivacidad: consentPrivacidad,
+  aceptaComercial: z.boolean().default(false),
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+});
+export type LeadMagnetInput = z.input<typeof leadMagnetSchema>;

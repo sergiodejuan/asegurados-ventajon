@@ -8,6 +8,7 @@ import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue, PRESUPUESTO_STATUS_COLORS } from "@/lib/adminFormat";
 import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
+import { NpsCard } from "@/components/admin/NpsCard";
 
 type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };
 type PresupuestoEleccion = { compania: string; precio: number | null; condiciones?: string; servicios?: string[]; at: string };
@@ -33,6 +34,7 @@ function PresupuestoDetail() {
   const { token, agent } = useAdminToken();
   const [presupuesto, setPresupuesto] = useState<Presupuesto | null>(null);
   const [lead, setLead] = useState<LeadSummary>(null);
+  const [nps, setNps] = useState<{ score: number; comentario: string; createdAt: string } | null>(null);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ function PresupuestoDetail() {
       if (!detailRes.ok || !detail.ok) { setError(detail.error ?? "No se pudo cargar el presupuesto."); setLoading(false); return; }
       setPresupuesto(detail.presupuesto);
       setLead(detail.lead);
+      setNps(detail.nps ?? null);
       if (list.ok) { setStatuses(list.statuses); setStatusLabels(list.statusLabels); }
     } catch { setError("Error de conexión."); }
     setLoading(false);
@@ -204,6 +207,8 @@ function PresupuestoDetail() {
             </p>
             {p.closedBy && <p className="mt-2 text-[12px] text-slate2">Cerrado por <b className="text-ink">{p.closedBy}</b>.</p>}
           </div>
+
+          {(p.status === "ganado" || nps) && <NpsCard nps={nps} />}
         </div>
 
         {/* DERECHA (70%): paneles colapsables */}

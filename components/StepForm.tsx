@@ -13,6 +13,7 @@ import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { ConsentNudgeModal } from "./ConsentNudgeModal";
+import { ExitIntentModal } from "./ExitIntentModal";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -37,6 +38,9 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const [resumeChecked, setResumeChecked] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [showConsentNudge, setShowConsentNudge] = useState(false);
+  const [showExitIntent, setShowExitIntent] = useState(false);
+  const [exitIntentArmed, setExitIntentArmed] = useState(false);
+  const doneRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
@@ -84,6 +88,48 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
 
   useEffect(() => { topRef.current?.focus(); }, [idx]);
   useEffect(() => { onStepChange?.(idx); }, [idx, onStepChange]);
+  useEffect(() => { if (finalizing) doneRef.current = true; }, [finalizing]);
+
+  // Exit-intent: en cuanto hay progreso real (idx > 0) se arma la detección
+  // de abandono, una sola vez por sesión de pestaña. En escritorio, el ratón
+  // saliendo por arriba de la ventana (hacia la barra de pestañas/cerrar);
+  // en móvil, sin ratón, se usa el gesto de "atrás" — se atrapa UNA entrada
+  // extra del historial, así que la primera vez que el usuario vuelve atrás
+  // ve la oferta en vez de abandonar la página, y si insiste, la segunda vez
+  // sale con normalidad.
+  useEffect(() => {
+    if (idx > 0 && !exitIntentArmed) setExitIntentArmed(true);
+  }, [idx, exitIntentArmed]);
+
+  useEffect(() => {
+    if (!exitIntentArmed) return;
+    try { if (sessionStorage.getItem("ventajon:exitintent:shown")) return; } catch { /* noop */ }
+
+    function trigger() {
+      if (doneRef.current) return;
+      try { sessionStorage.setItem("ventajon:exitintent:shown", "1"); } catch { /* noop */ }
+      setShowExitIntent(true);
+    }
+    function onMouseOut(e: MouseEvent) {
+      if (e.clientY <= 0 && !e.relatedTarget) trigger();
+    }
+    document.addEventListener("mouseout", onMouseOut);
+
+    let poppedOnce = false;
+    function onPopState() {
+      if (poppedOnce) return;
+      poppedOnce = true;
+      window.history.pushState(null, "", window.location.href);
+      trigger();
+    }
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      document.removeEventListener("mouseout", onMouseOut);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [exitIntentArmed]);
 
   const set = (patch: FormData) => setData((d) => ({ ...d, ...patch }));
   const next = () => { setErrors({}); setStepIndex((s) => Math.min(s + 1, total)); };
@@ -475,6 +521,14 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           setErrors({});
           setShowConsentNudge(false);
         }}
+      />
+      <ExitIntentModal
+        open={showExitIntent}
+        onClose={() => setShowExitIntent(false)}
+        nombre={String(data.nombre ?? "")}
+        telefono={String(data.telefono ?? "")}
+        codigoPostal={String(data.codigoPostal ?? "")}
+        producto={variant}
       />
     </section>
   );

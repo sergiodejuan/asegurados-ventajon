@@ -4,6 +4,7 @@ import {
   type Presupuesto, type PresupuestoStatus, type PresupuestoNote, type PresupuestoEleccion,
   type Task, type TaskDraft,
   type Llamada, type LlamadaDraft, type LlamadaStatus, type LlamadaNote, type ClientNotification,
+  type NpsResponse,
 } from "./crm";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
@@ -768,11 +769,12 @@ export async function findClientPresupuestos(identifier: string): Promise<{ lead
 export async function updatePresupuesto(
   id: string,
   patch: { status?: PresupuestoStatus; note?: string; agente?: string }
-): Promise<Presupuesto | null> {
+): Promise<{ presupuesto: Presupuesto; notifyText: string | null; notifyUrl: string } | null> {
   const p = await jget<Presupuesto>(`presupuesto:${id}`);
   if (!p) return null;
   const now = new Date().toISOString();
   const agente = patch.agente?.trim() || "";
+  const wonJustNow = !!patch.status && patch.status !== p.status && patch.status === "ganado";
   if (patch.status && patch.status !== p.status) {
     p.status = patch.status;
     const closing = patch.status === "ganado" || patch.status === "perdido";
@@ -788,7 +790,19 @@ export async function updatePresupuesto(
   await jset(`presupuesto:${id}`, p);
   await zadd("presupuestos:index", Date.parse(now), id);
   await zadd(`presupuestos:byLead:${p.leadId}`, Date.parse(now), id);
-  return p;
+
+  // Al contratar (ganado), igual que al cerrar una llamada: se ofrece la
+  // encuesta de satisfacción en el momento en que la experiencia está más
+  // fresca, en vez de esperar a que el cliente entre por su cuenta.
+  let notifyText: string | null = null;
+  let notifyUrl = "";
+  if (wonJustNow) {
+    notifyText = "¡Enhorabuena por tu nuevo seguro! ¿Nos cuentas qué tal la experiencia?";
+    notifyUrl = `/valoracion/${p.id}`;
+    await createClientNotification({ leadId: p.leadId, llamadaId: "", texto: notifyText, url: notifyUrl });
+  }
+
+  return { presupuesto: p, notifyText, notifyUrl };
 }
 
 /* ---------------------------------- Llamadas ----------------------------------- */
@@ -906,24 +920,29 @@ export async function updateLlamada(
   // Solo avisamos al cliente ante eventos que le conciernen de verdad
   // (nunca por una nota interna suelta).
   let notifyText: string | null = null;
+  let notifyUrl = "";
   if (rescheduled) {
     notifyText = `Hemos reprogramado tu llamada${cuandoLlamada(l) ? ` para ${cuandoLlamada(l)}` : ""}.`;
   } else if (statusChanged && l.status === "hecha") {
-    notifyText = "Hemos completado tu llamada. Gracias por tu tiempo.";
+    // En vez de mandar sin más al área de cliente, el aviso lleva directo a
+    // la encuesta de satisfacción — el momento en el que más fresca está la
+    // experiencia para responder en 10 segundos.
+    notifyText = "¿Qué tal la llamada? Cuéntanoslo en 10 segundos.";
+    notifyUrl = `/valoracion/${l.id}`;
   } else if (statusChanged && l.status === "cancelada") {
     notifyText = "Hemos cancelado tu llamada.";
   }
-  if (notifyText) await createClientNotification({ leadId: l.leadId, llamadaId: l.id, texto: notifyText });
+  if (notifyText) await createClientNotification({ leadId: l.leadId, llamadaId: l.id, texto: notifyText, url: notifyUrl });
 
   return { llamada: l, notifyText };
 }
 
 /* ----------------------------- Notificaciones al cliente ----------------------------- */
 
-export async function createClientNotification(input: { leadId: string; llamadaId: string; texto: string }): Promise<ClientNotification> {
+export async function createClientNotification(input: { leadId: string; llamadaId: string; texto: string; url?: string }): Promise<ClientNotification> {
   const now = new Date().toISOString();
   const id = makeSubmissionId();
-  const n: ClientNotification = { id, leadId: input.leadId, llamadaId: input.llamadaId, at: now, texto: input.texto, leido: false };
+  const n: ClientNotification = { id, leadId: input.leadId, llamadaId: input.llamadaId, at: now, texto: input.texto, leido: false, url: input.url ?? "" };
   await jset(`notif:${id}`, n);
   await zadd(`notifs:byLead:${input.leadId}`, Date.parse(now), id);
   return n;
@@ -1044,4 +1063,38 @@ export async function deleteTask(id: string): Promise<boolean> {
   if (!t) return false;
   await jdel(`task:${id}`);
   return true;
+}
+
+/* -------------------------------- Valoración (NPS) -------------------------------- */
+// Una respuesta por llamada/presupuesto (refId = el id de esa entidad, que ya
+// es un UUID impredecible — así el enlace público /valoracion/[id] no
+// necesita sesión ni login, igual que un enlace de encuesta por email).
+
+export async function getNpsResponse(refId: string): Promise<NpsResponse | null> {
+  return jget<NpsResponse>(`nps:byRef:${refId}`);
+}
+
+export async function saveNpsResponse(input: {
+  refId: string; refType: "llamada" | "presupuesto"; leadId: string; producto: string;
+  score: number; comentario?: string;
+}): Promise<NpsResponse> {
+  const now = new Date().toISOString();
+  const id = makeSubmissionId();
+  const n: NpsResponse = {
+    id, refId: input.refId, refType: input.refType, leadId: input.leadId, producto: input.producto,
+    score: Math.max(0, Math.min(10, Math.round(input.score))),
+    comentario: input.comentario?.trim() ?? "",
+    quiereResena: input.score >= 9,
+    createdAt: now,
+  };
+  await jset(`nps:byRef:${input.refId}`, n);
+  await zadd("nps:index", Date.parse(now), input.refId);
+
+  const nota = `Encuesta de satisfacción respondida: ${n.score}/10${n.comentario ? ` — "${n.comentario}"` : ""}.`;
+  if (input.refType === "llamada") {
+    await updateLlamada(input.refId, { note: nota }).catch(() => {});
+  } else {
+    await updatePresupuesto(input.refId, { note: nota }).catch(() => {});
+  }
+  return n;
 }

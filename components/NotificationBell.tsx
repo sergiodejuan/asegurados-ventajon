@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type ClientNotification = { id: string; at: string; texto: string; leido: boolean };
+type ClientNotification = { id: string; at: string; texto: string; leido: boolean; url?: string };
 
 function formatDate(iso: string) {
   try { return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)); }
@@ -76,9 +76,18 @@ export function NotificationBell() {
           ) : (
             <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
               {items.map((n) => (
-                <li key={n.id} className="rounded-lg px-3 py-2.5 hover:bg-mist">
-                  <p className="text-[13px] leading-relaxed text-ink">{n.texto}</p>
-                  <p className="mt-0.5 text-[11px] text-slate2">{formatDate(n.at)}</p>
+                <li key={n.id}>
+                  {n.url ? (
+                    <a href={n.url} className="block rounded-lg px-3 py-2.5 hover:bg-mist">
+                      <p className="text-[13px] font-medium leading-relaxed text-navy underline">{n.texto}</p>
+                      <p className="mt-0.5 text-[11px] text-slate2">{formatDate(n.at)}</p>
+                    </a>
+                  ) : (
+                    <div className="rounded-lg px-3 py-2.5 hover:bg-mist">
+                      <p className="text-[13px] leading-relaxed text-ink">{n.texto}</p>
+                      <p className="mt-0.5 text-[11px] text-slate2">{formatDate(n.at)}</p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

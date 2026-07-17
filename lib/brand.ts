@@ -27,6 +27,12 @@ export const CALLER_NUMBERS = [
   { label: "Línea alternativa", number: process.env.NEXT_PUBLIC_CALLER_2 ?? "+34 971 000 000" },
 ];
 
+// Enlace directo a "escribir una reseña" del perfil de Google Business.
+// ⚠️ PENDIENTE (Sergio): sin el perfil real todavía. Mientras esta env no
+// esté configurada, la encuesta de satisfacción (/valoracion) simplemente no
+// muestra el paso de pedir reseña — nunca se inventa una URL.
+export const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ?? "";
+
 export const PARTNERS = ["Mapfre", "Adeslas", "Asisa", "Zurich", "Generali"];
 export const ECOSYSTEM_MEMBERS = "350.000 socios";
 

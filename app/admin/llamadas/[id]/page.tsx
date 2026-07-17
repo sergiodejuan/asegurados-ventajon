@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 import { fmt } from "@/lib/adminFormat";
 import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
+import { NpsCard } from "@/components/admin/NpsCard";
 
 type LlamadaNote = { id: string; at: string; texto: string; agente?: string };
 type Llamada = {
@@ -37,6 +38,7 @@ function LlamadaDetail() {
   const { token, agent } = useAdminToken();
   const [llamada, setLlamada] = useState<Llamada | null>(null);
   const [lead, setLead] = useState<LeadSummary>(null);
+  const [nps, setNps] = useState<{ score: number; comentario: string; createdAt: string } | null>(null);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,7 @@ function LlamadaDetail() {
       if (!detailRes.ok || !detail.ok) { setError(detail.error ?? "No se pudo cargar la llamada."); setLoading(false); return; }
       setLlamada(detail.llamada);
       setLead(detail.lead);
+      setNps(detail.nps ?? null);
       setFechaProgramada(detail.llamada.fechaProgramada || "");
       setHoraProgramada(detail.llamada.horaProgramada || "");
       if (list.ok) { setStatuses(list.statuses); setStatusLabels(list.statusLabels); }
@@ -170,6 +173,8 @@ function LlamadaDetail() {
               {rescheduling ? "Guardando…" : "Guardar reprogramación"}
             </button>
           </div>
+
+          {(l.status === "hecha" || nps) && <NpsCard nps={nps} />}
         </div>
 
         {/* DERECHA: comentarios */}

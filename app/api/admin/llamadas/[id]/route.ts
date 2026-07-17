@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLlamada, updateLlamada, getLead } from "@/lib/store";
+import { getLlamada, updateLlamada, getLead, getNpsResponse } from "@/lib/store";
 import { LLAMADA_STATUSES, type LlamadaStatus } from "@/lib/crm";
 import { adminAuthFail } from "@/lib/adminAuth";
 import { sendPushToLead } from "@/lib/webPush";
@@ -16,11 +16,12 @@ export async function GET(
   if (denied) return denied;
   const llamada = await getLlamada(params.id);
   if (!llamada) return NextResponse.json({ ok: false, error: "No encontrada." }, { status: 404 });
-  const lead = await getLead(llamada.leadId);
+  const [lead, nps] = await Promise.all([getLead(llamada.leadId), getNpsResponse(params.id)]);
   return NextResponse.json({
     ok: true,
     llamada,
     lead: lead ? { id: lead.id, nombre: lead.nombre, telefono: lead.telefono, email: lead.email, status: lead.status } : null,
+    nps,
   });
 }
 
