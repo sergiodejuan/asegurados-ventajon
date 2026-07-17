@@ -15,6 +15,9 @@ export type AssistantContext = {
 // Rutas donde el asistente NO debe aparecer: páginas que ya son en sí mismas
 // un funnel de captura (tarificadores, mes gratis, quiero que me llamen), el
 // área privada de cliente, páginas legales/de agradecimiento y todo /admin.
+// La comparativa tampoco lo lleva: ya tiene su propio widget de WhatsApp
+// contextual (ver WhatsAppHelpWidget) y mostrar los dos a la vez satura la
+// pantalla en el momento en que el usuario está decidiendo.
 const EXCLUDED_PREFIXES = [
   "/admin",
   "/tarificador-vida",
@@ -25,6 +28,7 @@ const EXCLUDED_PREFIXES = [
   "/legal",
   "/gracias",
   "/quiero-que-me-llamen",
+  "/comparativa",
 ];
 
 export function isAssistantAllowed(pathname: string): boolean {
@@ -56,9 +60,6 @@ const CONTEXTS: { test: (p: string) => boolean; context: AssistantContext }[] = 
   } },
   { test: (p) => p.startsWith("/seguro-de-hogar"), context: {
     greeting: "Cuéntame un poco sobre tu vivienda y te paso con un asesor de seguro de hogar.",
-  } },
-  { test: (p) => p.startsWith("/comparativa"), context: {
-    greeting: "¿Tienes dudas sobre tu comparativa? Dime qué necesitas y te ayudo o te paso con un asesor.",
   } },
   { test: (p) => p.startsWith("/actualidad"), context: {
     greeting: "¿Buscas comparar precios de seguros? Puedo calculártelo aquí mismo.",

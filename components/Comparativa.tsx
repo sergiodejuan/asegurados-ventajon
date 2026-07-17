@@ -278,7 +278,7 @@ export function Comparativa() {
 
         <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>
-      <WhatsAppHelpWidget message="¿Necesitas ayuda para elegir?" waHref={whatsAppUrl(widgetWaText)} />
+      <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />
     </>
   );
 }

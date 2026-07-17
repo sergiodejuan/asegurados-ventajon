@@ -58,6 +58,7 @@ export function CompanyDetail() {
 
   const waText = buildWhatsAppText({ producto, compania: entry.compania, quote });
   const widgetWaText = buildWhatsAppText({ producto, compania: entry.compania, quote, origen: `ficha ${entry.compania}` });
+  const firstName = quote?.nombre?.trim().split(/\s+/)[0];
   const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
   const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
   const precioAuto = autoPrice({ precio: entry.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada });
@@ -178,7 +179,7 @@ export function CompanyDetail() {
           </div>
         </div>
       </main>
-      <WhatsAppHelpWidget message={`¿Necesitas ayuda con tu opción con ${entry.compania}?`} waHref={whatsAppUrl(widgetWaText)} />
+      <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda con tu opción con ${entry.compania}?` : `¿Necesitas ayuda con tu opción con ${entry.compania}?`} waHref={whatsAppUrl(widgetWaText)} />
     </>
   );
 }
