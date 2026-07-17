@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
+import { useSiteTheme } from "@/lib/useTheme";
 import { Wordmark } from "./Header";
 import { Close, WhatsApp, ArrowRight } from "./icons";
 
@@ -21,6 +22,7 @@ const LINKS = [
 // de seguros desde el móvil salvo enlaces sueltos dentro de cada página.
 export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const theme = useSiteTheme();
 
   useEffect(() => { onClose(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pathname]);
 
@@ -46,9 +48,18 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
       className="safe-top safe-bottom fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-y-auto bg-navy motion-safe:animate-fade-up lg:hidden"
     >
       <div className="flex items-center justify-between px-5 py-4">
-        <span className="inline-flex items-center rounded-card bg-white px-3 py-1.5">
-          <Wordmark />
-        </span>
+        {theme.logoUrl ? (
+          <Wordmark logoUrl={theme.logoUrl} />
+        ) : (
+          // Sin logo configurado, el wordmark de texto de <Wordmark> es
+          // navy (pensado para el header, con fondo blanco) — aquí, sobre
+          // fondo navy, sería invisible, así que este fallback va en blanco.
+          <span className="inline-flex items-baseline gap-1.5 font-display text-[17px] font-extrabold tracking-tight text-white" translate="no">
+            <span aria-hidden="true" className="mr-0.5 inline-block h-3 w-3 translate-y-[1px] rounded-[3px] bg-brand-red" />
+            {BRAND_NAME.split(" ")[0]}
+            <span className="text-brand-red">{BRAND_NAME.split(" ").slice(1).join(" ")}</span>
+          </span>
+        )}
         <button
           type="button"
           onClick={onClose}

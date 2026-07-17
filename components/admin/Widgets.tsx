@@ -32,6 +32,34 @@ export function FilterTab({ label, active, onClick, small }: { label: string; ac
   );
 }
 
+// Desplegable con la misma pinta que FilterTab (pill), para agrupar ahí el
+// resto de opciones cuando la lista es larga (p.ej. todas las fuentes de un
+// lead) — así solo queda visible en pantalla "Todas las fuentes" + este
+// desplegable, en vez de una fila de chips por cada fuente posible.
+export function FilterDropdown({
+  placeholder, value, options, onChange,
+}: {
+  placeholder: string;
+  value: string; // "" = ninguna opción del desplegable seleccionada
+  options: { key: string; label: string }[];
+  onChange: (key: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`rounded-pill px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+        value ? "border border-navy bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"
+      }`}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((o) => (
+        <option key={o.key} value={o.key}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
 export function CollapsiblePanel({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (

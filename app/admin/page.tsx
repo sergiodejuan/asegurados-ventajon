@@ -6,7 +6,7 @@ import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 import { ChevronDown, WhatsApp } from "@/components/icons";
 import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/adminFormat";
-import { StatTile, ViewToggle, FilterTab, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
+import { StatTile, ViewToggle, FilterTab, FilterDropdown, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 
 type Activity = { at: string; type: string; note: string; meta?: { agente?: string; channel?: string } };
@@ -416,11 +416,16 @@ function LeadsCrm() {
           placeholder="Buscar por nombre, teléfono, email, código postal o campaña…"
           className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]"
         />
-        <div role="tablist" aria-label="Filtrar por fuente" className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Filtrar por fuente" className="flex flex-wrap items-center gap-2">
           <FilterTab label={`Todas las fuentes (${leads.length})`} active={filterSource === "all"} onClick={() => setFilterSource("all")} />
-          {Object.entries(sources).map(([key, label]) => (
-            <FilterTab key={key} label={`${label} (${leads.filter((l) => l.sources.includes(key)).length})`} active={filterSource === key} onClick={() => setFilterSource(key)} />
-          ))}
+          <FilterDropdown
+            placeholder="Otra fuente…"
+            value={filterSource === "all" ? "" : filterSource}
+            onChange={(key) => setFilterSource(key || "all")}
+            options={Object.entries(sources).map(([key, label]) => ({
+              key, label: `${label} (${leads.filter((l) => l.sources.includes(key)).length})`,
+            }))}
+          />
         </div>
         {productos.length > 0 && (
           <div role="tablist" aria-label="Filtrar por producto" className="flex flex-wrap gap-2">
