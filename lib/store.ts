@@ -343,7 +343,11 @@ export async function exportLeadData(id: string): Promise<{ lead: Lead; presupue
   return { lead, presupuestos };
 }
 
-export async function anonymizeLead(id: string, agente?: string): Promise<Lead | null> {
+export async function anonymizeLead(
+  id: string,
+  agente?: string,
+  motivo = "Datos personales anonimizados a petición del interesado (derecho de supresión, RGPD)."
+): Promise<Lead | null> {
   const lead = await jget<Lead>(`lead:${id}`);
   if (!lead) return null;
   const now = new Date().toISOString();
@@ -362,7 +366,7 @@ export async function anonymizeLead(id: string, agente?: string): Promise<Lead |
   lead.updatedAt = now;
   lead.activity.unshift({
     at: now, type: "rgpd",
-    note: "Datos personales anonimizados a petición del interesado (derecho de supresión, RGPD).",
+    note: motivo,
     meta: agente ? { agente } : undefined,
   });
   await jset(`lead:${id}`, lead);
@@ -383,6 +387,28 @@ export async function anonymizeLead(id: string, agente?: string): Promise<Lead |
   }
 
   return lead;
+}
+
+// Política de retención (RGPD art. 5.1.e, ver /legal): un lead que nunca
+// llega a convertirse en cliente ("ganado") se anonimiza automáticamente
+// pasado el plazo, en vez de conservarse indefinidamente. Los que sí se
+// convirtieron en cliente NO se tocan aquí — su conservación se rige por
+// los plazos contractuales/fiscales, no por esta limpieza. Pensada para
+// ejecutarse periódicamente desde /api/cron/retention (ver vercel.json).
+export async function purgeStaleLeads(olderThanDays: number): Promise<{ purged: number; total: number }> {
+  const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+  const all = await listLeads();
+  const candidatos = all.filter((l) => l.status !== "ganado" && !l.anonymizedAt && Date.parse(l.updatedAt) < cutoff);
+
+  for (const lead of candidatos) {
+    await anonymizeLead(
+      lead.id,
+      undefined,
+      `Datos personales anonimizados automáticamente: sin actividad desde hace más de ${olderThanDays} días sin haber contratado (política de retención, RGPD art. 5.1.e).`
+    );
+  }
+
+  return { purged: candidatos.length, total: all.length };
 }
 
 /* ---------------------------- Catálogo (productos) ------------------------- */

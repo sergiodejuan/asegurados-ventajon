@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { leadMagnetSchema } from "@/lib/schema";
 import { upsertLead, updateLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
+import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true, downloadUrl: GUIAS[d.guia].downloadUrl });
+
+  const limited = await rateLimitFail(request, { bucket: "lead-magnet", limit: 10, windowSeconds: 3600 });
+  if (limited) return limited;
 
   const guia = GUIAS[d.guia];
   const consent = buildConsent(request, guia.source, "/recursos-seguros-canarias-baleares",

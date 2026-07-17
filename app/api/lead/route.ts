@@ -7,6 +7,7 @@ import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { ageFromDob } from "@/lib/quote";
+import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,13 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true }); // honeypot
+
+  // Este envío puede disparar una llamada automática real (Retell/Bland AI)
+  // si autoriza contacto: limita por IP y, sobre todo, por el teléfono
+  // destino, para que no se pueda usar el formulario para acosar a un
+  // tercero con llamadas repetidas.
+  const limited = await callTriggerRateLimitFail(request, "tarificador-salud", d.telefono);
+  if (limited) return limited;
 
   // Mismo tarificador, pero completado desde el widget asistente o desde una
   // landing de captación SEO (/seguro-de-salud-*) en vez de la página normal:

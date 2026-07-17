@@ -5,6 +5,7 @@ import { normalizePhone } from "@/lib/schema";
 import { getAttribution } from "@/lib/attribution";
 import { BRAND_NAME } from "@/lib/brand";
 import { Spinner } from "./icons";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 // Calculadora de ahorro embebida en las landings SEO: primero da una
 // estimación instantánea (sin pedir nada) para que el usuario vea valor de
@@ -20,6 +21,7 @@ export function SavingsCalculator({ slug, pricePerAsegurado }: { slug: string; p
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const pago = Number(pagoActual) || 0;
   const estimado = pricePerAsegurado * numAsegurados;
@@ -41,7 +43,7 @@ export function SavingsCalculator({ slug, pricePerAsegurado }: { slug: string; p
           telefono, pagoActual: pago || undefined, numAsegurados, slug,
           aceptaPrivacidad: true, autorizaContacto: true,
           consent: { privacidadAt: new Date().toISOString(), contactoAt: new Date().toISOString() },
-          company: "", utm: getAttribution(),
+          company: "", utm: getAttribution(), turnstileToken,
         }),
       });
       if (res.ok) { setSent(true); return; }
@@ -123,6 +125,7 @@ export function SavingsCalculator({ slug, pricePerAsegurado }: { slug: string; p
                   <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
                 </span>
               </label>
+              <TurnstileWidget onToken={setTurnstileToken} />
               {error && <p role="alert" className="mt-2 text-[13px] font-medium text-brand-red">{error}</p>}
               <button
                 type="submit" disabled={submitting} aria-busy={submitting || undefined}

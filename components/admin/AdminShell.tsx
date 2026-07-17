@@ -202,6 +202,14 @@ export function AdminShell({
       const urlToken = new URLSearchParams(window.location.search).get("token");
       const stored = urlToken || sessionStorage.getItem(TOKEN_KEY);
       if (stored) sessionStorage.setItem(TOKEN_KEY, stored);
+      if (urlToken) {
+        // Se guarda en sessionStorage y ya no hace falta en la URL visible:
+        // dejarlo ahí lo expondría en el historial del navegador y en
+        // cualquier herramienta de analítica que capture la URL completa.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("token");
+        window.history.replaceState({}, "", url.toString());
+      }
       const t = stored ?? "";
       setToken(t);
       await loadIdentity(t);

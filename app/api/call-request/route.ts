@@ -7,6 +7,8 @@ import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendPushToLead } from "@/lib/webPush";
 import { BRAND_NAME } from "@/lib/brand";
+import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +24,12 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
+
+  const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
+  if (!humano) return NextResponse.json({ ok: false, error: "No hemos podido verificar la solicitud. Recarga la página e inténtalo de nuevo." }, { status: 403 });
+
+  const limited = await callTriggerRateLimitFail(request, "quiero-que-me-llamen", d.telefono);
+  if (limited) return limited;
 
   // Mismo formulario, pero completado desde el widget asistente en vez de la
   // página normal: se distingue en el source para poder medirlo aparte.

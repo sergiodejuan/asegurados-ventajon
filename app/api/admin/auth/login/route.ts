@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAgentByEmail, touchAgentLogin, createAuditLog } from "@/lib/store";
 import { verifyPassword, setAgentSessionCookie } from "@/lib/agentAuth";
 import { toPublicAgent } from "@/lib/crm";
+import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,11 @@ export const dynamic = "force-dynamic";
 // ADMIN_TOKEN maestro, que sigue funcionando igual que siempre en la
 // pantalla de acceso de /admin.
 export async function POST(request: Request) {
+  // Sin esto, el login es fuerza-bruteable: cualquiera podría probar
+  // contraseñas sin límite contra un email conocido.
+  const limited = await rateLimitFail(request, { bucket: "admin-login", limit: 10, windowSeconds: 600 });
+  if (limited) return limited;
+
   let body: { email?: string; password?: string };
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }

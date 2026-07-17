@@ -4,6 +4,8 @@ import { upsertLead, createLlamada } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { getSeoLandingPage, resolvePrice } from "@/lib/seoLandingPages";
+import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +26,12 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
+
+  const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
+  if (!humano) return NextResponse.json({ ok: false, error: "No hemos podido verificar la solicitud. Recarga la página e inténtalo de nuevo." }, { status: 403 });
+
+  const limited = await callTriggerRateLimitFail(request, "calculadora-ahorro", d.telefono);
+  if (limited) return limited;
 
   const page = getSeoLandingPage(d.slug);
   const precioBase = page ? await resolvePrice(page) : 35;

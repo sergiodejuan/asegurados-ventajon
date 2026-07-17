@@ -3,6 +3,8 @@ import { exitIntentSchema } from "@/lib/schema";
 import { upsertLead, createLlamada } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +26,12 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
+
+  const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
+  if (!humano) return NextResponse.json({ ok: false, error: "No hemos podido verificar la solicitud. Recarga la página e inténtalo de nuevo." }, { status: 403 });
+
+  const limited = await callTriggerRateLimitFail(request, SOURCE, d.telefono);
+  if (limited) return limited;
 
   const consent = buildConsent(request, SOURCE, "/tarificador",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: false },

@@ -176,6 +176,7 @@ export const callRequestSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type CallRequestInput = z.input<typeof callRequestSchema>;
 
@@ -194,6 +195,7 @@ export const exitIntentSchema = z.object({
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type ExitIntentInput = z.input<typeof exitIntentSchema>;
 
@@ -219,6 +221,7 @@ export const savingsCalculatorSchema = z.object({
   consent: consentClient,
   company: honeypot,
   utm: utmField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type SavingsCalculatorInput = z.input<typeof savingsCalculatorSchema>;
 

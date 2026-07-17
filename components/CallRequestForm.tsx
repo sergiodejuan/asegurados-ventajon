@@ -12,6 +12,7 @@ import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Spinner } from "./icons";
 import { ConsentNudgeModal } from "./ConsentNudgeModal";
 import { CallSlotPicker, type CallSlot } from "./CallSlotPicker";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -46,6 +47,7 @@ export function CallRequestForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showConsentNudge, setShowConsentNudge] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const hasProductoParam = searchParams.has("producto");
 
@@ -87,7 +89,7 @@ export function CallRequestForm({
           aceptaComercial: !!quote.consentAt?.comercialAt,
           company: "",
           consent: quote.consentAt,
-          utm: getAttribution(),
+          utm: getAttribution(), turnstileToken,
         }),
       });
       if (res.ok) {
@@ -121,7 +123,7 @@ export function CallRequestForm({
       aceptaComercial: comercial,
       company: "",
       consent: consentTimes,
-      utm: getAttribution(),
+      utm: getAttribution(), turnstileToken,
     };
     const parsed = callRequestSchema.safeParse(payload);
     if (!parsed.success) {
@@ -183,6 +185,7 @@ export function CallRequestForm({
           </div>
         </div>
 
+        <TurnstileWidget onToken={setTurnstileToken} />
         {quickError && (
           <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">
             {quickError}
@@ -337,6 +340,7 @@ export function CallRequestForm({
         </label>
       </div>
 
+      <TurnstileWidget onToken={setTurnstileToken} />
       {submitError && (
         <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">
           {submitError}

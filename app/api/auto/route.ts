@@ -7,6 +7,7 @@ import { blandConfigured, triggerBlandCall, humanizeUsoVehiculo, humanizeCobertu
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { ageFromDob } from "@/lib/quote";
+import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
+
+  const limited = await callTriggerRateLimitFail(request, "tarificador-auto", d.telefono);
+  if (limited) return limited;
 
   // Mismo tarificador, pero completado desde el widget asistente en vez de
   // la página normal: se distingue en el source para poder medirlo aparte.

@@ -11,7 +11,10 @@ export function Footer() {
           <div>
             <p className="font-display text-[15px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
             <p className="mt-2 text-[13px] leading-relaxed text-slate2 md:max-w-sm">Correduría de seguros. Trabajamos en toda España. Atención {CONTACT_HOURS}.</p>
-            <p className="mt-2 text-[12px] leading-relaxed text-slate2 md:max-w-sm">[Pendiente de validación legal: identificación registral de la correduría y textos obligatorios.]</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-slate2 md:max-w-sm">
+              Datos identificativos, inscripción en el registro de la DGSFP y política de privacidad completa en{" "}
+              <a href="/legal" className="font-semibold text-navy underline">información legal</a>.
+            </p>
           </div>
 
           <nav aria-label="Seguros" className="mt-6 md:mt-0">

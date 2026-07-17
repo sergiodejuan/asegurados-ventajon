@@ -6,6 +6,7 @@ import { Phone, Spinner } from "./icons";
 import { BRAND_NAME } from "@/lib/brand";
 import { normalizePhone } from "@/lib/schema";
 import { getAttribution } from "@/lib/attribution";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 export function ExitIntentModal({
   open, onClose, nombre, telefono: telefonoInicial, codigoPostal, producto,
@@ -22,6 +23,7 @@ export function ExitIntentModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +40,7 @@ export function ExitIntentModal({
           nombre: nombre ?? "", telefono, codigoPostal: codigoPostal ?? "", producto: producto ?? "",
           aceptaPrivacidad: true, autorizaContacto: true,
           consent: { privacidadAt: new Date().toISOString(), contactoAt: new Date().toISOString() },
-          company: "", utm: getAttribution(),
+          company: "", utm: getAttribution(), turnstileToken,
         }),
       });
       if (res.ok) { setSent(true); return; }
@@ -90,6 +92,7 @@ export function ExitIntentModal({
             </span>
           </label>
 
+          <TurnstileWidget onToken={setTurnstileToken} />
           {error && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{error}</p>}
 
           <button

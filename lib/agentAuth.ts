@@ -56,10 +56,24 @@ export type ResolvedIdentity =
   | { kind: "master"; agentId: string; agentNombre: string }
   | { kind: "agent"; agentId: string; agentNombre: string; agent: Agent };
 
+// Comparación en tiempo constante para no filtrar por temporización cuántos
+// caracteres iniciales del token coinciden — timingSafeEqual exige buffers
+// de igual longitud, así que primero se comparan las longitudes (filtrar
+// eso por temporización no revela nada útil sobre el secreto en sí).
+function safeTokenEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 export async function resolveIdentity(request: Request): Promise<ResolvedIdentity | null> {
   const masterSecret = process.env.ADMIN_TOKEN;
-  const token = request.headers.get("x-admin-token") || new URL(request.url).searchParams.get("token");
-  if (masterSecret && token === masterSecret) {
+  // Solo por cabecera: aceptarlo también por query string (?token=) lo deja
+  // expuesto en el historial del navegador, en logs de acceso y en la
+  // cabecera Referer de cualquier enlace saliente de esa página.
+  const token = request.headers.get("x-admin-token");
+  if (masterSecret && token && safeTokenEquals(token, masterSecret)) {
     return { kind: "master", agentId: "master", agentNombre: "Admin" };
   }
   const sessionToken = cookies().get(AGENT_SESSION_COOKIE)?.value;
