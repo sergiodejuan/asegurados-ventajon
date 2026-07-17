@@ -44,9 +44,10 @@ const consentContacto = z.literal(true, {
 const honeypot = z.string().max(0).optional().default("");
 
 // De dónde viene el envío dentro de la propia web: formulario normal de la
-// página, o el widget asistente flotante — para poder distinguirlo en el
-// origen del lead sin tocar la atribución de marketing real (utm).
-const origenField = z.enum(["web", "asistente"]).optional().default("web");
+// página, el widget asistente flotante, o el tarificador embebido en una
+// landing de captación SEO — para poder distinguirlo en el origen del lead
+// sin tocar la atribución de marketing real (utm).
+const origenField = z.enum(["web", "asistente", "seo-landing"]).optional().default("web");
 
 const dobField = z
   .string()
@@ -195,6 +196,31 @@ export const exitIntentSchema = z.object({
   utm: utmField,
 });
 export type ExitIntentInput = z.input<typeof exitIntentSchema>;
+
+/* ------------------- Calculadora de ahorro (landings SEO) ------------------ */
+// Widget ligero embebido en las landings de captación pura (/seguro-de-salud-*):
+// el usuario indica lo que paga ahora y cuántos asegurados tiene, ve un ahorro
+// estimado al momento, y deja el teléfono para recibir su comparativa real —
+// se guarda como lead aunque no llegue a completar el tarificador completo.
+export const savingsCalculatorSchema = z.object({
+  nombre: z.string().trim().max(120).optional().default(""),
+  telefono: phoneField,
+  pagoActual: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number().nonnegative().max(2000).optional()
+  ),
+  numAsegurados: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? 1 : Number(v)),
+    z.number().int().min(1).max(20).default(1)
+  ),
+  slug: z.string().max(60),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+});
+export type SavingsCalculatorInput = z.input<typeof savingsCalculatorSchema>;
 
 /* --------------------- Recurso descargable (lead magnet) ------------------- */
 // Landing de guías/checklists: solo email a cambio de la descarga, sin pedir

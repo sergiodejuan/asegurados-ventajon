@@ -7,6 +7,14 @@
  */
 export const BRAND_NAME = "Asegurados Ventajon";
 
+// Dominio absoluto para JSON-LD (url, breadcrumbs) en las landings SEO.
+// ⚠️ PENDIENTE (Sergio): confirma el dominio de producción definitivo con
+// NEXT_PUBLIC_SITE_URL — mientras tanto usa el dominio de Vercel visto en
+// los despliegues de este PR.
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://asegurados-ventajon.vercel.app");
+
 export const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34600000000";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;

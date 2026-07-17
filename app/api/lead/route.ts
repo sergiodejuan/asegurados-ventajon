@@ -23,11 +23,22 @@ export async function POST(request: Request) {
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true }); // honeypot
 
-  // Mismo tarificador, pero completado desde el widget asistente en vez de
-  // la página normal: se distingue en el source para poder medirlo aparte.
-  const source = d.origen === "asistente" ? "tarificador-salud-widget" : "tarificador-salud";
+  // Mismo tarificador, pero completado desde el widget asistente o desde una
+  // landing de captación SEO (/seguro-de-salud-*) en vez de la página normal:
+  // se distingue en el source para poder medirlo aparte.
+  const source =
+    d.origen === "asistente" ? "tarificador-salud-widget"
+    : d.origen === "seo-landing" ? "tarificador-salud-seo"
+    : "tarificador-salud";
 
-  const consent = buildConsent(request, source, "/tarificador",
+  // La página exacta de origen viaja en el Referer del navegador — útil para
+  // saber desde cuál de las landings SEO llegó este lead concreto sin tener
+  // que crear un source distinto por cada una.
+  const referer = request.headers.get("referer") || "";
+  let pageOrigen = "/tarificador";
+  try { if (referer) pageOrigen = new URL(referer).pathname; } catch { /* referer no parseable, se deja el valor por defecto */ }
+
+  const consent = buildConsent(request, source, pageOrigen,
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
     d.consent);
 

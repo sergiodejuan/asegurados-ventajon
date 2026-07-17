@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import { savingsCalculatorSchema } from "@/lib/schema";
+import { upsertLead, createLlamada } from "@/lib/store";
+import { buildConsent } from "@/lib/consent";
+import { setClientSessionCookie } from "@/lib/clientSession";
+import { getSeoLandingPage, resolvePrice } from "@/lib/seoLandingPages";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Calculadora de ahorro embebida en las landings de captación SEO
+// (/seguro-de-salud-*): envío ligero (teléfono + lo que paga ahora) para
+// captar el lead aunque no llegue a completar el tarificador completo. El
+// ahorro se recalcula aquí con el mismo precio de referencia que se le
+// mostró en pantalla, para no fiarnos de un cálculo hecho en el cliente.
+export async function POST(request: Request) {
+  let raw: unknown;
+  try { raw = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  const parsed = savingsCalculatorSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, errors: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
+  const d = parsed.data;
+  if (d.company) return NextResponse.json({ ok: true });
+
+  const page = getSeoLandingPage(d.slug);
+  const precioBase = page ? await resolvePrice(page) : 35;
+  const precioEstimado = precioBase * d.numAsegurados;
+  const ahorro = d.pagoActual != null && d.pagoActual > precioEstimado ? Math.round(d.pagoActual - precioEstimado) : null;
+
+  const source = "calculadora-ahorro";
+  const consent = buildConsent(request, source, page?.path ?? "/",
+    { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: false },
+    d.consent);
+
+  const { id } = await upsertLead(
+    {
+      nombre: d.nombre, telefono: d.telefono, producto: "salud",
+      yaTieneSeguro: d.pagoActual != null, seguroActualImporte: d.pagoActual,
+      numAsegurados: d.numAsegurados,
+      aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto,
+      utm: d.utm,
+    },
+    source,
+    consent
+  );
+
+  const pagoTxt = d.pagoActual != null ? `Paga ${d.pagoActual} €/mes ahora mismo. ` : "";
+  const ahorroTxt = ahorro != null ? `Ahorro estimado: ~${ahorro} €/mes.` : "Quiere ver si puede mejorar su precio actual.";
+  await createLlamada({
+    leadId: id, producto: "salud", source,
+    motivo: `Calculadora de ahorro (${page?.badge ?? "landing SEO"}): ${pagoTxt}${d.numAsegurados} asegurado(s). ${ahorroTxt}`,
+    diaLlamada: "Cualquier día", turnoLlamada: "Cualquier turno",
+    nombre: d.nombre, telefono: d.telefono,
+  }).catch((err) => console.error("[calculadora-ahorro] llamada error", err));
+
+  setClientSessionCookie(id);
+  return NextResponse.json({ ok: true, id, precioEstimado, ahorro });
+}
+
+export function GET() {
+  return NextResponse.json({ ok: false, error: "Método no permitido." }, { status: 405 });
+}

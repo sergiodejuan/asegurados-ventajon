@@ -3,7 +3,7 @@ import { SeoLandingPage } from "@/components/SeoLandingPage";
 import { getSeoLandingPage, resolvePrice, getCombinedFaq, buildJsonLd } from "@/lib/seoLandingPages";
 import { SITE_URL } from "@/lib/brand";
 
-const page = getSeoLandingPage("tenerife")!;
+const page = getSeoLandingPage("las-palmas")!;
 
 export const metadata: Metadata = {
   title: page.metaTitle,
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: { title: page.metaTitle, description: page.metaDescription, locale: "es_ES", type: "website" },
 };
 
-export default async function SeguroDeSaludTenerifePage() {
+export default async function SeguroDeSaludLasPalmasPage() {
   const precio = await resolvePrice(page);
   const jsonLd = buildJsonLd(page, precio, getCombinedFaq(page), SITE_URL);
 

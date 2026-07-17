@@ -417,6 +417,18 @@ export async function listProducts(producto?: string, onlyActive = false): Promi
   return sortProducts(all);
 }
 
+// Precio "desde" real para las landings que se anuncian como más baratas
+// (p.ej. /seguro-de-salud-barato): el mínimo entre las compañías de salud
+// activas ahora mismo en /admin/productos, para no depender de una cifra
+// fija que se quede desactualizada. Devuelve null si no hay ninguna con
+// precio (catálogo vacío o todas desactivadas).
+export async function getStartingSaludPrice(modo: "con_copago" | "sin_copago"): Promise<number | null> {
+  const activos = await listProducts("salud", true);
+  const campo = modo === "con_copago" ? "precioConCopago" : "precioSinCopago";
+  const precios = activos.map((p) => p[campo]).filter((n): n is number => typeof n === "number" && n > 0);
+  return precios.length ? Math.min(...precios) : null;
+}
+
 export async function getProduct(id: string): Promise<Product | null> {
   const all = await readProducts();
   return all.find((p) => p.id === id) ?? null;

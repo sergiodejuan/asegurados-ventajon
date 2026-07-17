@@ -28,24 +28,6 @@ const PRICE_LINE = "Desde 35 €/mes asegurado, con todas las coberturas";
 
 export const GEO_LANDING_PAGES: GeoLandingPage[] = [
   {
-    slug: "tenerife",
-    path: "/seguro-de-salud-tenerife",
-    islandName: "Tenerife",
-    metaTitle: "Seguro de salud en Tenerife desde 35 €/mes — Asegurados Ventajon",
-    metaDescription: "Comparamos tu seguro de salud en Tenerife entre las mejores compañías. Desde 35 €/mes asegurado, con todas las coberturas. Comparativa gratuita en 1 minuto.",
-    badge: "Seguro de salud en Tenerife",
-    h1: "Seguro de salud en Tenerife, comparado por un experto",
-    subheadline: "Comparamos entre las mejores compañías de salud para que pagues lo justo, con cuadro médico y cobertura pensados para vivir en la isla.",
-    priceLine: PRICE_LINE,
-    localidades: ["Santa Cruz de Tenerife", "La Laguna", "Puerto de la Cruz", "Adeje", "Los Cristianos", "Arona"],
-    localIntro:
-      "En Tenerife, la disponibilidad real de especialistas y hospitales concertados no es la misma en Santa Cruz o La Laguna que en el sur de la isla. Comparamos el cuadro médico de cada compañía en tu zona —norte o sur— y revisamos si tu póliza cubre el traslado sanitario a otra isla o a la península cuando una prueba o especialista no está disponible cerca de ti.",
-    localFaq: [
-      { q: "¿Tenéis cobertura de seguros de salud en toda la isla de Tenerife?", a: "Sí, trabajamos con tu código postal exacto, tanto si vives en el área metropolitana (Santa Cruz, La Laguna) como en el sur (Adeje, Los Cristianos, Arona) o el norte de la isla." },
-      { q: "¿Qué pasa si necesito un especialista que no está disponible en Tenerife?", a: "Algunas pólizas incluyen cobertura de traslado sanitario a otra isla o a la península cuando una prueba o especialista no está disponible donde vives. Te lo confirmamos según la compañía antes de que decidas." },
-    ],
-  },
-  {
     slug: "gran-canaria",
     path: "/seguro-de-salud-gran-canaria",
     islandName: "Gran Canaria",

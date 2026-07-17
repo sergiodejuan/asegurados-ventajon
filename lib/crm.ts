@@ -12,6 +12,12 @@ export const SOURCE_LABELS: Record<string, string> = {
   "tarificador-vida-widget": "Tarificador vida (asistente)",
   "tarificador-auto-widget": "Tarificador auto (asistente)",
   "quiero-que-me-llamen-widget": "Quiero que me llamen (asistente)",
+  // Tarificador embebido directamente en una landing de captación SEO
+  // (/seguro-de-salud-las-palmas, /seguro-de-salud-barato…) en vez de la
+  // página general /tarificador — la URL exacta queda en el campo "page"
+  // del registro de consentimiento de cada lead.
+  "tarificador-salud-seo": "Tarificador salud (landing SEO)",
+  "calculadora-ahorro": "Calculadora de ahorro (landing SEO)",
   // Se ofrece cuando el usuario está a punto de abandonar un tarificador a
   // medias (ratón hacia la pestaña/cierre en escritorio, gesto de "atrás" en
   // móvil): un callback exprés de un solo campo (teléfono) para no perder el lead.
