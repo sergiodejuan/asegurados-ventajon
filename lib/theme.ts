@@ -123,6 +123,14 @@ export const DEFAULT_COOKIE_CONSENT: CookieConsentConfig = {
   cookiesHref: "/legal",
 };
 
+export type AccessibilityWidgetConfig = {
+  enabled: boolean;
+};
+
+export const DEFAULT_ACCESSIBILITY_WIDGET: AccessibilityWidgetConfig = {
+  enabled: true,
+};
+
 export type SiteTheme = {
   colors: SiteColors;
   displayFont: string;
@@ -133,6 +141,7 @@ export type SiteTheme = {
   heroImages: Record<string, string>; // pageKey -> imagen (data URL)
   partnerLogos: Record<string, string>; // nombre de aseguradora (lib/brand.ts PARTNERS) -> logo (data URL)
   cookieConsent: CookieConsentConfig;
+  accessibilityWidget: AccessibilityWidgetConfig;
   gtmId: string; // ID de contenedor de Google Tag Manager (GTM-XXXXXXX); vacío = no se carga
   updatedAt: string;
 };
@@ -147,6 +156,7 @@ export const DEFAULT_THEME: SiteTheme = {
   heroImages: {},
   partnerLogos: {},
   cookieConsent: DEFAULT_COOKIE_CONSENT,
+  accessibilityWidget: DEFAULT_ACCESSIBILITY_WIDGET,
   gtmId: "",
   updatedAt: new Date(0).toISOString(),
 };

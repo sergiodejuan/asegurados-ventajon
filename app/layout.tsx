@@ -7,6 +7,7 @@ import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { GoogleTagManager } from "@/components/GoogleTagManager";
 import { Analytics } from "@/components/Analytics";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
+import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -98,6 +99,7 @@ export default async function RootLayout({
         {children}
         <Analytics />
         <AssistantWidget />
+        <AccessibilityWidget />
         <CookieConsentBanner />
       </body>
     </html>

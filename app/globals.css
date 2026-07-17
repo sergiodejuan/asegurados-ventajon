@@ -74,6 +74,50 @@
   }
 }
 
+/* ----------------------- Accesibilidad visual -----------------------------
+   Activadas desde components/AccessibilityWidget.tsx (lib/accessibility.ts)
+   vía atributos data-* en <html>. El tamaño de texto se aplica aparte, con
+   "zoom" en <body> (ver lib/accessibility.ts), no con CSS aquí. */
+
+html[data-a11y-contrast="true"] {
+  --color-ink: #000000;
+  --color-slate2: #1a1a1a;
+  --color-mist: #ffffff;
+  --color-hair: #000000;
+}
+html[data-a11y-contrast="true"] body {
+  background: #ffffff;
+}
+html[data-a11y-contrast="true"] :focus-visible {
+  outline: 3px solid #000000 !important;
+}
+
+html[data-a11y-underline="true"] a {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+
+html[data-a11y-font="true"] body {
+  font-family: Arial, Helvetica, "Segoe UI", sans-serif !important;
+}
+
+html[data-a11y-spacing="true"] body {
+  letter-spacing: 0.02em;
+  word-spacing: 0.12em;
+}
+html[data-a11y-spacing="true"] p,
+html[data-a11y-spacing="true"] li,
+html[data-a11y-spacing="true"] dd {
+  line-height: 1.85 !important;
+}
+
+html[data-a11y-cursor="true"],
+html[data-a11y-cursor="true"] a,
+html[data-a11y-cursor="true"] button,
+html[data-a11y-cursor="true"] [role="button"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M4 2l14 8-6 2 4 6-3 2-4-6-4 4z' fill='black' stroke='white' stroke-width='1'/%3E%3C/svg%3E") 4 4, auto !important;
+}
+
 /* Respeta prefers-reduced-motion en toda la app */
 @media (prefers-reduced-motion: reduce) {
   *,

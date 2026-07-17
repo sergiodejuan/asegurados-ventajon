@@ -55,6 +55,15 @@ export function Spinner(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function Eye(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>);
+}
+export function Minus(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="M5 12h14" /></svg>);
+}
+export function Plus(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="M12 5v14M5 12h14" /></svg>);
+}
 export function WhatsApp(p: SVGProps<SVGSVGElement>) {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>

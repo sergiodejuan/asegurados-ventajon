@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { WhatsApp } from "./icons";
+import { WhatsApp, Menu } from "./icons";
+import { MobileNavMenu } from "./MobileNavMenu";
 
 export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
   if (logoUrl) {
@@ -84,8 +85,10 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
   const crumbs = !isHome ? (crumbsOverride ?? BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
   const progress = useScrollProgress(showProgress && !isHome);
   const theme = useSiteTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    <>
     <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md xl:mx-12">
       {showProgress && !isHome && (
         <div aria-hidden="true" className="hidden h-[3px] w-full bg-hair lg:block">
@@ -120,6 +123,15 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
           >
             Calcula tu precio
           </a>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menú"
+            aria-expanded={menuOpen}
+            className="grid h-10 w-10 place-items-center rounded-full text-navy transition-colors hover:bg-mist lg:hidden"
+          >
+            <Menu width={22} height={22} />
+          </button>
         </div>
       </div>
 
@@ -139,5 +151,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
         </nav>
       )}
     </header>
+    <MobileNavMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+    </>
   );
 }

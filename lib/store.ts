@@ -616,6 +616,7 @@ export async function getTheme(): Promise<SiteTheme> {
     heroImages: { ...(stored.heroImages ?? {}) },
     partnerLogos: { ...(stored.partnerLogos ?? {}) },
     cookieConsent: { ...DEFAULT_THEME.cookieConsent, ...(stored.cookieConsent ?? {}) },
+    accessibilityWidget: { ...DEFAULT_THEME.accessibilityWidget, ...(stored.accessibilityWidget ?? {}) },
   };
 }
 
@@ -628,6 +629,7 @@ export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
     heroImages: { ...current.heroImages, ...(patch.heroImages ?? {}) },
     partnerLogos: { ...current.partnerLogos, ...(patch.partnerLogos ?? {}) },
     cookieConsent: { ...current.cookieConsent, ...(patch.cookieConsent ?? {}) },
+    accessibilityWidget: { ...current.accessibilityWidget, ...(patch.accessibilityWidget ?? {}) },
     updatedAt: new Date().toISOString(),
   };
   await jset(THEME_KEY, next);
