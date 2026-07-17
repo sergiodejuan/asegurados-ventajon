@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { TarificadorExperience } from "@/components/TarificadorExperience";
 import { SeoContent } from "@/components/SeoContent";
+import { MinimalTopBar } from "@/components/MinimalTopBar";
 import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function TarificadorAuto() {
   return (
     <main className="safe-top min-h-screen bg-mist md:py-12">
       <div className="mx-auto max-w-app px-5 py-6 md:max-w-5xl md:py-0 lg:max-w-6xl">
-        <p className="mb-4 text-center font-display text-[16px] font-extrabold text-navy md:mb-8" translate="no">{BRAND_NAME}</p>
+        <MinimalTopBar />
 
         <Suspense fallback={<div className="h-[480px] rounded-[24px] border border-hair bg-white shadow-card md:h-[560px]" />}>
           <TarificadorExperience

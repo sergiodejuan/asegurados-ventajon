@@ -8,18 +8,13 @@ import { Modal } from "@/components/Modal";
 import { RescheduleCallModal } from "@/components/RescheduleCallModal";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PushOptIn } from "@/components/PushOptIn";
+import { LlamadaClientModal, type LlamadaView } from "@/components/LlamadaClientModal";
 import { Check, ChevronLeft, ChevronRight, IconByName, Spinner } from "@/components/icons";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
 import { saveQuote, quoteNumber, ageFromDob, buildWhatsAppText, whatsAppUrl, type QuoteProfile } from "@/lib/quote";
 
 type Profile = { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string };
-
-type LlamadaView = {
-  id: string; producto: string; status: string; presupuestoId: string;
-  diaLlamada: string; turnoLlamada: string; fechaProgramada: string; horaProgramada: string;
-  createdAt: string; updatedAt: string;
-};
 
 const LLAMADA_STATUS_LABELS: Record<string, string> = {
   pendiente: "Pendiente de contactar",
@@ -92,6 +87,7 @@ export function AreaClienteContent() {
   const [profile, setProfile] = useState<Profile>({});
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
   const [llamadas, setLlamadas] = useState<LlamadaView[]>([]);
+  const [selectedLlamada, setSelectedLlamada] = useState<LlamadaView | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -522,16 +518,25 @@ export function AreaClienteContent() {
             <h2 id="llamadas" className="text-[18px] font-bold text-navy">Tus llamadas</h2>
             <ul className="mt-4 flex flex-col gap-3">
               {llamadas.map((l) => (
-                <li key={l.id} className="flex items-center justify-between gap-3 rounded-[20px] border border-hair bg-white p-5 shadow-soft">
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-semibold capitalize text-ink">
-                      {l.producto ? `Seguro de ${l.producto}` : "Consulta general"}
-                    </p>
-                    <p className="mt-0.5 text-[13px] text-slate2">{cuandoLlamada(l)}</p>
-                  </div>
-                  <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${LLAMADA_STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
-                    {LLAMADA_STATUS_LABELS[l.status] ?? l.status}
-                  </span>
+                <li key={l.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLlamada(l)}
+                    className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-hair bg-white p-5 text-left shadow-soft transition-colors hover:bg-mist"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[14px] font-semibold capitalize text-ink">
+                        {l.producto ? `Seguro de ${l.producto}` : "Consulta general"}
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-slate2">{cuandoLlamada(l)}</p>
+                      {l.presupuestoId && (
+                        <p className="mt-0.5 text-[12px] tnums text-slate2/80">Presupuesto nº {quoteNumber(l.presupuestoId)}</p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${LLAMADA_STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>
+                      {LLAMADA_STATUS_LABELS[l.status] ?? l.status}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -544,6 +549,17 @@ export function AreaClienteContent() {
             onClose={() => setRescheduleQuote(null)}
             onUpdated={(updated) => {
               setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+            }}
+          />
+        )}
+
+        {selectedLlamada && (
+          <LlamadaClientModal
+            llamada={selectedLlamada}
+            onClose={() => setSelectedLlamada(null)}
+            onUpdated={(updated) => {
+              setLlamadas((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+              setSelectedLlamada(null);
             }}
           />
         )}

@@ -461,7 +461,10 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           <p className="mt-1.5 text-[12px] font-medium tnums text-slate2">Paso {idx + 1} de {total}</p>
         </div>
       </div>
-      <div ref={topRef} tabIndex={-1} className="outline-none" />
+      {/* Ancla de accesibilidad: mueve el foco al inicio del paso nuevo para
+          lectores de pantalla. Sin contenido visible, así que se anula el
+          anillo de foco global (si no, se ve como una línea azul suelta). */}
+      <div ref={topRef} tabIndex={-1} className="outline-none focus:ring-0 focus-visible:ring-0" style={{ boxShadow: "none" }} />
       {current && <div key={current.key}>{renderStep(current)}</div>}
       <ConsentNudgeModal
         open={showConsentNudge}
