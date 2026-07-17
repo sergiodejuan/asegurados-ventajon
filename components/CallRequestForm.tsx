@@ -11,6 +11,7 @@ import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Spinner } from "./icons";
 import { ConsentNudgeModal } from "./ConsentNudgeModal";
+import { CallSlotPicker, type CallSlot } from "./CallSlotPicker";
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -34,6 +35,7 @@ export function CallRequestForm({
   const [codigoPostal, setCp] = useState("");
   const [diaLlamada, setDiaLlamada] = useState<string>(DIAS_LLAMADA[0]);
   const [turnoLlamada, setTurnoLlamada] = useState<string>(TURNOS_LLAMADA[0]);
+  const [slot, setSlot] = useState<CallSlot | null>(null);
   const [genericProducto, setGenericProducto] = useState<string>("salud");
   const [clientFirstName, setClientFirstName] = useState<string | undefined>(undefined);
   const [priv, setPriv] = useState(false);
@@ -79,8 +81,7 @@ export function CallRequestForm({
           producto,
           compania,
           precioElegido,
-          diaLlamada,
-          turnoLlamada,
+          diaLlamada, turnoLlamada: slot?.turno ?? turnoLlamada, fechaProgramada: slot?.fecha ?? "",
           aceptaPrivacidad: true,
           autorizaContacto: true,
           aceptaComercial: !!quote.consentAt?.comercialAt,
@@ -114,8 +115,7 @@ export function CallRequestForm({
       producto,
       compania,
       precioElegido,
-      diaLlamada,
-      turnoLlamada,
+      diaLlamada, turnoLlamada: slot?.turno ?? turnoLlamada, fechaProgramada: slot?.fecha ?? "",
       aceptaPrivacidad: priv,
       autorizaContacto: contacto,
       aceptaComercial: comercial,
@@ -177,7 +177,10 @@ export function CallRequestForm({
           {compania ? ` para hablar de tu opción con ${compania}` : ""}. Ya tenemos tu autorización de contacto, no hace falta que la repitas.
         </p>
         <div className="mt-4">
-          <CallTimePreference dia={diaLlamada} onDia={setDiaLlamada} turno={turnoLlamada} onTurno={setTurnoLlamada} />
+          <div>
+            <p className="text-[13px] font-semibold text-ink">¿Cuándo prefieres que te llamemos?</p>
+            <div className="mt-2"><CallSlotPicker value={slot} onChange={setSlot} /></div>
+          </div>
         </div>
 
         {quickError && (
@@ -301,7 +304,8 @@ export function CallRequestForm({
       </div>
 
       <div className="mt-5">
-        <CallTimePreference dia={diaLlamada} onDia={setDiaLlamada} turno={turnoLlamada} onTurno={setTurnoLlamada} />
+        <p className="mb-2 text-[13px] font-semibold text-ink">¿Cuándo prefieres que te llamemos?</p>
+        <CallSlotPicker value={slot} onChange={setSlot} />
       </div>
 
       <div className="mt-5 flex flex-col gap-3">
@@ -360,37 +364,5 @@ export function CallRequestForm({
         }}
       />
     </form>
-  );
-}
-
-function CallTimePreference({
-  dia, onDia, turno, onTurno,
-}: {
-  dia: string; onDia: (v: string) => void; turno: string; onTurno: (v: string) => void;
-}) {
-  return (
-    <div>
-      <p className="text-[13px] font-semibold text-ink">¿Cuándo prefieres que te llamemos? <span className="font-normal text-slate2">(opcional)</span></p>
-      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Mejor día para llamar">
-        {DIAS_LLAMADA.map((d) => (
-          <button
-            key={d} type="button" aria-pressed={dia === d} onClick={() => onDia(d)}
-            className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${dia === d ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Turno para llamar">
-        {TURNOS_LLAMADA.map((t) => (
-          <button
-            key={t} type="button" aria-pressed={turno === t} onClick={() => onTurno(t)}
-            className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${turno === t ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

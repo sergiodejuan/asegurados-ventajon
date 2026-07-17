@@ -20,6 +20,7 @@ type LeadSubmission = { id: string; at: string; source: string; producto: string
 type Lead = {
   id: string; createdAt: string; updatedAt: string;
   source: string; sources: string[]; producto: string; status: string; nextStep: string;
+  agenteAsignadoId: string; agenteAsignadoNombre: string;
   nombre: string; telefono: string; email: string; codigoPostal: string;
   inicio: string; numAsegurados: number | null; coberturaDental: boolean | null;
   motivo: string; fumador: boolean | null;
@@ -69,7 +70,7 @@ export default function AdminLeadsPage() {
 }
 
 function LeadsCrm() {
-  const { token, agent } = useAdminToken();
+  const { token, agent, identity } = useAdminToken();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [sources, setSources] = useState<Record<string, string>>({});
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -85,6 +86,8 @@ function LeadsCrm() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"lista" | "pipeline">("lista");
   const [selected, setSelected] = useState<Lead | null>(null);
+  const [agents, setAgents] = useState<{ id: string; nombre: string }[]>([]);
+  const [filterCartera, setFilterCartera] = useState<"all" | "mia">("all");
 
   const load = useCallback(async (tk: string) => {
     setError(null); setLoading(true);
@@ -93,7 +96,7 @@ function LeadsCrm() {
       const body = await res.json();
       if (!res.ok || !body.ok) { setError(body.error ?? "Error al cargar."); setLoading(false); return; }
       setLeads(body.leads); setSources(body.sources); setStatuses(body.statuses);
-      setStatusLabels(body.statusLabels); setStorage(body.storage); setLoadedOnce(true);
+      setStatusLabels(body.statusLabels); setStorage(body.storage); setAgents(body.agents ?? []); setLoadedOnce(true);
     } catch { setError("Error de conexión."); }
     setLoading(false);
   }, []);
@@ -137,6 +140,11 @@ function LeadsCrm() {
     }
   }
 
+  async function assign(id: string, agenteAsignadoId: string) {
+    const nombre = agents.find((a) => a.id === agenteAsignadoId)?.nombre ?? "";
+    await patch(id, { agenteAsignadoId, agenteAsignadoNombre: nombre });
+  }
+
   async function exportCsv() {
     try {
       const params = new URLSearchParams();
@@ -170,13 +178,14 @@ function LeadsCrm() {
       if (filterSource !== "all" && !l.sources.includes(filterSource)) return false;
       if (filterProducto !== "all" && l.producto !== filterProducto) return false;
       if (filterStatus !== "all" && l.status !== filterStatus) return false;
+      if (filterCartera === "mia" && l.agenteAsignadoId !== identity?.id) return false;
       if (q) {
         const hay = `${l.nombre} ${l.telefono} ${l.email} ${l.codigoPostal} ${l.utm?.campaign ?? ""} ${l.utm?.source ?? ""} ${l.utm?.medium ?? ""} ${l.utm?.landingPage ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [leads, filterSource, filterProducto, filterStatus, search]);
+  }, [leads, filterSource, filterProducto, filterStatus, filterCartera, identity?.id, search]);
 
   const statCounts = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -238,6 +247,19 @@ function LeadsCrm() {
                 {l.presupuestoId && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Último presupuesto</dt><dd className="text-right font-medium tnums text-ink">#{quoteNumber(l.presupuestoId)}</dd></div>}
                 {(l.seguroActualServicios?.length ?? 0) > 0 && <div><dt className="text-slate2">Servicios actuales</dt><dd className="mt-0.5 font-medium text-ink">{l.seguroActualServicios.join(", ")}</dd></div>}
               </dl>
+
+              {agents.length > 0 && (
+                <div className="mt-5 border-t border-hair pt-4">
+                  <label htmlFor="lead-cartera" className="text-[12px] font-semibold text-ink">Cartera (agente asignado)</label>
+                  <select
+                    id="lead-cartera" value={l.agenteAsignadoId} onChange={(e) => assign(l.id, e.target.value)}
+                    className="mt-1.5 w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]"
+                  >
+                    <option value="">Sin asignar</option>
+                    {agents.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                  </select>
+                </div>
+              )}
 
               {(l.utm?.source || l.utm?.medium || l.utm?.campaign || l.utm?.content || l.utm?.term || l.utm?.landingPage || l.utm?.referrer) && (
                 <div className="mt-5 border-t border-hair pt-4">
@@ -383,6 +405,12 @@ function LeadsCrm() {
 
       {/* Filtros */}
       <div className="mt-5 flex flex-col gap-3">
+        {identity?.kind === "agent" && (
+          <div role="tablist" aria-label="Filtrar por cartera" className="flex gap-2">
+            <FilterTab label="Todos los leads" active={filterCartera === "all"} onClick={() => setFilterCartera("all")} />
+            <FilterTab label={`Mi cartera (${leads.filter((l) => l.agenteAsignadoId === identity.id).length})`} active={filterCartera === "mia"} onClick={() => setFilterCartera("mia")} />
+          </div>
+        )}
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre, teléfono, email, código postal o campaña…"
@@ -442,7 +470,7 @@ function LeadsCrm() {
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
                   <p className="truncate text-[13px] text-slate2 tnums">
-                    {[l.telefono || l.email, sources[l.source] ?? l.source, l.producto || null, fmt(l.updatedAt)].filter(Boolean).join(" · ")}
+                    {[l.telefono || l.email, sources[l.source] ?? l.source, l.producto || null, l.agenteAsignadoNombre || null, fmt(l.updatedAt)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-bold ${STATUS_COLORS[l.status] ?? "bg-slate-200"}`}>

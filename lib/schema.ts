@@ -160,6 +160,9 @@ export const callRequestSchema = z.object({
   ),
   diaLlamada: z.string().max(20).optional(),
   turnoLlamada: z.string().max(20).optional(),
+  // Fecha concreta elegida en el selector de huecos (máx. 3 días laborables
+  // vista), si el cliente llegó a elegir una en vez de dejarlo en "cuando sea".
+  fechaProgramada: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")]).optional(),
   presupuestoId: z.string().max(60).optional(),
   // Resumen legible de las respuestas del asistente (p.ej. para decesos/hogar,
   // que no tienen tarificador propio): siempre construido por el widget a

@@ -27,7 +27,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Esta llamada ya no está activa." }, { status: 409 });
   }
 
-  let body: { action?: string; diaLlamada?: string; turnoLlamada?: string };
+  let body: { action?: string; fechaProgramada?: string; turnoLlamada?: string };
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
 
@@ -38,15 +38,12 @@ export async function PATCH(
       note: "El cliente ha cancelado la llamada desde su área de cliente.",
     });
   } else if (body.action === "reprogramar") {
-    if (!body.diaLlamada && !body.turnoLlamada) {
-      return NextResponse.json({ ok: false, error: "Elige cuándo prefieres que te llamemos." }, { status: 400 });
+    if (!body.fechaProgramada || !/^\d{4}-\d{2}-\d{2}$/.test(body.fechaProgramada) || !body.turnoLlamada) {
+      return NextResponse.json({ ok: false, error: "Elige un día y un turno." }, { status: 400 });
     }
     result = await updateLlamada(params.id, {
       status: "programada",
-      diaLlamada: body.diaLlamada, turnoLlamada: body.turnoLlamada,
-      // Una reprogramación desde aquí sustituye la fecha/hora concreta que
-      // pudiera haber fijado un agente: vuelve a quedar por concretar.
-      fechaProgramada: "", horaProgramada: "",
+      turnoLlamada: body.turnoLlamada, fechaProgramada: body.fechaProgramada, horaProgramada: "",
       note: "El cliente ha reprogramado la llamada desde su área de cliente.",
     });
   } else {

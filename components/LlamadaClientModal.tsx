@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Modal } from "./Modal";
 import { Spinner } from "./icons";
 import { DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
+import { CallSlotPicker, type CallSlot } from "./CallSlotPicker";
 import { quoteNumber } from "@/lib/quote";
 
 export type LlamadaView = {
@@ -35,8 +36,7 @@ export function LlamadaClientModal({
   onUpdated: (l: LlamadaView) => void;
 }) {
   const [view, setView] = useState<"detalle" | "reprogramar" | "cancelar">("detalle");
-  const [dia, setDia] = useState(llamada.diaLlamada || DIAS_LLAMADA[0]);
-  const [turno, setTurno] = useState(llamada.turnoLlamada || TURNOS_LLAMADA[0]);
+  const [slot, setSlot] = useState<CallSlot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,21 +110,8 @@ export function LlamadaClientModal({
       {view === "reprogramar" && (
         <div>
           <p className="text-[14px] leading-relaxed text-slate2">¿Cuándo prefieres que te llamemos?</p>
-          <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Mejor día para llamar">
-            {DIAS_LLAMADA.map((d) => (
-              <button key={d} type="button" aria-pressed={dia === d} onClick={() => setDia(d)}
-                className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${dia === d ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}>
-                {d}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Turno para llamar">
-            {TURNOS_LLAMADA.map((t) => (
-              <button key={t} type="button" aria-pressed={turno === t} onClick={() => setTurno(t)}
-                className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${turno === t ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}>
-                {t}
-              </button>
-            ))}
+          <div className="mt-3">
+            <CallSlotPicker value={slot} onChange={setSlot} />
           </div>
 
           {error && <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{error}</p>}
@@ -135,7 +122,9 @@ export function LlamadaClientModal({
               Volver
             </button>
             <button
-              type="button" onClick={() => send("reprogramar", { diaLlamada: dia, turnoLlamada: turno })} disabled={submitting}
+              type="button"
+              onClick={() => { if (!slot) { setError("Elige un día y un turno."); return; } send("reprogramar", { fechaProgramada: slot.fecha, turnoLlamada: slot.turno }); }}
+              disabled={submitting}
               className="flex flex-1 items-center justify-center gap-2 rounded-card bg-brand-red px-4 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40"
             >
               {submitting && <Spinner />}

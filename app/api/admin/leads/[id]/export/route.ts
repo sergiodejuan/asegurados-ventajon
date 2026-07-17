@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { exportLeadData } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +11,8 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "rgpd");
+  if (!auth.ok) return auth.response;
   const data = await exportLeadData(params.id);
   if (!data) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
 

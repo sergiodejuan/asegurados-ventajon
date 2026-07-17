@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminAuthFail } from "@/lib/adminAuth";
-import { getCampaignConfig, saveCampaignConfig } from "@/lib/store";
+import { requireModule } from "@/lib/agentAuth";
+import { getCampaignConfig, saveCampaignConfig, createAuditLog } from "@/lib/store";
 import type { CampaignConfig } from "@/lib/campaign";
 
 export const runtime = "nodejs";
@@ -12,15 +12,15 @@ const MAX_IMAGE_LENGTH = 900_000;
 const MAX_SLIDES = 8;
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "campana");
+  if (!auth.ok) return auth.response;
   const config = await getCampaignConfig();
   return NextResponse.json({ ok: true, config });
 }
 
 export async function PATCH(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "campana");
+  if (!auth.ok) return auth.response;
 
   let body: Partial<CampaignConfig>;
   try { body = await request.json(); }
@@ -44,5 +44,11 @@ export async function PATCH(request: Request) {
   }
 
   const config = await saveCampaignConfig(body);
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "actualizar", modulo: "campana",
+    entidad: "campana", entidadId: "config", resumen: "Actualizó la configuración de la campaña.",
+  });
+
   return NextResponse.json({ ok: true, config });
 }

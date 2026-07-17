@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listLeads } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 import type { Lead } from "@/lib/crm";
 
 export const runtime = "nodejs";
@@ -65,8 +65,8 @@ const COLUMNS: { key: string; get: (l: Lead) => unknown }[] = [
 ];
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "leads");
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPresupuesto, updatePresupuesto, getLead, getNpsResponse } from "@/lib/store";
+import { getPresupuesto, updatePresupuesto, getLead, getNpsResponse, createAuditLog } from "@/lib/store";
 import { PRESUPUESTO_STATUSES, type PresupuestoStatus } from "@/lib/crm";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 import { sendPushToLead } from "@/lib/webPush";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -12,8 +12,8 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "presupuestos");
+  if (!auth.ok) return auth.response;
   const presupuesto = await getPresupuesto(params.id);
   if (!presupuesto) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
   const [lead, nps] = await Promise.all([getLead(presupuesto.leadId), getNpsResponse(params.id)]);
@@ -29,10 +29,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "presupuestos");
+  if (!auth.ok) return auth.response;
 
-  let body: { status?: string; note?: string; agente?: string };
+  let body: { status?: string; note?: string };
   try {
     body = await request.json();
   } catch {
@@ -44,12 +44,20 @@ export async function PATCH(
       ? (body.status as PresupuestoStatus)
       : undefined;
 
-  const result = await updatePresupuesto(params.id, { status, note: body.note, agente: body.agente });
+  const result = await updatePresupuesto(params.id, { status, note: body.note, agente: auth.agentNombre });
   if (!result) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
 
   if (result.notifyText) {
     sendPushToLead(result.presupuesto.leadId, { title: BRAND_NAME, body: result.notifyText, url: result.notifyUrl || "/area-cliente" })
       .catch((err) => console.error("[presupuestos] push error", err));
+  }
+
+  if (status || body.note) {
+    await createAuditLog({
+      agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: body.note ? "comentar" : "actualizar", modulo: "presupuestos",
+      entidad: "presupuesto", entidadId: params.id,
+      resumen: [status && `Cambió el estado a "${status}".`, body.note && "Añadió una nota."].filter(Boolean).join(" "),
+    });
   }
 
   return NextResponse.json({ ok: true, presupuesto: result.presupuesto });

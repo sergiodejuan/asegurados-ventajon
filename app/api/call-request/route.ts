@@ -62,12 +62,15 @@ export async function POST(request: Request) {
       ? (await listLlamadasByLead(id)).find((l) => l.presupuestoId === d.presupuestoId && l.status !== "cancelada")
       : undefined;
     if (existing) {
-      const result = await updateLlamada(existing.id, { status: "programada", diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada });
-      if (result?.notifyText) sendPushToLead(id, { title: BRAND_NAME, body: result.notifyText, url: "/area-cliente" }).catch(() => {});
+      const result = await updateLlamada(existing.id, {
+        status: "programada", diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada,
+        fechaProgramada: d.fechaProgramada || undefined,
+      });
+      if (result?.notifyText) sendPushToLead(id, { title: BRAND_NAME, body: result.notifyText, url: result.notifyUrl || "/area-cliente" }).catch(() => {});
     } else {
       await createLlamada({
         leadId: id, producto: d.producto, source, presupuestoId: d.presupuestoId,
-        motivo: d.detalleConsulta, diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada,
+        motivo: d.detalleConsulta, diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada, fechaProgramada: d.fechaProgramada,
         nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal,
       });
     }

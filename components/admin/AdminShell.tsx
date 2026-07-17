@@ -1,13 +1,22 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { BRAND_NAME } from "@/lib/brand";
-import { getAgentName, setAgentName } from "@/lib/adminAgent";
-import { ChevronDown, Menu, Close } from "@/components/icons";
+import { ChevronDown, Menu, Close, Spinner } from "@/components/icons";
+import type { AdminModule } from "@/lib/crm";
 
 const TOKEN_KEY = "ventajon:admin:token";
 
-const AdminTokenContext = createContext<{ token: string; clear: () => void; agent: string } | null>(null);
+export type Identity = {
+  kind: "master" | "agent";
+  id: string;
+  nombre: string;
+  fotoUrl: string;
+  rol: "admin" | "agente";
+  permisos: readonly string[];
+};
+
+const AdminTokenContext = createContext<{ token: string; clear: () => void; agent: string; identity: Identity | null } | null>(null);
 
 export function useAdminToken() {
   const ctx = useContext(AdminTokenContext);
@@ -15,42 +24,52 @@ export function useAdminToken() {
   return ctx;
 }
 
-type NavLeaf = { href: string; label: string; key: string };
+type NavLeaf = { href: string; label: string; key: string; modulo: AdminModule };
 
 // Navegación agrupada por categoría, con desplegables — así el menú crece
-// por secciones coherentes en vez de una lista plana de páginas.
+// por secciones coherentes en vez de una lista plana de páginas. Cada hoja
+// lleva su módulo de permisos: si el agente que ha entrado no tiene acceso,
+// no se le muestra.
 const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: string; children: NavLeaf[] })[] = [
   {
     kind: "group", label: "Ventas", key: "ventas",
     children: [
-      { href: "/admin", label: "Leads", key: "leads" },
-      { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos" },
-      { href: "/admin/llamadas", label: "Llamadas", key: "llamadas" },
-      { href: "/admin/tareas", label: "Tareas", key: "tareas" },
+      { href: "/admin", label: "Leads", key: "leads", modulo: "leads" },
+      { href: "/admin/presupuestos", label: "Presupuestos", key: "presupuestos", modulo: "presupuestos" },
+      { href: "/admin/llamadas", label: "Llamadas", key: "llamadas", modulo: "llamadas" },
+      { href: "/admin/tareas", label: "Tareas", key: "tareas", modulo: "tareas" },
     ],
   },
   {
     kind: "group", label: "Contenido", key: "contenido",
     children: [
-      { href: "/admin/blog", label: "Blog", key: "blog" },
-      { href: "/admin/campana", label: "Campaña", key: "campana" },
+      { href: "/admin/blog", label: "Blog", key: "blog", modulo: "blog" },
+      { href: "/admin/campana", label: "Campaña", key: "campana", modulo: "campana" },
     ],
   },
-  { kind: "link", href: "/admin/productos", label: "Productos", key: "productos" },
+  { kind: "link", href: "/admin/productos", label: "Productos", key: "productos", modulo: "productos" },
   {
     kind: "group", label: "Analítica", key: "analitica-grupo",
     children: [
-      { href: "/admin/informes", label: "Informes", key: "informes" },
-      { href: "/admin/utm", label: "UTM", key: "utm" },
+      { href: "/admin/informes", label: "Informes", key: "informes", modulo: "informes" },
+      { href: "/admin/utm", label: "UTM", key: "utm", modulo: "informes" },
     ],
   },
   {
     kind: "group", label: "Configuración", key: "configuracion-grupo",
     children: [
-      { href: "/admin/diseno", label: "Diseño", key: "diseno" },
-      { href: "/admin/configuracion/cookies", label: "Cookies", key: "cookies" },
-      { href: "/admin/configuracion/seguimiento", label: "Seguimiento (GTM)", key: "seguimiento" },
-      { href: "/admin/rgpd", label: "RGPD", key: "rgpd" },
+      { href: "/admin/diseno", label: "Diseño", key: "diseno", modulo: "configuracion" },
+      { href: "/admin/configuracion/cookies", label: "Cookies", key: "cookies", modulo: "configuracion" },
+      { href: "/admin/configuracion/seguimiento", label: "Seguimiento (GTM)", key: "seguimiento", modulo: "configuracion" },
+      { href: "/admin/rgpd", label: "RGPD", key: "rgpd", modulo: "rgpd" },
+    ],
+  },
+  {
+    kind: "group", label: "Equipo", key: "equipo-grupo",
+    children: [
+      { href: "/admin/agentes", label: "Agentes", key: "agentes", modulo: "agentes" },
+      { href: "/admin/permisos", label: "Permisos", key: "permisos", modulo: "agentes" },
+      { href: "/admin/registro", label: "Registro de actividad", key: "registro", modulo: "agentes" },
     ],
   },
 ];
@@ -64,14 +83,21 @@ function groupKeyForActive(active: string): string | null {
 
 export type AdminActiveKey =
   | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
-  | "diseno" | "cookies" | "seguimiento" | "rgpd";
+  | "diseno" | "cookies" | "seguimiento" | "rgpd" | "agentes" | "permisos" | "registro";
+
+function visibleFor(identity: Identity | null) {
+  const canSee = (modulo: AdminModule) => !identity || identity.rol === "admin" || identity.permisos.includes(modulo);
+  return NAV
+    .map((item) => item.kind === "link" ? item : { ...item, children: item.children.filter((c) => canSee(c.modulo)) })
+    .filter((item) => item.kind === "link" ? canSee(item.modulo) : item.children.length > 0);
+}
 
 function NavList({
-  active, openGroups, onToggleGroup, onNavigate,
-}: { active: AdminActiveKey; openGroups: Set<string>; onToggleGroup: (key: string) => void; onNavigate?: () => void }) {
+  active, openGroups, onToggleGroup, onNavigate, identity,
+}: { active: AdminActiveKey; openGroups: Set<string>; onToggleGroup: (key: string) => void; onNavigate?: () => void; identity: Identity | null }) {
   return (
     <>
-      {NAV.map((item) => {
+      {visibleFor(identity).map((item) => {
         if (item.kind === "link") {
           return (
             <a
@@ -117,33 +143,24 @@ function NavList({
   );
 }
 
-function AgentControls({
-  agent, editingAgent, agentInput, setAgentInput, saveAgent, setEditingAgent, clear,
-}: {
-  agent: string; editingAgent: boolean; agentInput: string; setAgentInput: (v: string) => void;
-  saveAgent: () => void; setEditingAgent: (v: boolean) => void; clear: () => void;
-}) {
+function IdentityCard({ identity, onLogout }: { identity: Identity | null; onLogout: () => void }) {
   return (
     <>
-      {editingAgent ? (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="agent-name" className="text-[11px] font-semibold text-slate2">Tu nombre (para atribuir notas y cierres)</label>
-          <input id="agent-name" value={agentInput} onChange={(e) => setAgentInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && saveAgent()}
-            placeholder="p.ej. Sergio" autoFocus
-            className="w-full rounded-card border border-hair bg-white px-2.5 py-1.5 text-[13px]" />
-          <div className="flex gap-2">
-            <button onClick={saveAgent} className="flex-1 rounded-card bg-navy px-2 py-1.5 text-[12px] font-semibold text-white">Guardar</button>
-            <button onClick={() => setEditingAgent(false)} className="rounded-card border border-hair px-2 py-1.5 text-[12px] font-semibold text-navy">Cancelar</button>
-          </div>
+      <div className="flex items-center gap-2.5 rounded-card px-2 py-2">
+        {identity?.fotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={identity.fotoUrl} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-[13px] font-bold text-navy">
+            {(identity?.nombre ?? "?").trim().charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-ink">{identity?.nombre ?? "…"}</p>
+          {identity && <p className="text-[11px] capitalize text-slate2">{identity.rol === "admin" ? "Administrador" : "Agente"}</p>}
         </div>
-      ) : (
-        <button onClick={() => { setAgentInput(agent); setEditingAgent(true); }}
-          className="w-full rounded-card px-3.5 py-2 text-left text-[12px] font-medium text-slate2 transition-colors hover:bg-mist">
-          {agent ? <>Agente: <span className="font-semibold text-ink">{agent}</span></> : "Identifícate como agente →"}
-        </button>
-      )}
-      <button onClick={clear} className="mt-1 w-full rounded-card px-3.5 py-2 text-left text-[13px] font-medium text-slate2 transition-colors hover:bg-mist">
+      </div>
+      <button onClick={onLogout} className="mt-1 w-full rounded-card px-3.5 py-2 text-left text-[13px] font-medium text-slate2 transition-colors hover:bg-mist">
         Salir
       </button>
     </>
@@ -153,12 +170,9 @@ function AgentControls({
 export function AdminShell({
   children, active,
 }: { children: React.ReactNode; active: AdminActiveKey }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [input, setInput] = useState("");
+  const [token, setToken] = useState<string>("");
+  const [identity, setIdentity] = useState<Identity | null>(null);
   const [ready, setReady] = useState(false);
-  const [agent, setAgent] = useState("");
-  const [editingAgent, setEditingAgent] = useState(false);
-  const [agentInput, setAgentInput] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const g = groupKeyForActive(active);
@@ -173,63 +187,56 @@ export function AdminShell({
     });
   }
 
-  useEffect(() => {
-    const urlToken = new URLSearchParams(window.location.search).get("token");
-    const stored = urlToken || sessionStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      sessionStorage.setItem(TOKEN_KEY, stored);
-      setToken(stored);
-    }
-    setAgent(getAgentName());
-    setReady(true);
+  const loadIdentity = useCallback(async (headerToken: string) => {
+    try {
+      const res = await fetch("/api/admin/auth/me", { headers: headerToken ? { "x-admin-token": headerToken } : {} });
+      const body = await res.json();
+      if (res.ok && body.ok) { setIdentity(body.identity); return true; }
+    } catch { /* noop */ }
+    setIdentity(null);
+    return false;
   }, []);
 
-  function saveAgent() {
-    setAgentName(agentInput);
-    setAgent(agentInput.trim());
-    setEditingAgent(false);
-  }
-
-  function enter() {
-    if (!input.trim()) return;
-    sessionStorage.setItem(TOKEN_KEY, input.trim());
-    setToken(input.trim());
-  }
+  useEffect(() => {
+    (async () => {
+      const urlToken = new URLSearchParams(window.location.search).get("token");
+      const stored = urlToken || sessionStorage.getItem(TOKEN_KEY);
+      if (stored) sessionStorage.setItem(TOKEN_KEY, stored);
+      const t = stored ?? "";
+      setToken(t);
+      await loadIdentity(t);
+      setReady(true);
+    })();
+  }, [loadIdentity]);
 
   function clear() {
     sessionStorage.removeItem(TOKEN_KEY);
-    setToken(null);
+    setToken("");
+    setIdentity(null);
+    fetch("/api/admin/auth/logout", { method: "POST" }).catch(() => {});
+  }
+
+  async function enterWithToken(value: string) {
+    sessionStorage.setItem(TOKEN_KEY, value);
+    setToken(value);
+    await loadIdentity(value);
+  }
+
+  async function enterAsAgent() {
+    setToken("");
+    await loadIdentity("");
   }
 
   if (!ready) return null;
 
-  if (!token) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-mist px-5">
-        <div className="w-full max-w-sm rounded-[24px] border border-hair bg-white p-6 shadow-card">
-          <p className="font-display text-[16px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
-          <h1 className="mt-3 text-[22px] font-extrabold text-navy">Admin</h1>
-          <p className="mt-1 text-[14px] text-slate2">Introduce el token de acceso.</p>
-          <label htmlFor="tk" className="sr-only">Token</label>
-          <input
-            id="tk" type="password" value={input} onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && enter()}
-            placeholder="ADMIN_TOKEN…"
-            className="mt-4 w-full rounded-card border border-hair bg-white px-4 py-3 text-[16px]"
-          />
-          <button
-            onClick={enter} disabled={!input.trim()}
-            className="mt-4 w-full rounded-card bg-navy px-5 py-3.5 text-[16px] font-semibold text-white disabled:bg-slate2/40"
-          >
-            Entrar
-          </button>
-        </div>
-      </main>
-    );
+  const loggedIn = !!token || identity?.kind === "agent";
+
+  if (!loggedIn) {
+    return <LoginScreen onMasterToken={enterWithToken} onAgentLoggedIn={enterAsAgent} />;
   }
 
   return (
-    <AdminTokenContext.Provider value={{ token, clear, agent }}>
+    <AdminTokenContext.Provider value={{ token, clear, agent: identity?.nombre ?? "", identity }}>
       <div className="min-h-screen bg-mist lg:flex">
         {/* Cabecera móvil: marca + botón de menú. La navegación completa vive
             en un panel desplegable debajo, no en el sidebar de escritorio. */}
@@ -251,13 +258,10 @@ export function AdminShell({
         {mobileNavOpen && (
           <div className="sticky top-[57px] z-30 max-h-[calc(100vh-57px)] overflow-y-auto border-b border-hair bg-white p-3 shadow-card lg:hidden">
             <nav className="flex flex-col gap-1">
-              <NavList active={active} openGroups={openGroups} onToggleGroup={toggleGroup} onNavigate={() => setMobileNavOpen(false)} />
+              <NavList active={active} openGroups={openGroups} onToggleGroup={toggleGroup} onNavigate={() => setMobileNavOpen(false)} identity={identity} />
             </nav>
             <div className="mt-2 border-t border-hair pt-2">
-              <AgentControls
-                agent={agent} editingAgent={editingAgent} agentInput={agentInput}
-                setAgentInput={setAgentInput} saveAgent={saveAgent} setEditingAgent={setEditingAgent} clear={clear}
-              />
+              <IdentityCard identity={identity} onLogout={clear} />
             </div>
           </div>
         )}
@@ -269,17 +273,105 @@ export function AdminShell({
             <p className="text-[12px] font-medium text-slate2">Admin</p>
           </div>
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-            <NavList active={active} openGroups={openGroups} onToggleGroup={toggleGroup} />
+            <NavList active={active} openGroups={openGroups} onToggleGroup={toggleGroup} identity={identity} />
           </nav>
           <div className="border-t border-hair p-3">
-            <AgentControls
-              agent={agent} editingAgent={editingAgent} agentInput={agentInput}
-              setAgentInput={setAgentInput} saveAgent={saveAgent} setEditingAgent={setEditingAgent} clear={clear}
-            />
+            <IdentityCard identity={identity} onLogout={clear} />
           </div>
         </aside>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </AdminTokenContext.Provider>
+  );
+}
+
+// Pantalla de entrada: dos caminos que coexisten. El ADMIN_TOKEN maestro
+// (heredado, nunca se puede quedar el equipo sin poder entrar) y el login
+// propio de cada agente (email + contraseña), que además aplica sus
+// permisos.
+function LoginScreen({ onMasterToken, onAgentLoggedIn }: { onMasterToken: (token: string) => void; onAgentLoggedIn: () => void }) {
+  const [mode, setMode] = useState<"agent" | "master">("agent");
+  const [tokenInput, setTokenInput] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitAgent(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) { setError(body.error ?? "No hemos podido iniciar sesión."); setSubmitting(false); return; }
+      onAgentLoggedIn();
+    } catch {
+      setError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-mist px-5">
+      <div className="w-full max-w-sm rounded-[24px] border border-hair bg-white p-6 shadow-card">
+        <p className="font-display text-[16px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
+        <h1 className="mt-3 text-[22px] font-extrabold text-navy">Admin</h1>
+
+        <div className="mt-4 flex overflow-hidden rounded-card border border-hair">
+          <button type="button" onClick={() => setMode("agent")}
+            className={`flex-1 px-3 py-2 text-[13px] font-semibold transition-colors ${mode === "agent" ? "bg-navy text-white" : "bg-white text-navy hover:bg-mist"}`}>
+            Soy agente
+          </button>
+          <button type="button" onClick={() => setMode("master")}
+            className={`flex-1 px-3 py-2 text-[13px] font-semibold transition-colors ${mode === "master" ? "bg-navy text-white" : "bg-white text-navy hover:bg-mist"}`}>
+            Acceso maestro
+          </button>
+        </div>
+
+        {mode === "agent" ? (
+          <form onSubmit={submitAgent} className="mt-4">
+            <label htmlFor="agent-email" className="sr-only">Email</label>
+            <input
+              id="agent-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@email.com" className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[16px]"
+            />
+            <label htmlFor="agent-password" className="sr-only">Contraseña</label>
+            <input
+              id="agent-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="Contraseña" className="mt-2.5 w-full rounded-card border border-hair bg-white px-4 py-3 text-[16px]"
+            />
+            {error && <p role="alert" className="mt-2.5 text-[13px] font-medium text-brand-red">{error}</p>}
+            <button
+              type="submit" disabled={submitting || !email || !password} aria-busy={submitting || undefined}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[16px] font-semibold text-white disabled:bg-slate2/40"
+            >
+              {submitting && <Spinner />}
+              {submitting ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
+        ) : (
+          <div className="mt-4">
+            <p className="text-[13px] text-slate2">Introduce el token de acceso maestro.</p>
+            <label htmlFor="tk" className="sr-only">Token</label>
+            <input
+              id="tk" type="password" value={tokenInput} onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && tokenInput.trim() && onMasterToken(tokenInput.trim())}
+              placeholder="ADMIN_TOKEN…"
+              className="mt-3 w-full rounded-card border border-hair bg-white px-4 py-3 text-[16px]"
+            />
+            <button
+              onClick={() => tokenInput.trim() && onMasterToken(tokenInput.trim())} disabled={!tokenInput.trim()}
+              className="mt-4 w-full rounded-card bg-navy px-5 py-3.5 text-[16px] font-semibold text-white disabled:bg-slate2/40"
+            >
+              Entrar
+            </button>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

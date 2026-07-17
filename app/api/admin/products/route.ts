@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createProduct, listProducts } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { createProduct, listProducts, createAuditLog } from "@/lib/store";
+import { requireModule } from "@/lib/agentAuth";
 import { makeProductId, type Product } from "@/lib/catalog";
 
 export const runtime = "nodejs";
@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 const MAX_LOGO_LENGTH = 400_000;
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "productos");
+  if (!auth.ok) return auth.response;
   const { searchParams } = new URL(request.url);
   const producto = searchParams.get("producto") ?? undefined;
   const products = await listProducts(producto, false);
@@ -19,8 +19,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "productos");
+  if (!auth.ok) return auth.response;
 
   let body: Partial<Product>;
   try { body = await request.json(); }
@@ -51,5 +51,11 @@ export async function POST(request: Request) {
   };
 
   const created = await createProduct(product);
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "crear", modulo: "productos",
+    entidad: "producto", entidadId: created.id, resumen: `Añadió el producto de ${created.compania} (${created.producto}).`,
+  });
+
   return NextResponse.json({ ok: true, product: created });
 }

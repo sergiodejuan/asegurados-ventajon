@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getLead, updateLead, listProducts } from "@/lib/store";
+import { getLead, updateLead, listProducts, assignLead, createAuditLog } from "@/lib/store";
 import { STATUSES, type Status, type LeadSubmission } from "@/lib/crm";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 import { saludPrice, vidaPrice } from "@/lib/quote";
 
 export const runtime = "nodejs";
@@ -32,8 +32,8 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "leads");
+  if (!auth.ok) return auth.response;
   const lead = await getLead(params.id);
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
   const submissions = await Promise.all(
@@ -46,10 +46,13 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "leads");
+  if (!auth.ok) return auth.response;
 
-  let body: { status?: string; nextStep?: string; note?: string; contact?: { channel?: string; note?: string }; agente?: string };
+  let body: {
+    status?: string; nextStep?: string; note?: string; contact?: { channel?: string; note?: string };
+    agenteAsignadoId?: string; agenteAsignadoNombre?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -66,13 +69,32 @@ export async function PATCH(
       ? { channel: body.contact.channel, note: body.contact.note }
       : undefined;
 
+  if (body.agenteAsignadoId !== undefined) {
+    const assigned = await assignLead(params.id, body.agenteAsignadoId, body.agenteAsignadoNombre ?? "");
+    if (!assigned) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
+    await createAuditLog({
+      agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "asignar", modulo: "leads",
+      entidad: "lead", entidadId: params.id,
+      resumen: body.agenteAsignadoId ? `Asignó el lead a ${body.agenteAsignadoNombre}.` : "Quitó la asignación del lead.",
+    });
+  }
+
   const lead = await updateLead(params.id, {
     status,
     nextStep: typeof body.nextStep === "string" ? body.nextStep : undefined,
     note: body.note,
     contact,
-    agente: body.agente,
+    agente: auth.agentNombre,
   });
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
+
+  if (status || body.note || contact) {
+    await createAuditLog({
+      agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: body.note ? "comentar" : "actualizar", modulo: "leads",
+      entidad: "lead", entidadId: params.id,
+      resumen: [status && `Cambió el estado a "${status}".`, body.note && "Añadió una nota.", contact && `Registró contacto por ${contact.channel}.`].filter(Boolean).join(" "),
+    });
+  }
+
   return NextResponse.json({ ok: true, lead });
 }

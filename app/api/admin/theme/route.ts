@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminAuthFail } from "@/lib/adminAuth";
-import { getTheme, saveTheme } from "@/lib/store";
+import { requireModule } from "@/lib/agentAuth";
+import { getTheme, saveTheme, createAuditLog } from "@/lib/store";
 import type { SiteTheme } from "@/lib/theme";
 
 export const runtime = "nodejs";
@@ -12,15 +12,15 @@ const MAX_FAVICON_LENGTH = 150_000;
 const MAX_HERO_LENGTH = 900_000;
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "configuracion");
+  if (!auth.ok) return auth.response;
   const theme = await getTheme();
   return NextResponse.json({ ok: true, theme });
 }
 
 export async function PATCH(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "configuracion");
+  if (!auth.ok) return auth.response;
 
   let body: Partial<SiteTheme>;
   try { body = await request.json(); }
@@ -57,5 +57,11 @@ export async function PATCH(request: Request) {
   }
 
   const theme = await saveTheme(body);
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "actualizar", modulo: "configuracion",
+    entidad: "theme", entidadId: "config", resumen: "Actualizó el diseño/tema del sitio.",
+  });
+
   return NextResponse.json({ ok: true, theme });
 }

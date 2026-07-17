@@ -73,6 +73,10 @@ export type Lead = {
   producto: string;
   status: Status;
   nextStep: string;
+  // Cartera: a qué agente pertenece este lead ("" = sin asignar, visible
+  // para todo el equipo). Permite que cada agente filtre "mi cartera".
+  agenteAsignadoId: string;
+  agenteAsignadoNombre: string;
   nombre: string;
   telefono: string;
   email: string;
@@ -269,6 +273,9 @@ export type LlamadaDraft = {
   motivo?: string;
   diaLlamada?: string;
   turnoLlamada?: string;
+  // Fecha concreta ya elegida por el cliente en el selector de huecos
+  // (dentro de los próximos días laborables disponibles), si la hay.
+  fechaProgramada?: string;
   nombre?: string;
   telefono?: string;
   codigoPostal?: string;
@@ -317,3 +324,94 @@ export function npsCategory(score: number): NpsCategory {
   if (score >= 7) return "pasivo";
   return "detractor";
 }
+
+/* ------------------------------- Agentes -------------------------------- */
+// Cada persona del equipo comercial tiene su propia cuenta (login, foto,
+// disponibilidad) en vez de compartir un único ADMIN_TOKEN. El ADMIN_TOKEN
+// sigue funcionando como acceso maestro (nunca se puede quedar el equipo sin
+// entrar al panel), pero las acciones del día a día quedan atribuidas a la
+// persona real que las hizo — como en cualquier CRM.
+
+export const ADMIN_MODULES = [
+  "leads", "presupuestos", "llamadas", "tareas", "blog", "campana",
+  "productos", "informes", "rgpd", "configuracion", "agentes",
+] as const;
+export type AdminModule = (typeof ADMIN_MODULES)[number];
+
+export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
+  leads: "Leads", presupuestos: "Presupuestos", llamadas: "Llamadas", tareas: "Tareas",
+  blog: "Blog", campana: "Campaña", productos: "Productos", informes: "Informes y analítica",
+  rgpd: "RGPD", configuracion: "Configuración y diseño", agentes: "Agentes y permisos",
+};
+
+export const AGENT_ROLES = ["admin", "agente"] as const;
+export type AgentRole = (typeof AGENT_ROLES)[number];
+
+export const WORK_DAYS = ["lunes", "martes", "miercoles", "jueves", "viernes"] as const;
+export type WorkDay = (typeof WORK_DAYS)[number];
+export const WORK_DAY_LABELS: Record<WorkDay, string> = {
+  lunes: "Lunes", martes: "Martes", miercoles: "Miércoles", jueves: "Jueves", viernes: "Viernes",
+};
+
+export type DayShift = { manana: boolean; tarde: boolean };
+export type AgentAvailability = Record<WorkDay, DayShift>;
+
+export function emptyAvailability(): AgentAvailability {
+  return { lunes: { manana: false, tarde: false }, martes: { manana: false, tarde: false }, miercoles: { manana: false, tarde: false }, jueves: { manana: false, tarde: false }, viernes: { manana: false, tarde: false } };
+}
+export function fullTimeAvailability(): AgentAvailability {
+  return { lunes: { manana: true, tarde: true }, martes: { manana: true, tarde: true }, miercoles: { manana: true, tarde: true }, jueves: { manana: true, tarde: true }, viernes: { manana: true, tarde: true } };
+}
+
+export type Agent = {
+  id: string;
+  nombre: string;
+  email: string;
+  passwordHash: string;
+  fotoUrl: string;
+  rol: AgentRole;
+  // Se ignora si rol === "admin" (acceso total siempre). Para rol "agente",
+  // solo puede ver/usar los módulos listados aquí.
+  permisos: AdminModule[];
+  disponibilidad: AgentAvailability;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
+};
+
+export type AgentDraft = {
+  nombre: string; email: string; fotoUrl?: string; rol?: AgentRole;
+  permisos?: AdminModule[]; disponibilidad?: AgentAvailability; activo?: boolean;
+  password?: string;
+};
+
+export function hasPermission(agent: Pick<Agent, "rol" | "permisos">, modulo: AdminModule): boolean {
+  return agent.rol === "admin" || agent.permisos.includes(modulo);
+}
+
+// Nunca se manda el hash de la contraseña al cliente.
+export type PublicAgent = Omit<Agent, "passwordHash">;
+export function toPublicAgent(a: Agent): PublicAgent {
+  const { passwordHash: _passwordHash, ...rest } = a;
+  return rest;
+}
+
+/* ---------------------------- Registro de auditoría ----------------------------- */
+// Historial general de acciones en el panel admin — igual que en cualquier
+// CRM: quién hizo qué, cuándo y sobre qué ficha. Complementa (no sustituye)
+// las notas propias de cada lead/presupuesto/llamada.
+
+export type AuditAction = "crear" | "actualizar" | "eliminar" | "login" | "asignar" | "comentar";
+
+export type AuditLog = {
+  id: string;
+  at: string;
+  agenteId: string;
+  agenteNombre: string;
+  action: AuditAction;
+  modulo: AdminModule | "auth";
+  entidad: string; // "lead" | "presupuesto" | "llamada" | "tarea" | "agente" | "post" | "producto" | ...
+  entidadId: string;
+  resumen: string;
+};

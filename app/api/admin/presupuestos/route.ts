@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { listPresupuestos, storageMode, createManualPresupuesto } from "@/lib/store";
+import { listPresupuestos, storageMode, createManualPresupuesto, createAuditLog } from "@/lib/store";
 import { PRESUPUESTO_STATUSES, PRESUPUESTO_STATUS_LABELS, SOURCE_LABELS } from "@/lib/crm";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "presupuestos");
+  if (!auth.ok) return auth.response;
 
   const leadId = new URL(request.url).searchParams.get("leadId");
   const all = await listPresupuestos();
@@ -27,8 +27,8 @@ export async function GET(request: Request) {
 // Presupuesto creado a mano por un agente, vinculado a un lead ya existente
 // (desde el catálogo de productos o con datos completamente personalizados).
 export async function POST(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "presupuestos");
+  if (!auth.ok) return auth.response;
 
   let body: {
     leadId?: string; producto?: string; compania?: string; precio?: number;
@@ -49,5 +49,11 @@ export async function POST(request: Request) {
     condiciones: body.condiciones, servicios: body.servicios,
   });
   if (!presupuesto) return NextResponse.json({ ok: false, error: "Lead no encontrado." }, { status: 404 });
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "crear", modulo: "presupuestos",
+    entidad: "presupuesto", entidadId: presupuesto.id, resumen: `Creó un presupuesto manual de ${presupuesto.producto} con ${body.compania}.`,
+  });
+
   return NextResponse.json({ ok: true, presupuesto });
 }

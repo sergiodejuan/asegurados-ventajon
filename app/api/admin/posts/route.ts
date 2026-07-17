@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createPost, listPosts, slugTaken } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { createPost, listPosts, slugTaken, createAuditLog } from "@/lib/store";
+import { requireModule } from "@/lib/agentAuth";
 import { slugifyTitle, type PostDraft } from "@/lib/posts";
 
 export const runtime = "nodejs";
@@ -10,15 +10,15 @@ export const dynamic = "force-dynamic";
 const MAX_IMAGE_LENGTH = 900_000;
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "blog");
+  if (!auth.ok) return auth.response;
   const posts = await listPosts();
   return NextResponse.json({ ok: true, posts });
 }
 
 export async function POST(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "blog");
+  if (!auth.ok) return auth.response;
 
   let body: PostDraft;
   try { body = await request.json(); }
@@ -39,5 +39,11 @@ export async function POST(request: Request) {
   }
 
   const post = await createPost({ ...body, slug });
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "crear", modulo: "blog",
+    entidad: "post", entidadId: post.id, resumen: `Creó la entrada de blog "${post.title}".`,
+  });
+
   return NextResponse.json({ ok: true, post });
 }

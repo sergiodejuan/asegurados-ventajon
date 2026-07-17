@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listPresupuestos } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 import type { Presupuesto } from "@/lib/crm";
 
 export const runtime = "nodejs";
@@ -37,8 +37,8 @@ const COLUMNS: { key: string; get: (p: Presupuesto) => unknown }[] = [
 ];
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "presupuestos");
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");

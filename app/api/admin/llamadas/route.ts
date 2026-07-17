@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { listLlamadas, createLlamada, storageMode } from "@/lib/store";
+import { listLlamadas, createLlamada, storageMode, createAuditLog } from "@/lib/store";
 import { LLAMADA_STATUSES, LLAMADA_STATUS_LABELS, SOURCE_LABELS } from "@/lib/crm";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { requireModule } from "@/lib/agentAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "llamadas");
+  if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);
   const leadId = url.searchParams.get("leadId");
@@ -40,8 +40,8 @@ export async function GET(request: Request) {
 // existente (p.ej. si el cliente lo pide por otra vía, no a través de un
 // formulario propio).
 export async function POST(request: Request) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "llamadas");
+  if (!auth.ok) return auth.response;
 
   let body: {
     leadId?: string; producto?: string; motivo?: string; diaLlamada?: string; turnoLlamada?: string;
@@ -58,5 +58,11 @@ export async function POST(request: Request) {
     diaLlamada: body.diaLlamada, turnoLlamada: body.turnoLlamada,
     nombre: body.nombre, telefono: body.telefono, codigoPostal: body.codigoPostal,
   });
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "crear", modulo: "llamadas",
+    entidad: "llamada", entidadId: llamada.id, resumen: `Registró una llamada manual${llamada.producto ? ` de ${llamada.producto}` : ""}.`,
+  });
+
   return NextResponse.json({ ok: true, llamada });
 }

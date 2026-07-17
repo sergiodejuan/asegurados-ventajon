@@ -5,7 +5,11 @@ import {
   type Task, type TaskDraft,
   type Llamada, type LlamadaDraft, type LlamadaStatus, type LlamadaNote, type ClientNotification,
   type NpsResponse,
+  type Agent, type AgentDraft, type AdminModule, type AuditAction, type AuditLog,
+  emptyAvailability,
 } from "./crm";
+import { hashPassword } from "./password";
+import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
@@ -175,6 +179,7 @@ export async function upsertLead(
     id: newId, createdAt: now, updatedAt: now,
     source, sources: [source], producto: draft.producto ?? "",
     status: "nuevo", nextStep: "",
+    agenteAsignadoId: "", agenteAsignadoNombre: "",
     nombre: draft.nombre ?? "", telefono: phone, email, codigoPostal: draft.codigoPostal ?? "",
     inicio: draft.inicio ?? "", numAsegurados: draft.numAsegurados ?? null, coberturaDental: draft.coberturaDental ?? null,
     motivo: draft.motivo ?? "", fumador: draft.fumador ?? null,
@@ -816,10 +821,10 @@ export async function createLlamada(draft: LlamadaDraft): Promise<Llamada> {
   const now = new Date().toISOString();
   const id = makeSubmissionId();
   const llamada: Llamada = {
-    id, leadId: draft.leadId, createdAt: now, updatedAt: now, status: "pendiente",
+    id, leadId: draft.leadId, createdAt: now, updatedAt: now, status: draft.fechaProgramada ? "programada" : "pendiente",
     producto: draft.producto ?? "", source: draft.source ?? "", presupuestoId: draft.presupuestoId ?? "",
     motivo: draft.motivo ?? "", diaLlamada: draft.diaLlamada ?? "", turnoLlamada: draft.turnoLlamada ?? "",
-    fechaProgramada: "", horaProgramada: "", agente: "", notas: [],
+    fechaProgramada: draft.fechaProgramada ?? "", horaProgramada: "", agente: "", notas: [],
     nombre: draft.nombre ?? "", telefono: draft.telefono ?? "", codigoPostal: draft.codigoPostal ?? "",
   };
   await jset(`llamada:${id}`, llamada);
@@ -885,7 +890,7 @@ export async function updateLlamada(
     status?: LlamadaStatus; note?: string; agente?: string;
     diaLlamada?: string; turnoLlamada?: string; fechaProgramada?: string; horaProgramada?: string;
   }
-): Promise<{ llamada: Llamada; notifyText: string | null } | null> {
+): Promise<{ llamada: Llamada; notifyText: string | null; notifyUrl: string } | null> {
   const l = await jget<Llamada>(`llamada:${id}`);
   if (!l) return null;
   const now = new Date().toISOString();
@@ -934,7 +939,7 @@ export async function updateLlamada(
   }
   if (notifyText) await createClientNotification({ leadId: l.leadId, llamadaId: l.id, texto: notifyText, url: notifyUrl });
 
-  return { llamada: l, notifyText };
+  return { llamada: l, notifyText, notifyUrl };
 }
 
 /* ----------------------------- Notificaciones al cliente ----------------------------- */
@@ -1097,4 +1102,152 @@ export async function saveNpsResponse(input: {
     await updatePresupuesto(input.refId, { note: nota }).catch(() => {});
   }
   return n;
+}
+
+/* --------------------------------- Agentes -------------------------------- */
+// Cuenta propia por cada persona del equipo comercial: login, foto,
+// permisos modulares y disponibilidad (días/turnos) — esta última alimenta
+// los huecos que se ofrecen al cliente en el selector de fecha de llamada.
+
+export async function createAgent(draft: AgentDraft): Promise<Agent> {
+  const now = new Date().toISOString();
+  const id = makeSubmissionId();
+  const email = draft.email.trim().toLowerCase();
+  const agent: Agent = {
+    id, nombre: draft.nombre.trim(), email,
+    passwordHash: draft.password ? await hashPassword(draft.password) : "",
+    fotoUrl: draft.fotoUrl ?? "", rol: draft.rol ?? "agente",
+    permisos: draft.permisos ?? [], disponibilidad: draft.disponibilidad ?? emptyAvailability(),
+    activo: draft.activo ?? true, createdAt: now, updatedAt: now, lastLoginAt: "",
+  };
+  await jset(`agent:${id}`, agent);
+  if (email) await jset(`idx:agentEmail:${email}`, id);
+  await zadd("agents:index", Date.parse(now), id);
+  return agent;
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  const ids = await zrangeRev("agents:index");
+  const out: Agent[] = [];
+  for (const id of ids) {
+    const a = await jget<Agent>(`agent:${id}`);
+    if (a) out.push(a);
+  }
+  return out;
+}
+
+export async function getAgent(id: string): Promise<Agent | null> {
+  return jget<Agent>(`agent:${id}`);
+}
+
+export async function getAgentByEmail(email: string): Promise<Agent | null> {
+  const id = await jget<string>(`idx:agentEmail:${email.trim().toLowerCase()}`);
+  return id ? jget<Agent>(`agent:${id}`) : null;
+}
+
+export async function updateAgent(id: string, patch: Partial<AgentDraft>): Promise<Agent | null> {
+  const a = await jget<Agent>(`agent:${id}`);
+  if (!a) return null;
+  if (patch.nombre !== undefined) a.nombre = patch.nombre.trim();
+  if (patch.email !== undefined) {
+    const newEmail = patch.email.trim().toLowerCase();
+    if (newEmail && newEmail !== a.email) {
+      await jset(`idx:agentEmail:${newEmail}`, id);
+      a.email = newEmail;
+    }
+  }
+  if (patch.fotoUrl !== undefined) a.fotoUrl = patch.fotoUrl;
+  if (patch.rol !== undefined) a.rol = patch.rol;
+  if (patch.permisos !== undefined) a.permisos = patch.permisos;
+  if (patch.disponibilidad !== undefined) a.disponibilidad = patch.disponibilidad;
+  if (patch.activo !== undefined) a.activo = patch.activo;
+  if (patch.password) a.passwordHash = await hashPassword(patch.password);
+  a.updatedAt = new Date().toISOString();
+  await jset(`agent:${id}`, a);
+  return a;
+}
+
+export async function deleteAgent(id: string): Promise<boolean> {
+  const a = await jget<Agent>(`agent:${id}`);
+  if (!a) return false;
+  await jdel(`agent:${id}`);
+  if (a.email) await jdel(`idx:agentEmail:${a.email}`);
+  return true;
+}
+
+export async function touchAgentLogin(id: string): Promise<void> {
+  const a = await jget<Agent>(`agent:${id}`);
+  if (!a) return;
+  a.lastLoginAt = new Date().toISOString();
+  await jset(`agent:${id}`, a);
+}
+
+/* ------------------------------ Registro de auditoría ------------------------------ */
+
+export async function createAuditLog(entry: {
+  agenteId: string; agenteNombre: string; action: AuditAction; modulo: AdminModule | "auth";
+  entidad: string; entidadId: string; resumen: string;
+}): Promise<AuditLog> {
+  const now = new Date().toISOString();
+  const id = makeSubmissionId();
+  const log: AuditLog = { id, at: now, ...entry };
+  await jset(`audit:${id}`, log);
+  await zadd("audit:index", Date.parse(now), id);
+  return log;
+}
+
+export async function listAuditLogs(filters?: { agenteId?: string; modulo?: string; limit?: number }): Promise<AuditLog[]> {
+  const ids = await zrangeRev("audit:index");
+  const out: AuditLog[] = [];
+  for (const id of ids) {
+    if (filters?.limit && out.length >= filters.limit) break;
+    const l = await jget<AuditLog>(`audit:${id}`);
+    if (!l) continue;
+    if (filters?.agenteId && l.agenteId !== filters.agenteId) continue;
+    if (filters?.modulo && l.modulo !== filters.modulo) continue;
+    out.push(l);
+  }
+  return out;
+}
+
+/* --------------------------- Asignación de cartera --------------------------- */
+
+export async function assignLead(leadId: string, agenteId: string, agenteNombre: string): Promise<Lead | null> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return null;
+  const now = new Date().toISOString();
+  lead.agenteAsignadoId = agenteId;
+  lead.agenteAsignadoNombre = agenteNombre;
+  lead.updatedAt = now;
+  lead.activity.unshift({
+    at: now, type: "note",
+    note: agenteId ? `Asignado a ${agenteNombre}.` : "Sin asignar.",
+  });
+  await jset(`lead:${leadId}`, lead);
+  await zadd("leads:index", Date.parse(now), leadId);
+  return lead;
+}
+
+/* ------------------------------ Disponibilidad ------------------------------ */
+// Huecos que se ofrecen en el selector de fecha del cliente: próximos 3 días
+// laborables, por turno. Si todavía no hay ningún agente dado de alta, no se
+// bloquea nada (para no romper la captación de leads antes de configurar el
+// equipo) — en cuanto hay al menos un agente activo, la disponibilidad real
+// (quién trabaja ese día/turno, menos lo ya reservado) empieza a mandar.
+
+export type SlotAvailability = { fecha: string; dayKey: string; label: string; manana: boolean; tarde: boolean };
+
+export async function getAvailability(days = 3): Promise<SlotAvailability[]> {
+  const agents = (await listAgents()).filter((a) => a.activo);
+  const candidates = nextBusinessDays(days);
+  if (!agents.length) return candidates.map((c) => ({ ...c, manana: true, tarde: true }));
+
+  const llamadas = await listLlamadas();
+  return candidates.map((c) => {
+    const capacidadManana = agents.filter((a) => a.disponibilidad[c.dayKey]?.manana).length;
+    const capacidadTarde = agents.filter((a) => a.disponibilidad[c.dayKey]?.tarde).length;
+    const reservadasManana = llamadas.filter((l) => l.fechaProgramada === c.fecha && l.turnoLlamada === "Mañana" && l.status !== "cancelada").length;
+    const reservadasTarde = llamadas.filter((l) => l.fechaProgramada === c.fecha && l.turnoLlamada === "Tarde" && l.status !== "cancelada").length;
+    return { ...c, manana: capacidadManana > reservadasManana, tarde: capacidadTarde > reservadasTarde };
+  });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { anonymizeLead } from "@/lib/store";
-import { adminAuthFail } from "@/lib/adminAuth";
+import { anonymizeLead, createAuditLog } from "@/lib/store";
+import { requireModule } from "@/lib/agentAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,13 +12,16 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const denied = adminAuthFail(request);
-  if (denied) return denied;
+  const auth = await requireModule(request, "rgpd");
+  if (!auth.ok) return auth.response;
 
-  let body: { agente?: string } = {};
-  try { body = await request.json(); } catch { /* cuerpo opcional */ }
-
-  const lead = await anonymizeLead(params.id, body.agente);
+  const lead = await anonymizeLead(params.id, auth.agentNombre);
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
+
+  await createAuditLog({
+    agenteId: auth.agentId, agenteNombre: auth.agentNombre, action: "actualizar", modulo: "rgpd",
+    entidad: "lead", entidadId: params.id, resumen: "Anonimizó el lead (derecho de supresión RGPD).",
+  });
+
   return NextResponse.json({ ok: true, lead });
 }
