@@ -641,6 +641,7 @@ function PresupuestosPanel({ leadId }: { leadId: string }) {
       {waTarget && (
         <WhatsAppFollowupModal
           telefono={waTarget.telefono}
+          presupuestoId={waTarget.id}
           ctx={{
             nombre: waTarget.nombre, producto: waTarget.producto, precioAprox: waTarget.precioAprox,
             quoteNumber: quoteNumber(waTarget.id), compania: waTarget.eleccion?.compania,

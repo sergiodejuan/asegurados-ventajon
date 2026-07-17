@@ -250,6 +250,7 @@ function PresupuestoDetail() {
       {waOpen && (
         <WhatsAppFollowupModal
           telefono={p.telefono}
+          presupuestoId={p.id}
           ctx={{
             nombre: p.nombre, producto: p.producto, precioAprox: p.precioAprox,
             quoteNumber: quoteNumber(p.id), compania: p.eleccion?.compania,

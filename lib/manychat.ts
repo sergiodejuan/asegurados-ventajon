@@ -180,6 +180,30 @@ async function triggerFlow(subscriberId: string, flowNs: string): Promise<{ ok: 
   return { ok: result.ok, error: result.error };
 }
 
+// Envía un mensaje de texto libre por WhatsApp a un suscriptor ya existente
+// (o lo crea si hace falta) usando el endpoint sendContent de ManyChat —
+// para el botón "Enviar por ManyChat" del seguimiento de presupuestos en
+// admin. ⚠️ Igual que cualquier envío directo de WhatsApp Business, solo
+// funciona dentro de la ventana de 24h desde el último mensaje del cliente:
+// fuera de esa ventana, WhatsApp exige una plantilla aprobada por Meta (ver
+// triggerFlow más arriba) y esta llamada devolverá el error que ManyChat
+// reporte tal cual, para poder verlo en el admin — en ese caso, usa el
+// botón "Abrir en WhatsApp" como alternativa manual.
+async function sendContent(subscriberId: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  const result = await manychatFetch("/fb/sending/sendContent", {
+    subscriber_id: subscriberId,
+    data: { version: "v2", content: { messages: [{ type: "text", text }] } },
+  });
+  return { ok: result.ok, error: result.error };
+}
+
+export async function sendManychatWhatsAppText(toNumber: string, nombre: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  if (!manychatConfigured()) return { ok: false, error: "ManyChat no configurado (falta MANYCHAT_API_TOKEN)." };
+  const subscriber = await findOrCreateSubscriber(toNumber, nombre);
+  if (!subscriber.ok || !subscriber.subscriberId) return { ok: false, error: subscriber.error || "No se pudo localizar al suscriptor en ManyChat." };
+  return sendContent(subscriber.subscriberId, text);
+}
+
 export async function syncManychatLead(opts: {
   toNumber: string;
   nombre: string;
