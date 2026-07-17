@@ -29,14 +29,14 @@ export function Modal({
     <div
       role="presentation"
       onClick={onClose}
-      className="fixed inset-0 z-50 grid place-items-end bg-navy-deep/50 p-0 sm:place-items-center sm:p-5"
+      className="fixed inset-0 z-50 grid place-items-end bg-navy-deep/75 p-0 backdrop-blur-sm sm:place-items-center sm:p-5"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-[24px] bg-white p-6 shadow-card motion-safe:animate-fade-up sm:max-w-lg sm:rounded-[24px]"
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-[24px] border border-hair bg-white p-6 shadow-[0_8px_40px_-6px_rgba(18,32,79,0.45)] motion-safe:animate-fade-up sm:max-w-lg sm:rounded-[24px]"
       >
         <div className="flex items-start justify-between gap-4">
           <h2 id="modal-title" className="text-[20px] font-extrabold leading-tight text-navy">{title}</h2>
