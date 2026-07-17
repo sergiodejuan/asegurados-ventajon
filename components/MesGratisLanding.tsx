@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BRAND_NAME, WHATSAPP_URL, PARTNERS, ECOSYSTEM_MEMBERS } from "@/lib/brand";
+import { BRAND_NAME, WHATSAPP_URL_GENERIC, PARTNERS, ECOSYSTEM_MEMBERS } from "@/lib/brand";
 import { PartnerBadge } from "./PartnerBadge";
 import { Header } from "./Header";
 import { Modal } from "./Modal";
@@ -235,7 +235,7 @@ export function MesGratisLanding() {
 
       {/* Barra fija móvil */}
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur lg:hidden">
-        <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+        <a href={WHATSAPP_URL_GENERIC} target="_blank" rel="noopener noreferrer"
           onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "mes_gratis_sticky" })}
           className="grid h-12 w-12 shrink-0 place-items-center rounded-card border border-white/15 text-[#25D366]">
           <WhatsApp width={20} height={20} />

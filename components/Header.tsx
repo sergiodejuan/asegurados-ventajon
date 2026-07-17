@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
+import { BRAND_NAME, WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { WhatsApp, Menu } from "./icons";
@@ -108,7 +108,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
         </nav>
         <div className="flex items-center gap-3">
           <a
-            href={WHATSAPP_URL}
+            href={WHATSAPP_URL_GENERIC}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "header" })}

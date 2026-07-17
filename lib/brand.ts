@@ -19,6 +19,17 @@ export const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34600000000";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
+// Enlace de WhatsApp con mensaje prellenado para los puntos de contacto
+// genéricos previos a cualquier registro del usuario (header, menú móvil,
+// landings de captación como /mes-gratis) — antes de que haya un
+// presupuesto/comparativa que personalizar. El texto está pensado para
+// entrar directo en un flujo concreto de ManyChat en vez de en una
+// conversación sin contexto. En el espacio de comparativa se sigue usando
+// el texto dinámico de buildWhatsAppText (lib/quote.ts), con los datos
+// reales del presupuesto — no se sustituye ahí.
+export const WHATSAPP_URL_GENERIC =
+  "https://wa.me/34637143809?text=Hola%20vengo%20de%20la%20web%20de%20Asegurados%20Ventajon%20y%20quiero%20informaci%C3%B3n%20sobre%20vuestros%20seguros";
+
 export const CONTACT_HOURS =
   process.env.NEXT_PUBLIC_CONTACT_HOURS ?? "L–V · 9:00–20:00 (hora canaria)";
 

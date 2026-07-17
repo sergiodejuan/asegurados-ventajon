@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { BRAND_NAME, WHATSAPP_URL } from "@/lib/brand";
+import { BRAND_NAME, WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Wordmark } from "./Header";
@@ -98,7 +98,7 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
           Te llamamos gratis
         </a>
         <a
-          href={WHATSAPP_URL}
+          href={WHATSAPP_URL_GENERIC}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "mobile_menu" })}

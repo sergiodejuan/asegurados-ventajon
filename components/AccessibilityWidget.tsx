@@ -9,15 +9,16 @@ import {
 } from "@/lib/accessibility";
 import { Eye, Close, Minus, Plus, Check } from "./icons";
 
-// Widget flotante de accesibilidad visual: tamaño de texto, alto contraste,
+// Widget de accesibilidad visual: tamaño de texto, alto contraste,
 // subrayado de enlaces, fuente de lectura fácil, cursor grande y más
-// espaciado entre líneas. Posición: centrado verticalmente a la izquierda,
-// tanto en escritorio como en móvil — es la única zona de la pantalla libre
-// de elementos fijos en ambos formatos (la cabecera vive arriba, el CTA
-// fijo y el resto de burbujas —asistente, WhatsApp— viven abajo, y en
+// espaciado entre líneas. El disparador es una pestaña pegada al borde
+// izquierdo de la pantalla (no un botón circular flotante), centrada
+// verticalmente — tanto en escritorio como en móvil, es la única zona
+// libre de elementos fijos en ambos formatos (la cabecera vive arriba, el
+// CTA fijo y el resto de burbujas —asistente, WhatsApp— viven abajo, y en
 // escritorio la burbuja del asistente también está abajo a la izquierda,
 // no a media altura). El panel se abre como hoja inferior en móvil (más
-// cómodo con el pulgar) y como tarjeta junto al botón en escritorio.
+// cómodo con el pulgar) y como tarjeta junto a la pestaña en escritorio.
 export function AccessibilityWidget() {
   const pathname = usePathname();
   const theme = useSiteTheme();
@@ -59,11 +60,11 @@ export function AccessibilityWidget() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Opciones de accesibilidad"
         aria-expanded={open}
-        className="fixed left-3 top-1/2 z-40 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-navy text-white shadow-card transition-transform hover:scale-105"
+        className="fixed left-0 top-1/2 z-40 flex h-14 w-10 -translate-y-1/2 items-center justify-center rounded-r-xl bg-navy text-white shadow-card transition-[width,padding] hover:w-11"
       >
-        <Eye width={22} height={22} />
+        <Eye width={20} height={20} />
         {activeCount > 0 && (
-          <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-brand-red text-[10px] font-bold text-white">
+          <span aria-hidden="true" className="absolute -top-1 right-0.5 grid h-5 w-5 place-items-center rounded-full bg-brand-red text-[10px] font-bold text-white">
             {activeCount}
           </span>
         )}
@@ -74,7 +75,7 @@ export function AccessibilityWidget() {
           role="dialog"
           aria-modal="true"
           aria-label="Opciones de accesibilidad"
-          className="safe-bottom fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-white p-5 shadow-card lg:inset-x-auto lg:bottom-auto lg:left-20 lg:top-1/2 lg:w-[340px] lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:border-hair"
+          className="safe-bottom fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-white p-5 shadow-card lg:inset-x-auto lg:bottom-auto lg:left-14 lg:top-1/2 lg:w-[340px] lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:border-hair"
         >
           <div className="flex items-center justify-between">
             <h2 className="text-[17px] font-extrabold text-navy">Accesibilidad</h2>
