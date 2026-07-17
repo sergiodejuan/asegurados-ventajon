@@ -34,7 +34,11 @@ export async function POST(request: Request) {
 
   const result = await findClientPresupuestos(telefono);
   if (!result) {
-    return NextResponse.json({ ok: true, existe: false, nombre: "", numPresupuestos: 0, numLlamadas: 0, presupuestos: [], llamadas: [], resumenTexto: "" });
+    return NextResponse.json({
+      ok: true, existe: false, nombre: "", numPresupuestos: 0, numLlamadas: 0, presupuestos: [], llamadas: [], resumenTexto: "",
+      llamadaId: "", llamadaProducto: "", llamadaEstado: "", llamadaCuando: "",
+      presupuestoNumero: "", presupuestoProducto: "", presupuestoEstado: "",
+    });
   }
 
   const [lead, llamadas] = await Promise.all([getLead(result.leadId), listLlamadasByLead(result.leadId)]);
@@ -58,9 +62,19 @@ export async function POST(request: Request) {
     lineasLlamadas.length ? `Tus llamadas:\n${lineasLlamadas.join("\n")}` : "",
   ].filter(Boolean).join("\n\n") || "Todavía no tienes presupuestos ni llamadas con nosotros.";
 
+  // Además de los arrays completos, se exponen aplanados los datos de la
+  // llamada activa y el presupuesto más recientes — los arrays no se pueden
+  // mapear a "campos personalizados" en ManyChat, esto sí.
+  const primeraLlamada = llamadasView[0];
+  const primerPresupuesto = presupuestos[0];
+
   return NextResponse.json({
     ok: true, existe: true, leadId: result.leadId, nombre: lead?.nombre ?? "",
     numPresupuestos: presupuestos.length, numLlamadas: llamadasView.length,
     presupuestos, llamadas: llamadasView, resumenTexto,
+    llamadaId: primeraLlamada?.id ?? "", llamadaProducto: primeraLlamada?.producto ?? "",
+    llamadaEstado: primeraLlamada?.estado ?? "", llamadaCuando: primeraLlamada?.cuando ?? "",
+    presupuestoNumero: primerPresupuesto?.numero ?? "", presupuestoProducto: primerPresupuesto?.producto ?? "",
+    presupuestoEstado: primerPresupuesto?.estado ?? "",
   });
 }
