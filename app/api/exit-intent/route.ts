@@ -3,6 +3,7 @@ import { exitIntentSchema } from "@/lib/schema";
 import { upsertLead, createLlamada } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: false },
     d.consent);
 
-  const { id } = await upsertLead(
+  const { id, deduped } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal, producto: d.producto,
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto,
@@ -54,8 +55,10 @@ export async function POST(request: Request) {
     nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal,
   }).catch((err) => console.error("[exit-intent] llamada error", err));
 
-  setClientSessionCookie(id);
-  return NextResponse.json({ ok: true, id });
+  // Ver comentario equivalente en app/api/lead/route.ts.
+  if (deduped) await sendAreaClienteVerificationEmail(id);
+  else setClientSessionCookie(id);
+  return NextResponse.json({ ok: true, id, deduped });
 }
 
 export function GET() {

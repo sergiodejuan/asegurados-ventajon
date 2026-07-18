@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header, Wordmark } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Modal } from "@/components/Modal";
@@ -77,13 +77,13 @@ const LEGAL_CONTENT: Record<LegalKey, { title: string; body: string }> = {
 // después de tarificar en este mismo dispositivo), y los datos siempre se
 // piden en vivo al servidor — así funciona desde cualquier dispositivo,
 // como en la web de una aseguradora real.
-type Vista = "comprobando" | "acceso" | "transicion" | "area";
+type Vista = "comprobando" | "acceso" | "area";
 
 export function AreaClienteContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const theme = useSiteTheme();
   const [vista, setVista] = useState<Vista>("comprobando");
-  const [greeting, setGreeting] = useState("");
   const [profile, setProfile] = useState<Profile>({});
   const [quotes, setQuotes] = useState<QuoteProfile[]>([]);
   const [llamadas, setLlamadas] = useState<LlamadaView[]>([]);
@@ -105,6 +105,7 @@ export function AreaClienteContent() {
   const [loginValue, setLoginValue] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginSent, setLoginSent] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -119,8 +120,15 @@ export function AreaClienteContent() {
           return;
         }
       } catch { /* sin sesión válida: pasa a la pantalla de acceso */ }
+      // Vuelta del enlace de verificación por email (ver lib/clientVerification.ts):
+      // si el token no era válido o ya había caducado, se avisa aquí en vez de
+      // dejar al cliente sin explicación en la pantalla de acceso.
+      if (searchParams.get("error") === "token-invalido") {
+        setLoginError("Ese enlace ya no es válido o ha caducado. Pide uno nuevo con tu correo o teléfono.");
+      }
       setVista("acceso");
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSaveProfile() {
@@ -157,6 +165,12 @@ export function AreaClienteContent() {
   const currentPage = Math.min(page, totalPages);
   const pageQuotes = quotes.slice((currentPage - 1) * PRESUPUESTOS_POR_PAGINA, currentPage * PRESUPUESTOS_POR_PAGINA);
 
+  // Por seguridad, este endpoint ya no concede acceso al instante ni
+  // devuelve los presupuestos en la respuesta (un teléfono, un correo o un
+  // número de presupuesto no son un secreto: cualquiera que los conociera
+  // podría, si no, "entrar" como esa persona). Ahora manda un enlace de un
+  // solo uso al email ya guardado en la ficha; al hacer clic, ese enlace
+  // (app/api/client/verify) concede la sesión y trae de vuelta aquí.
   async function handleLogin() {
     if (!loginValue.trim()) {
       setLoginError("Introduce tu correo, tu teléfono o tu número de presupuesto.");
@@ -176,26 +190,9 @@ export function AreaClienteContent() {
         setLoginLoading(false);
         return;
       }
-      const found = body.presupuestos as QuoteProfile[];
-      const first = found[0];
-      setProfile((p) => ({ ...p, nombre: first?.nombre, telefono: first?.telefono, email: first?.email }));
-      setQuotes(found);
-      setPage(1);
-      // La búsqueda ya deja la sesión iniciada (cookie); se completa con el
-      // perfil y las llamadas, que ese endpoint no devuelve — imprescindible
-      // además para un lead que solo pidió que le llamaran (sin presupuesto
-      // ninguno), cuyo nombre/teléfono no vienen en `found`.
-      fetch("/api/client/session").then((r) => r.json()).then((s) => {
-        if (!s.ok) return;
-        setProfile((p) => ({ ...p, ...s.profile }));
-        setLlamadas(s.llamadas ?? []);
-      }).catch(() => {});
-      setShowRecoverBox(false);
+      setLoginSent(true);
       setLoginValue("");
       setLoginLoading(false);
-      setGreeting(first?.nombre?.trim().split(/\s+/)[0] ?? "");
-      setVista("transicion");
-      setTimeout(() => setVista("area"), 1800);
       return;
     } catch {
       setLoginError("Error de conexión. Inténtalo de nuevo.");
@@ -204,24 +201,6 @@ export function AreaClienteContent() {
   }
 
   if (vista === "comprobando") return null;
-
-  // Pantalla de transición tras identificarse: breve y personalizada, antes
-  // de revelar el área completa.
-  if (vista === "transicion") {
-    return (
-      <div
-        role="status" aria-live="polite"
-        className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-gradient-to-br from-navy to-navy-deep px-6 text-center text-white"
-      >
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 motion-safe:animate-pulse">
-          <Spinner width={32} height={32} />
-        </div>
-        <h2 className="mt-6 max-w-sm text-[22px] font-extrabold leading-snug md:text-[26px]">
-          Estamos recuperando tus datos y presupuestos{greeting ? `, ${greeting}` : ""}
-        </h2>
-      </div>
-    );
-  }
 
   const loginField = (
     <>
@@ -238,6 +217,20 @@ export function AreaClienteContent() {
     </>
   );
 
+  // Tras pedir el enlace de verificación (ver handleLogin): ya no hay nada
+  // que mostrar al instante, solo pedir que abran el correo.
+  const loginSentBox = (
+    <div className="mt-5 rounded-card border border-emerald-200 bg-emerald-50 p-4">
+      <p className="text-[14px] font-semibold text-emerald-800">Revisa tu correo</p>
+      <p className="mt-1 text-[13px] leading-relaxed text-emerald-700">
+        Te hemos enviado un enlace para confirmar que eres tú. Ábrelo desde este mismo dispositivo para entrar a tu área de cliente.
+      </p>
+      <button type="button" onClick={() => setLoginSent(false)} className="mt-2 text-[12px] font-semibold text-emerald-800 underline">
+        Usar otro dato
+      </button>
+    </div>
+  );
+
   // Sin sesión válida: pantalla de acceso a pantalla completa, sin cabecera
   // ni pie con enlaces de salida — como el login de un área de clientes real.
   if (vista === "acceso") {
@@ -251,16 +244,21 @@ export function AreaClienteContent() {
             <div className="mt-8 w-full max-w-sm sm:mt-12">
               <h1 className="text-[26px] font-extrabold leading-tight text-navy">Hola, entra en tu área de cliente</h1>
               <p className="mt-2 text-[14px] leading-relaxed text-slate2">
-                Con tu correo, tu teléfono o tu número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF).
+                Con tu correo, tu teléfono o tu número de presupuesto (te lo enviamos por WhatsApp o aparece en tu PDF), te
+                mandamos un enlace de acceso a tu correo para confirmar que eres tú.
               </p>
-              {loginField}
-              <button
-                type="button" onClick={handleLogin} disabled={loginLoading}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
-              >
-                {loginLoading && <Spinner />}
-                {loginLoading ? "Buscando…" : "Entrar a mi área"}
-              </button>
+              {loginSent ? loginSentBox : (
+                <>
+                  {loginField}
+                  <button
+                    type="button" onClick={handleLogin} disabled={loginLoading}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+                  >
+                    {loginLoading && <Spinner />}
+                    {loginLoading ? "Enviando enlace…" : "Enviarme un enlace de acceso"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -343,19 +341,22 @@ export function AreaClienteContent() {
             </button>
           </div>
           {showRecoverBox && (
-            <>
-              <p className="mt-2 text-[13px] leading-relaxed text-slate2">
-                Introduce el correo, el teléfono o el número de ese otro tarificador.
-              </p>
-              {loginField}
-              <button
-                type="button" onClick={handleLogin} disabled={loginLoading}
-                className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
-              >
-                {loginLoading && <Spinner />}
-                {loginLoading ? "Buscando…" : "Añadir a mi área"}
-              </button>
-            </>
+            loginSent ? loginSentBox : (
+              <>
+                <p className="mt-2 text-[13px] leading-relaxed text-slate2">
+                  Introduce el correo, el teléfono o el número de ese otro tarificador y te mandamos un enlace a ese correo
+                  para confirmarlo.
+                </p>
+                {loginField}
+                <button
+                  type="button" onClick={handleLogin} disabled={loginLoading}
+                  className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
+                >
+                  {loginLoading && <Spinner />}
+                  {loginLoading ? "Enviando enlace…" : "Enviarme un enlace"}
+                </button>
+              </>
+            )
           )}
         </section>
 

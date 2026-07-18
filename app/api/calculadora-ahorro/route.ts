@@ -3,6 +3,7 @@ import { savingsCalculatorSchema } from "@/lib/schema";
 import { upsertLead, createLlamada } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { getSeoLandingPage, resolvePrice } from "@/lib/seoLandingPages";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: false },
     d.consent);
 
-  const { id } = await upsertLead(
+  const { id, deduped } = await upsertLead(
     {
       nombre: d.nombre, telefono: d.telefono, producto: "salud",
       yaTieneSeguro: d.pagoActual != null, seguroActualImporte: d.pagoActual,
@@ -64,8 +65,10 @@ export async function POST(request: Request) {
     nombre: d.nombre, telefono: d.telefono,
   }).catch((err) => console.error("[calculadora-ahorro] llamada error", err));
 
-  setClientSessionCookie(id);
-  return NextResponse.json({ ok: true, id, precioEstimado, ahorro });
+  // Ver comentario equivalente en app/api/lead/route.ts.
+  if (deduped) await sendAreaClienteVerificationEmail(id);
+  else setClientSessionCookie(id);
+  return NextResponse.json({ ok: true, id, deduped, precioEstimado, ahorro });
 }
 
 export function GET() {

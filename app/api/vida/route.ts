@@ -6,6 +6,7 @@ import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeMotivo } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
@@ -118,7 +119,9 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[vida] manychat sync error", sync.error);
   }
 
-  setClientSessionCookie(id);
+  // Ver comentario equivalente en app/api/lead/route.ts.
+  if (deduped) await sendAreaClienteVerificationEmail(id);
+  else setClientSessionCookie(id);
   return NextResponse.json({ ok: true, id, deduped });
 }
 

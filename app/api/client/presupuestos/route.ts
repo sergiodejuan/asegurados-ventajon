@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
 import { findClientPresupuestos } from "@/lib/store";
-import { presupuestoToClientQuote } from "@/lib/clientQuote";
-import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Endpoint público (sin token admin) para que un cliente recupere sus
-// presupuestos desde cualquier dispositivo, identificándose con UN solo
-// dato que solo él conoce: su correo, su móvil (con o sin +34) o su número
-// de presupuesto. No se expone información interna del CRM (notas del
-// agente, quién lo cerró, etc.). Al verificar correctamente, deja una
-// sesión (cookie httpOnly) para que en próximas visitas desde ese mismo
-// navegador no haga falta volver a identificarse.
+// Endpoint público (sin token admin) para que un cliente recupere el acceso
+// a su área de cliente desde otro dispositivo, identificándose con su
+// correo, su móvil o su número de presupuesto.
+//
+// Importante: un teléfono, un email o un número de presupuesto NO son un
+// secreto — cualquiera que los conozca podría escribirlos aquí. Por eso este
+// endpoint YA NO concede sesión ni devuelve los presupuestos al momento
+// (como hacía antes): solo manda un enlace de un solo uso al email que YA
+// estaba guardado en la ficha (nunca a uno nuevo que llegue en la propia
+// petición). Sin ese clic, no hay acceso — ver lib/clientVerification.ts.
 export async function POST(request: Request) {
+  const limited = await rateLimitFail(request, { bucket: "client-recover", limit: 10, windowSeconds: 3600 });
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
@@ -28,9 +34,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "No hemos encontrado ningún presupuesto con ese dato. Revisa que esté bien escrito." });
   }
 
-  setClientSessionCookie(found.leadId);
+  const { sent } = await sendAreaClienteVerificationEmail(found.leadId);
+  if (!sent) {
+    return NextResponse.json({
+      ok: false,
+      error: "No hemos podido enviarte un enlace de verificación. Escríbenos por WhatsApp y te ayudamos a acceder.",
+    });
+  }
 
-  return NextResponse.json({ ok: true, presupuestos: found.presupuestos.map(presupuestoToClientQuote) });
+  return NextResponse.json({ ok: true, verificationSent: true });
 }
 
 export function GET() {

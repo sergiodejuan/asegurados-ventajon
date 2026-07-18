@@ -5,6 +5,7 @@ import { buildConsent } from "@/lib/consent";
 import { blandConfigured, triggerBlandCall } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { sendPushToLead } from "@/lib/webPush";
 import { BRAND_NAME } from "@/lib/brand";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
@@ -124,7 +125,12 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);
   }
 
-  setClientSessionCookie(id);
+  // Ver comentario equivalente en app/api/lead/route.ts. Este formulario no
+  // pide email (solo teléfono): si la ficha existente no tiene uno guardado
+  // de un envío anterior, sendAreaClienteVerificationEmail no hace nada — no
+  // se concede sesión, lo cual es el comportamiento seguro por defecto.
+  if (deduped) await sendAreaClienteVerificationEmail(id);
+  else setClientSessionCookie(id);
   return NextResponse.json({ ok: true, id, deduped });
 }
 

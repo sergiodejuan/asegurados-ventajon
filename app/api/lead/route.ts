@@ -6,6 +6,7 @@ import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
+import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
@@ -136,7 +137,12 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[lead] manychat sync error", sync.error);
   }
 
-  setClientSessionCookie(id);
+  // Si la ficha ya existía (mismo teléfono/email que un lead anterior), no
+  // se concede sesión al instante: cualquiera que conociera ese contacto
+  // podría "entrar" como esa persona. Se manda un enlace de verificación al
+  // email YA guardado en la ficha en vez de autenticar sin más.
+  if (deduped) await sendAreaClienteVerificationEmail(id);
+  else setClientSessionCookie(id);
   return NextResponse.json({ ok: true, id, deduped });
 }
 

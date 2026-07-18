@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AreaClienteContent } from "@/components/AreaClienteContent";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function AreaCliente() {
-  return <AreaClienteContent />;
+  return (
+    <Suspense fallback={null}>
+      <AreaClienteContent />
+    </Suspense>
+  );
 }
