@@ -14,6 +14,7 @@ import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
+import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { saludPrice, vidaPrice, autoPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -652,6 +653,23 @@ export async function saveCampaignConfig(patch: Partial<CampaignConfig>): Promis
   const current = await getCampaignConfig();
   const next: CampaignConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(CAMPAIGN_KEY, next);
+  return next;
+}
+
+/* ------------------------ Exit-intent de la web general --------------------- */
+
+const EXIT_INTENT_KEY = "exitintent:general";
+
+export async function getExitIntentConfig(): Promise<ExitIntentConfig> {
+  const stored = await jget<ExitIntentConfig>(EXIT_INTENT_KEY);
+  if (!stored || !Array.isArray(stored.campaigns)) return DEFAULT_EXIT_INTENT_CONFIG;
+  return { ...DEFAULT_EXIT_INTENT_CONFIG, ...stored };
+}
+
+export async function saveExitIntentConfig(patch: Partial<ExitIntentConfig>): Promise<ExitIntentConfig> {
+  const current = await getExitIntentConfig();
+  const next: ExitIntentConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  await jset(EXIT_INTENT_KEY, next);
   return next;
 }
 

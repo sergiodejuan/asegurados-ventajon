@@ -482,10 +482,13 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           </button>
         ) : <span aria-hidden="true" className="h-9 w-9 shrink-0" />}
         <div className="min-w-0 flex-1">
+          {/* Solo la barra, sin "Paso X de Y": un contador visible frena más
+              de lo que orienta (ver benchmarks de Typeform/Lemonade/Alan) —
+              el aria-label mantiene la posición accesible para lectores de
+              pantalla sin mostrarla a quien ve la pantalla. */}
           <div role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={idx + 1} aria-label={`Paso ${idx + 1} de ${total}`} className="h-1.5 w-full overflow-hidden rounded-full bg-hair">
             <div className="h-full rounded-full bg-brand-red transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} />
           </div>
-          <p className="mt-1.5 text-[12px] font-medium tnums text-slate2">Paso {idx + 1} de {total}</p>
         </div>
       </div>
       {/* Ancla de accesibilidad: mueve el foco al inicio del paso nuevo para

@@ -10,6 +10,7 @@ import { MetaPixel } from "@/components/MetaPixel";
 import { Analytics } from "@/components/Analytics";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
+import { GeneralExitIntentModal } from "@/components/GeneralExitIntentModal";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -104,6 +105,7 @@ export default async function RootLayout({
         <Analytics />
         <AssistantWidget />
         <AccessibilityWidget />
+        <GeneralExitIntentModal />
         <CookieConsentBanner />
       </body>
     </html>
