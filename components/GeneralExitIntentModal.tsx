@@ -4,6 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { IconByName, ChevronRight, Close } from "./icons";
 import type { ExitIntentCampaign } from "@/lib/exitIntentCampaign";
+import { useSiteTheme } from "@/lib/useTheme";
+
+const COOKIE_CONSENT_KEY = "ventajon:cookieConsent";
+
+// El aviso de cookies (components/CookieConsentBanner.tsx) es un overlay a
+// pantalla completa con z-index más alto y de obligado cumplimiento legal:
+// nunca debe competir por clics con un popup de marketing. Si todavía no hay
+// una decisión de cookies guardada (el aviso está o va a estar visible), el
+// exit-intent no se dispara en este intento.
+function cookieBannerPending(enabled: boolean): boolean {
+  if (!enabled) return false;
+  try {
+    return !localStorage.getItem(COOKIE_CONSENT_KEY);
+  } catch {
+    return false;
+  }
+}
 
 // Exit-intent de la web GENERAL (home, landings, blog, quiénes somos...).
 // Los tarificadores, la comparativa y "quiero que me llamen" ya tienen el
@@ -22,6 +39,7 @@ function countKey(id: string) {
 export function GeneralExitIntentModal() {
   const pathname = usePathname();
   const excluded = EXCLUDED_PREFIXES.some((p) => pathname?.startsWith(p));
+  const theme = useSiteTheme();
 
   const [campaigns, setCampaigns] = useState<ExitIntentCampaign[]>([]);
   const [active, setActive] = useState<ExitIntentCampaign | null>(null);
@@ -54,6 +72,7 @@ export function GeneralExitIntentModal() {
     let triggered = false;
     function trigger() {
       if (triggered || doneRef.current) return;
+      if (cookieBannerPending(theme.cookieConsent.enabled)) return;
       triggered = true;
       try {
         const shown = Number(sessionStorage.getItem(countKey(campaign.id)) ?? "0");
@@ -80,7 +99,7 @@ export function GeneralExitIntentModal() {
       document.removeEventListener("mouseout", onMouseOut);
       window.removeEventListener("popstate", onPopState);
     };
-  }, [excluded, campaigns]);
+  }, [excluded, campaigns, theme.cookieConsent.enabled]);
 
   useEffect(() => {
     if (!active) return;
