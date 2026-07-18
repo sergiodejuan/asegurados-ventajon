@@ -5,6 +5,7 @@ import { Testimonials, EXAMPLE_TESTIMONIALS } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
 import { PartnerBadge } from "./PartnerBadge";
+import { SocialProofBadge } from "./SocialProofBadge";
 import { ECOSYSTEM_MEMBERS, PARTNERS, TRUST_STATS } from "@/lib/brand";
 import { getProductPage } from "@/lib/productPages";
 import type { GeoLandingPage as GeoLandingPageData } from "@/lib/geoLandingPages";
@@ -47,6 +48,7 @@ export async function GeoLandingPage({ geo }: { geo: GeoLandingPageData }) {
                 {geo.subheadline}
               </p>
               <p className="mt-4 text-[22px] font-extrabold text-navy md:text-[26px]">{geo.priceLine}</p>
+              <SocialProofBadge />
             </div>
 
             <div

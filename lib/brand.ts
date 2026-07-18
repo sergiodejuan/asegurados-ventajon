@@ -55,6 +55,12 @@ export const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ?? ""
 export const PARTNERS = ["Mapfre", "Adeslas", "Asisa", "Zurich", "Generali"];
 export const ECOSYSTEM_MEMBERS = "350.000 socios";
 
+// Valoración mostrada junto a las estrellas del bloque de prueba social del
+// hero (ver components/SocialProofBadge.tsx). Cifra proporcionada por
+// Sergio; en cuanto haya una puntuación real verificable (Google Business,
+// Trustpilot…) sustitúyela aquí para que se actualice en toda la web.
+export const RATING_VALUE = "4,7/5";
+
 // Datos de confianza reales (sin inventar cifras): reutilizados en la home y
 // en los bloques de prueba social del tarificador.
 export const TRUST_STATS = [

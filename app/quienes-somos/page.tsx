@@ -6,6 +6,7 @@ import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Check, IconByName } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
+import { SocialProofBadge } from "@/components/SocialProofBadge";
 import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 
@@ -53,6 +54,7 @@ export default async function QuienesSomos() {
                 Somos una correduría de seguros aliada con las principales compañías del país. No vendemos un único
                 producto: comparamos por ti para que pagues lo justo, sin trucos ni letra pequeña.
               </p>
+              <SocialProofBadge />
             </div>
             <div
               role="img"

@@ -7,6 +7,7 @@ import { SavingsCalculator } from "./SavingsCalculator";
 import { TarificadorExperience } from "./TarificadorExperience";
 import { Check, IconByName } from "./icons";
 import { PartnerBadge } from "./PartnerBadge";
+import { SocialProofBadge } from "./SocialProofBadge";
 import { ECOSYSTEM_MEMBERS, PARTNERS, TRUST_STATS } from "@/lib/brand";
 import { getProductPage } from "@/lib/productPages";
 import { SEO_LANDING_PAGES, priceLine, getCombinedFaq, type SeoLandingPageData } from "@/lib/seoLandingPages";
@@ -58,6 +59,7 @@ export async function SeoLandingPage({ page, precio }: { page: SeoLandingPageDat
                 {page.subheadline}
               </p>
               <p className="mt-4 text-[22px] font-extrabold text-navy md:text-[26px]">{priceLine(precio)}</p>
+              <SocialProofBadge />
             </div>
 
             <div

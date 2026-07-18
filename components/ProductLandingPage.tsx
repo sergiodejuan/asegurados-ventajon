@@ -5,6 +5,7 @@ import { Testimonials } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
 import { PartnerBadge } from "./PartnerBadge";
+import { SocialProofBadge } from "./SocialProofBadge";
 import { ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES, type ProductPage } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
@@ -32,6 +33,7 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
               <p className="mt-3 text-[16px] leading-relaxed text-slate2 md:text-[18px] md:max-w-md">
                 {page.subheadline}
               </p>
+              <SocialProofBadge />
             </div>
 
             <div
