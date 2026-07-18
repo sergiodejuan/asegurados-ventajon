@@ -6,13 +6,17 @@
 // por petición, que no existe hoy. Aun así, esta política ya bloquea lo más
 // importante: que un script cargue desde un dominio arbitrario no
 // autorizado, y que el sitio se enmarque (iframe) desde otro origen.
+//
+// connect.facebook.net + www.facebook.com: píxel de Meta (components/
+// MetaPixel.tsx) — el script se sirve desde el primero, el beacon de
+// noscript y las llamadas de fbq() van al segundo.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://challenges.cloudflare.com",
+  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://challenges.cloudflare.com https://connect.facebook.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https:",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://challenges.cloudflare.com",
+  "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://challenges.cloudflare.com https://connect.facebook.net https://www.facebook.com",
   "frame-src https://www.googletagmanager.com https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",

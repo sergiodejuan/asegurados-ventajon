@@ -5,6 +5,8 @@ import { getTheme } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { GoogleTagManager } from "@/components/GoogleTagManager";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { MetaPixel } from "@/components/MetaPixel";
 import { Analytics } from "@/components/Analytics";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
@@ -90,6 +92,8 @@ export default async function RootLayout({
       )}
       <body>
         <GoogleTagManager gtmId={theme.gtmId} />
+        {theme.ga4.enabled && <GoogleAnalytics measurementId={theme.ga4.measurementId} />}
+        {theme.metaPixel.enabled && <MetaPixel pixelId={theme.metaPixel.pixelId} />}
         <a
           href="#contenido"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-navy focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"

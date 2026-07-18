@@ -139,17 +139,19 @@ export default function Legal() {
           <li><strong>Alojamiento y base de datos:</strong> Vercel Inc. y Upstash Inc. (infraestructura de hosting y almacenamiento de la web y del CRM).</li>
           <li><strong>Mensajería por WhatsApp:</strong> ManyChat LLC, si nos escribes o te contactamos por WhatsApp.</li>
           <li><strong>Llamada automática de bienvenida (si está activada):</strong> Retell AI o Bland AI, proveedores del asistente de voz que puede realizar una primera llamada automatizada tras completar un formulario con autorización de contacto.</li>
-          <li><strong>Analítica y medición (solo si aceptas cookies analíticas/de marketing):</strong> Google (Tag Manager / Analytics).</li>
+          <li><strong>Analítica y medición (solo si aceptas cookies analíticas/de marketing):</strong> Google (Tag Manager / Analytics) y Meta Platforms Inc. (píxel de Facebook/Instagram y Conversions API, esta última solo si has marcado la casilla de comunicaciones comerciales — el email y el teléfono se envían siempre cifrados con SHA-256 antes de salir de nuestro servidor, nunca en claro).</li>
+          <li><strong>Envío de correo electrónico:</strong> Resend (Resend Inc.), para el correo de verificación de acceso a tu área de cliente.</li>
           <li><strong>Aseguradoras:</strong> {partnersTxt}, únicamente si decides avanzar hacia la contratación de una póliza, y solo con los datos necesarios para tramitarla.</li>
         </ul>
 
         <H3>3.4 Transferencias internacionales</H3>
         <P>
-          Algunos de los proveedores anteriores (Vercel, Upstash, ManyChat, Retell AI, Bland AI, Google)
-          pueden tratar datos en servidores ubicados fuera del Espacio Económico Europeo, en particular
-          en Estados Unidos. En esos casos, la transferencia se ampara en las Cláusulas Contractuales
-          Tipo aprobadas por la Comisión Europea u otro mecanismo de garantía equivalente reconocido por
-          el RGPD. Puedes solicitarnos más información sobre estas garantías en cualquier momento.
+          Algunos de los proveedores anteriores (Vercel, Upstash, ManyChat, Retell AI, Bland AI, Google,
+          Meta, Resend) pueden tratar datos en servidores ubicados fuera del Espacio Económico Europeo,
+          en particular en Estados Unidos. En esos casos, la transferencia se ampara en las Cláusulas
+          Contractuales Tipo aprobadas por la Comisión Europea u otro mecanismo de garantía equivalente
+          reconocido por el RGPD. Puedes solicitarnos más información sobre estas garantías en cualquier
+          momento.
         </P>
 
         <H3>3.5 Plazo de conservación</H3>
@@ -234,6 +236,12 @@ export default function Legal() {
                 <td className="px-3 py-2">Analítica (opcional)</td>
                 <td className="px-3 py-2">Medir el uso de la web mediante Google Analytics, si aceptas cookies analíticas.</td>
                 <td className="px-3 py-2">Hasta 24 meses</td>
+              </tr>
+              <tr className="border-t border-hair">
+                <td className="px-3 py-2 font-mono text-[12px]">_fbp, _fbc</td>
+                <td className="px-3 py-2">Marketing (opcional)</td>
+                <td className="px-3 py-2">Píxel de Meta (Facebook/Instagram): medir campañas y mostrarte anuncios relevantes, si aceptas cookies de marketing.</td>
+                <td className="px-3 py-2">Hasta 3 meses</td>
               </tr>
             </tbody>
           </table>

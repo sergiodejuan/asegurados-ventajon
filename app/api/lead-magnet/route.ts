@@ -3,6 +3,7 @@ import { leadMagnetSchema } from "@/lib/schema";
 import { upsertLead, updateLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { rateLimitFail } from "@/lib/rateLimit";
+import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,10 @@ export async function POST(request: Request) {
     consent
   );
   await updateLead(id, { note: `Descargó la guía "${guia.label}" desde la landing de recursos para Canarias y Baleares.` }).catch(() => {});
+
+  if (d.aceptaComercial) {
+    await sendMetaLeadEvent({ email: d.email, ...capiContextFromRequest(request) });
+  }
 
   return NextResponse.json({ ok: true, downloadUrl: guia.downloadUrl });
 }

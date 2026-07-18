@@ -7,6 +7,7 @@ import { blandConfigured, triggerBlandCall, humanizeUsoVehiculo, humanizeCobertu
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
@@ -123,6 +124,10 @@ export async function POST(request: Request) {
       utm: d.utm,
     });
     if (!sync.ok) console.error("[auto] manychat sync error", sync.error);
+  }
+
+  if (d.aceptaComercial) {
+    await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });
   }
 
   // Ver comentario equivalente en app/api/lead/route.ts.

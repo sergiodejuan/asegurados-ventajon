@@ -65,8 +65,17 @@ export async function PATCH(request: Request) {
   if (body.cookieConsent?.body && body.cookieConsent.body.length > 5000) {
     return NextResponse.json({ ok: false, error: "El texto de cookies es demasiado largo." }, { status: 413 });
   }
-  if (typeof body.gtmId === "string" && body.gtmId.length > 30) {
-    return NextResponse.json({ ok: false, error: "El ID de Google Tag Manager no es válido." }, { status: 413 });
+  if (typeof body.gtmId === "string") {
+    if (body.gtmId.length > 30) return NextResponse.json({ ok: false, error: "El ID de Google Tag Manager no es válido." }, { status: 413 });
+    if (body.gtmId && !/^GTM-[A-Z0-9]+$/.test(body.gtmId)) return NextResponse.json({ ok: false, error: "El ID de Google Tag Manager debe tener el formato GTM-XXXXXXX." }, { status: 400 });
+  }
+  if (typeof body.ga4?.measurementId === "string") {
+    if (body.ga4.measurementId.length > 20) return NextResponse.json({ ok: false, error: "El ID de medición de GA4 no es válido." }, { status: 413 });
+    if (body.ga4.measurementId && !/^G-[A-Z0-9]+$/.test(body.ga4.measurementId)) return NextResponse.json({ ok: false, error: "El ID de medición de GA4 debe tener el formato G-XXXXXXXXXX." }, { status: 400 });
+  }
+  if (typeof body.metaPixel?.pixelId === "string") {
+    if (body.metaPixel.pixelId.length > 30) return NextResponse.json({ ok: false, error: "El ID del píxel de Meta no es válido." }, { status: 413 });
+    if (body.metaPixel.pixelId && !/^\d+$/.test(body.metaPixel.pixelId)) return NextResponse.json({ ok: false, error: "El ID del píxel de Meta debe ser solo números." }, { status: 400 });
   }
 
   const theme = await saveTheme(body);

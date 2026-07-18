@@ -7,6 +7,7 @@ import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
 import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
 
@@ -135,6 +136,13 @@ export async function POST(request: Request) {
       utm: d.utm,
     });
     if (!sync.ok) console.error("[lead] manychat sync error", sync.error);
+  }
+
+  // Conversions API de Meta: solo si ha marcado la casilla de comunicaciones
+  // comerciales (es un envío con fines publicitarios, no de gestión del
+  // servicio) — mismo criterio de consentimiento que exige el propio píxel.
+  if (d.aceptaComercial) {
+    await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });
   }
 
   // Si la ficha ya existía (mismo teléfono/email que un lead anterior), no

@@ -131,6 +131,36 @@ export const DEFAULT_ACCESSIBILITY_WIDGET: AccessibilityWidgetConfig = {
   enabled: true,
 };
 
+// Medición directa (gtag.js), independiente de si también se usa GTM. Si
+// usas GTM para cargar GA4 dentro del contenedor, no actives esto a la vez
+// para el mismo GA4 — duplicarías las visitas. El ID (G-XXXXXXXXXX) no es
+// secreto (aparece igualmente en el JS del navegador); lo que sí es secreto
+// es la API Secret de Measurement Protocol, que por eso vive en variable de
+// entorno (GA4_API_SECRET), no aquí.
+export type Ga4Config = {
+  enabled: boolean;
+  measurementId: string; // G-XXXXXXXXXX
+};
+
+export const DEFAULT_GA4: Ga4Config = {
+  enabled: false,
+  measurementId: "",
+};
+
+// Meta Pixel (Facebook/Instagram Ads). El ID del píxel no es secreto (viaja
+// igualmente en el JS del navegador); el token de acceso de la Conversions
+// API (servidor a servidor, para el evento "Lead") sí lo es, y por eso vive
+// en variable de entorno (META_CAPI_ACCESS_TOKEN), nunca aquí.
+export type MetaPixelConfig = {
+  enabled: boolean;
+  pixelId: string;
+};
+
+export const DEFAULT_META_PIXEL: MetaPixelConfig = {
+  enabled: false,
+  pixelId: "",
+};
+
 export type SiteTheme = {
   colors: SiteColors;
   displayFont: string;
@@ -143,6 +173,8 @@ export type SiteTheme = {
   cookieConsent: CookieConsentConfig;
   accessibilityWidget: AccessibilityWidgetConfig;
   gtmId: string; // ID de contenedor de Google Tag Manager (GTM-XXXXXXX); vacío = no se carga
+  ga4: Ga4Config;
+  metaPixel: MetaPixelConfig;
   updatedAt: string;
 };
 
@@ -158,5 +190,7 @@ export const DEFAULT_THEME: SiteTheme = {
   cookieConsent: DEFAULT_COOKIE_CONSENT,
   accessibilityWidget: DEFAULT_ACCESSIBILITY_WIDGET,
   gtmId: "",
+  ga4: DEFAULT_GA4,
+  metaPixel: DEFAULT_META_PIXEL,
   updatedAt: new Date(0).toISOString(),
 };
