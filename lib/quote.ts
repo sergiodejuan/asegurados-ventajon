@@ -109,7 +109,7 @@ export function buildWhatsAppText(opts: { producto: string; compania?: string; q
   if (opts.compania) lines.push(`Me interesa la opción de ${opts.compania}.`);
   lines.push(`Producto: ${PRODUCTO_LABELS[opts.producto] ?? "Seguro"}.`);
   if (opts.quote?.id) lines.push(`Presupuesto nº ${quoteNumber(opts.quote.id)}.`);
-  if (opts.quote?.codigoPostal) lines.push(`Código postal: ${opts.quote.codigoPostal}.`);
+  if (opts.quote?.codigoPostal) lines.push(`Zona: ${opts.quote.codigoPostal}.`);
   if (opts.quote?.numAsegurados) lines.push(`Personas a asegurar: ${opts.quote.numAsegurados}.`);
   if (opts.quote?.fechaNacimiento) lines.push(`Fecha de nacimiento: ${opts.quote.fechaNacimiento}.`);
   if (opts.quote?.matricula) lines.push(`Matrícula: ${opts.quote.matricula}.`);

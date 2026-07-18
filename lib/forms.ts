@@ -7,7 +7,6 @@ export type Step =
   | { type: "yesno"; key: string; field: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "numbergrid"; key: string; field: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "dobsex"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
-  | { type: "cp"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "seguroActual"; key: string; title: string; helper?: string; servicios: string[]; showIf?: (d: FormData) => boolean }
   | { type: "matricula"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
   | { type: "vehiculo"; key: string; title: string; helper?: string; showIf?: (d: FormData) => boolean }
@@ -20,6 +19,19 @@ export type FormConfig = {
   endpoint: string;
   steps: Step[];
 };
+
+// Reemplaza al antiguo paso de código postal: basta con saber en qué zona
+// vive para ajustar la comparativa (traslados interinsulares, red de
+// talleres, etc. — ver los posts de actualidad sobre seguros en Canarias y
+// Baleares). El valor sigue viajando en el campo "codigoPostal" a propósito
+// (ver lib/schema.ts y lib/manychat.ts): así no hace falta tocar la
+// variable que ya lee la automatización de ManyChat, solo cambia lo que
+// contiene.
+export const ZONA_OPTIONS: Option[] = [
+  { value: "Islas Canarias", label: "Islas Canarias" },
+  { value: "Islas Baleares", label: "Islas Baleares" },
+  { value: "Península", label: "Península" },
+];
 
 export const SALUD_CONFIG: FormConfig = {
   producto: "salud",
@@ -36,7 +48,7 @@ export const SALUD_CONFIG: FormConfig = {
         { value: "comparando", label: "Aún estoy comparando" },
       ],
     },
-    { type: "cp", key: "cp", title: "¿Cuál es tu código postal?", helper: "Para ajustar la comparativa a tu zona." },
+    { type: "choice", key: "zona", field: "codigoPostal", title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "numbergrid", key: "asegurados", field: "numAsegurados", title: "¿Cuántas personas queréis aseguraros?", helper: "Cuéntalas incluyéndote a ti." },
     { type: "dobsex", key: "titular", title: "Datos de la persona titular", helper: "Solo la titular; a las demás las añadimos después." },
     { type: "yesno", key: "dental", field: "coberturaDental", title: "¿Quieres que incluya cobertura dental?", helper: "Puedes cambiarlo luego con tu asesor." },
@@ -61,7 +73,7 @@ export const VIDA_CONFIG: FormConfig = {
         { value: "otro", label: "Otro motivo" },
       ],
     },
-    { type: "cp", key: "cp", title: "¿Cuál es tu código postal?", helper: "Para ajustar la comparativa a tu zona." },
+    { type: "choice", key: "zona", field: "codigoPostal", title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "dobsex", key: "titular", title: "Tus datos", helper: "La edad influye en el precio del seguro de vida." },
     { type: "yesno", key: "fumador", field: "fumador", title: "¿Fumas?", helper: "Es un dato clave para calcular tu seguro de vida." },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", title: "¿Ya tienes un seguro de vida?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
@@ -95,7 +107,7 @@ export const AUTO_CONFIG: FormConfig = {
         { value: "vtc_taxi", label: "VTC o taxi" },
       ],
     },
-    { type: "cp", key: "cp", title: "¿Dónde se guarda habitualmente?", helper: "El código postal de garaje o aparcamiento habitual." },
+    { type: "choice", key: "zona", field: "codigoPostal", title: "¿Dónde se guarda habitualmente?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "dobsex", key: "titular", title: "Datos del conductor principal", helper: "La edad influye en el precio del seguro de auto." },
     {
       type: "choice", key: "carnet", field: "antiguedadCarnet",

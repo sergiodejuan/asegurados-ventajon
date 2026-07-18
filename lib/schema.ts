@@ -11,6 +11,14 @@ const phoneField = z
     message: "Introduce un móvil español válido (9 dígitos).",
   });
 
+// Sigue llamándose "codigoPostal" a propósito (ver lib/forms.ts): mismo
+// campo/variable que antes llevaba un código postal de 5 dígitos, ahora con
+// la zona de residencia — así no hace falta tocar la automatización de
+// ManyChat, que ya lee esta variable.
+const zonaField = z.enum(["Islas Canarias", "Islas Baleares", "Península"], {
+  errorMap: () => ({ message: "Selecciona dónde vives." }),
+});
+
 const utmField = z
   .object({
     source: z.string().optional(),
@@ -75,7 +83,7 @@ const seguroActual = {
 export const leadSchema = z.object({
   inicio: z.enum(["cuanto_antes", "proximo_mes", "fecha_personalizada", "comparando"]),
   fechaInicioPersonalizada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha no válida.").optional(),
-  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  codigoPostal: zonaField,
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
@@ -99,7 +107,7 @@ export type LeadInput = z.input<typeof leadSchema>;
 
 export const vidaSchema = z.object({
   motivo: z.enum(["familia", "hipoteca", "ahorro", "otro"]),
-  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  codigoPostal: zonaField,
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
   fumador: z.boolean(),
@@ -127,7 +135,7 @@ export const autoSchema = z.object({
   modeloVehiculo: z.string().trim().max(60).optional().default(""),
   anioVehiculo: z.string().trim().max(4).optional().default(""),
   usoVehiculo: z.enum(["particular", "trabajo", "vtc_taxi"]),
-  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  codigoPostal: zonaField,
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
   antiguedadCarnet: z.enum(["menos_2", "2_5", "mas_5"]),
@@ -188,7 +196,9 @@ export type CallRequestInput = z.input<typeof callRequestSchema>;
 export const exitIntentSchema = z.object({
   nombre: z.string().trim().max(120).optional().default(""),
   telefono: phoneField,
-  codigoPostal: z.union([z.string().regex(/^\d{5}$/), z.literal("")]).optional().default(""),
+  // Viaja aquí la zona (ver zonaField): este modal solo lo lanza StepForm
+  // sobre un tarificador a medias, que ya no pide código postal.
+  codigoPostal: z.union([zonaField, z.literal("")]).optional().default(""),
   producto: z.string().max(40).optional().default(""),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,

@@ -7,6 +7,7 @@ import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
 import { BRAND_NAME } from "@/lib/brand";
+import { ZONA_OPTIONS } from "@/lib/forms";
 import type { Product } from "@/lib/catalog";
 import {
   loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, quoteNumber, ageFromDob,
@@ -80,8 +81,8 @@ export function Comparativa() {
   if (loaded && !quote) {
     return (
       <>
-        <MinimalTopBar />
         <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
+          <MinimalTopBar />
           <p className="text-[16px] leading-relaxed text-slate2">
             No encontramos los datos de tu comparativa. Vuelve a calcular tu precio para verla.
           </p>
@@ -103,8 +104,8 @@ export function Comparativa() {
 
   return (
     <>
-      <MinimalTopBar />
       <main id="contenido" className="mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20">
+        <MinimalTopBar />
         <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-white">
           <Check width={30} height={30} />
         </div>
@@ -135,8 +136,8 @@ export function Comparativa() {
 
             {!editing ? (
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
-                <dt className="text-slate2">Código postal</dt>
-                <dd className="text-right font-semibold tnums text-ink">{quote.codigoPostal || "—"}</dd>
+                <dt className="text-slate2">Zona</dt>
+                <dd className="text-right font-semibold text-ink">{quote.codigoPostal || "—"}</dd>
                 {producto === "salud" && (
                   <>
                     <dt className="text-slate2">Personas a asegurar</dt>
@@ -168,14 +169,17 @@ export function Comparativa() {
               </dl>
             ) : (
               <div className="mt-3 flex flex-col gap-3">
-                <label className="block">
-                  <span className="mb-1 block text-[13px] font-semibold text-ink">Código postal</span>
-                  <input
-                    inputMode="numeric" maxLength={5} value={cp}
-                    onChange={(e) => setCp(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                    className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink"
-                  />
-                </label>
+                <div>
+                  <span className="mb-1.5 block text-[13px] font-semibold text-ink">Zona</span>
+                  <div className="flex flex-wrap gap-2">
+                    {ZONA_OPTIONS.map((z) => (
+                      <button key={z.value} type="button" aria-pressed={cp === z.value} onClick={() => setCp(z.value)}
+                        className={`rounded-pill border px-3.5 py-2 text-[13px] font-medium transition-colors ${cp === z.value ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}>
+                        {z.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {producto === "salud" && (
                   <>
                     <label className="block">
@@ -240,11 +244,12 @@ export function Comparativa() {
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
-                        <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} />
-                        {c.compania}
+                      <div className="flex items-center gap-2">
+                        {c.logoUrl
+                          ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                          : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
                         {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
-                      </p>
+                      </div>
                       <p className="text-right text-[14px] text-slate2">
                         Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
                       </p>
@@ -257,11 +262,12 @@ export function Comparativa() {
                 const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
-                    <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
-                      <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} />
-                      {c.compania}
+                    <div className="flex items-center gap-2">
+                      {c.logoUrl
+                        ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                        : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
                       {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
-                    </p>
+                    </div>
                     <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
                       <span>Con copago</span>
                       <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>

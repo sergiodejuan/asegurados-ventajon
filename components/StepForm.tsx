@@ -141,10 +141,6 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   }
 
   /* ------------------------------ Validaciones ----------------------------- */
-  function validateCp(): boolean {
-    if (!/^\d{5}$/.test(String(data.codigoPostal ?? ""))) { setErrors({ codigoPostal: "El código postal debe tener 5 dígitos." }); return false; }
-    return true;
-  }
   function validateDob(): boolean {
     const e: FieldErrors = {};
     const dd = String(data.dd ?? ""), mm = String(data.mm ?? ""), aaaa = String(data.aaaa ?? "");
@@ -291,21 +287,6 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
                 </button>
               ))}
             </div>
-          </Shell>
-        );
-      case "cp":
-        return (
-          <Shell title={step.title} helper={step.helper}>
-            <form onSubmit={(ev) => { ev.preventDefault(); if (validateCp()) next(); }}>
-              <label htmlFor="f-codigoPostal" className="sr-only">Código postal</label>
-              <input id="f-codigoPostal" name="postal-code" inputMode="numeric" autoComplete="postal-code" maxLength={5} spellCheck={false}
-                placeholder="35001…" value={String(data.codigoPostal ?? "")}
-                onChange={(ev) => set({ codigoPostal: ev.target.value.replace(/\D/g, "").slice(0, 5) })}
-                aria-invalid={!!errors.codigoPostal} aria-describedby={errors.codigoPostal ? "err-cp" : undefined}
-                className={`w-full rounded-card border bg-white px-5 py-4 text-[18px] tracking-wide tnums text-ink placeholder:text-slate2/60 ${errors.codigoPostal ? "border-brand-red" : "border-hair"}`} />
-              <FieldError id="err-cp" msg={errors.codigoPostal} />
-              <PrimaryButton disabled={String(data.codigoPostal ?? "").length !== 5}>Continuar</PrimaryButton>
-            </form>
           </Shell>
         );
       case "matricula": {
