@@ -10,6 +10,7 @@ import { sendPushToLead } from "@/lib/webPush";
 import { BRAND_NAME } from "@/lib/brand";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { promotionSourceFromUtm } from "@/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +34,10 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   // Mismo formulario, pero completado desde el widget asistente en vez de la
-  // página normal: se distingue en el source para poder medirlo aparte.
-  const source = d.origen === "asistente" ? "quiero-que-me-llamen-widget" : "quiero-que-me-llamen";
+  // página normal: se distingue en el source para poder medirlo aparte. Si
+  // viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
+  const source = promotionSourceFromUtm(d.utm) ??
+    (d.origen === "asistente" ? "quiero-que-me-llamen-widget" : "quiero-que-me-llamen");
 
   const consent = buildConsent(request, source, "/quiero-que-me-llamen",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },

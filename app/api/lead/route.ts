@@ -11,6 +11,7 @@ import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
+import { promotionSourceFromUtm } from "@/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,11 +37,14 @@ export async function POST(request: Request) {
 
   // Mismo tarificador, pero completado desde el widget asistente o desde una
   // landing de captación SEO (/seguro-de-salud-*) en vez de la página normal:
-  // se distingue en el source para poder medirlo aparte.
+  // se distingue en el source para poder medirlo aparte. Si el envío llega
+  // con el UTM de una promoción, esa es la fuente que queda en el lead —
+  // pesa más que el origen genérico, porque dice de qué promoción concreta vino.
   const source =
-    d.origen === "asistente" ? "tarificador-salud-widget"
+    promotionSourceFromUtm(d.utm) ??
+    (d.origen === "asistente" ? "tarificador-salud-widget"
     : d.origen === "seo-landing" ? "tarificador-salud-seo"
-    : "tarificador-salud";
+    : "tarificador-salud");
 
   // La página exacta de origen viaja en el Referer del navegador — útil para
   // saber desde cuál de las landings SEO llegó este lead concreto sin tener

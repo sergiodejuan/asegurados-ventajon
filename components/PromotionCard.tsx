@@ -1,12 +1,16 @@
 import { IconByName } from "./icons";
-import type { Promotion } from "@/lib/promotions";
+import { withPromotionUtm, type Promotion } from "@/lib/promotions";
 
 // Tarjeta del listado /promociones: foto a sangre con degradado oscuro y
 // titular/CTA superpuestos en blanco, al estilo de la referencia (Línea
 // Directa). Toda la tarjeta es un único enlace, a diferencia de PostCard,
 // porque aquí no hay una franja de texto aparte donde poner un segundo enlace.
 export function PromotionCard({ promo }: { promo: Promotion }) {
-  const href = promo.linkExterno || `/promociones/${promo.slug}`;
+  // Si va a su propia página (caso normal) no hace falta etiquetarlo: el UTM
+  // se añade ahí, en los CTA reales que llevan a un tarificador/formulario.
+  // Si en cambio salta directo a una landing externa (linkExterno), sí
+  // necesita su propio UTM porque no pasa por esa página intermedia.
+  const href = promo.linkExterno ? withPromotionUtm(promo.linkExterno, promo.slug) : `/promociones/${promo.slug}`;
   return (
     <li className="overflow-hidden rounded-[20px] shadow-soft">
       <a href={href} className="group relative block h-64 w-full overflow-hidden bg-navy-deep">

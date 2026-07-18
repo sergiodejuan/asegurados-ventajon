@@ -44,6 +44,36 @@ export function isPromotionActive(promo: Pick<Promotion, "status" | "finPromocio
   return true;
 }
 
+// UTM automático por promoción (no hace falta escribirlo a mano ni en las
+// promociones actuales ni en las que se creen luego): utm_campaign se
+// deriva siempre del slug, con el prefijo "promo-" para poder distinguir en
+// el lead de qué promoción concreta vino (ver promotionSourceFromUtm).
+export function promotionUtmCampaign(slug: string): string {
+  return `promo-${slug}`;
+}
+
+// Si el propio ctaHref ya trae un UTM suyo (p.ej. el de "1 mes gratis", que
+// arrastra una campaña antigua propia) se sobrescribe, no se concatena: el
+// UTM de la promoción debe ganar siempre para que promotionSourceFromUtm
+// pueda leerlo (URLSearchParams.get() solo devuelve la primera aparición de
+// cada parámetro, así que dos utm_campaign en la misma URL sería un bug).
+export function withPromotionUtm(href: string, slug: string): string {
+  const [path, query = ""] = href.split("?");
+  const params = new URLSearchParams(query);
+  params.set("utm_source", "promociones");
+  params.set("utm_medium", "promocion");
+  params.set("utm_campaign", promotionUtmCampaign(slug));
+  return `${path}?${params.toString()}`;
+}
+
+// Si el envío llega con el utm_campaign que generan las promociones, esa es
+// la fuente que se guarda en la ficha del lead (en vez del origen genérico
+// del tarificador/formulario), para saber de qué promoción concreta vino.
+export function promotionSourceFromUtm(utm: { campaign?: string } | null | undefined): string | null {
+  const campaign = utm?.campaign;
+  return campaign && campaign.startsWith("promo-") ? campaign : null;
+}
+
 const now = new Date().toISOString();
 
 export const DEFAULT_PROMOTIONS: Promotion[] = [

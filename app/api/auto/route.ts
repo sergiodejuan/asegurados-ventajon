@@ -11,6 +11,7 @@ import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
+import { promotionSourceFromUtm } from "@/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,9 @@ export async function POST(request: Request) {
 
   // Mismo tarificador, pero completado desde el widget asistente en vez de
   // la página normal: se distingue en el source para poder medirlo aparte.
-  const source = d.origen === "asistente" ? "tarificador-auto-widget" : "tarificador-auto";
+  // Si viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
+  const source = promotionSourceFromUtm(d.utm) ??
+    (d.origen === "asistente" ? "tarificador-auto-widget" : "tarificador-auto");
 
   const consent = buildConsent(request, source, "/tarificador-auto",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },

@@ -4,7 +4,7 @@ import { StickyMobileCta } from "./StickyMobileCta";
 import { PromotionCard } from "./PromotionCard";
 import { Check, Phone, WhatsApp, ChevronRight } from "./icons";
 import { CALLER_NUMBERS, SITE_URL } from "@/lib/brand";
-import type { Promotion } from "@/lib/promotions";
+import { withPromotionUtm, type Promotion } from "@/lib/promotions";
 import { otherPromotions } from "@/lib/store";
 
 function telHref(n: string) {
@@ -17,7 +17,14 @@ function telHref(n: string) {
 // del artículo y bases legales embebidas en una caja aparte.
 export async function PromotionPage({ promo }: { promo: Promotion }) {
   const related = await otherPromotions(promo.id);
-  const llamadmeHref = `/quiero-que-me-llamen${promo.producto ? `?producto=${promo.producto}` : ""}&utm_campaign=promo-${promo.slug}`;
+  // Los dos CTA que llevan a un tarificador/formulario van con el UTM propio
+  // de la promoción, para que el lead que se cree quede atribuido a ella
+  // (ver promotionSourceFromUtm en los endpoints de /api).
+  const ctaHref = withPromotionUtm(promo.ctaHref, promo.slug);
+  const llamadmeHref = withPromotionUtm(
+    `/quiero-que-me-llamen${promo.producto ? `?producto=${promo.producto}` : ""}`,
+    promo.slug
+  );
   const pageUrl = `${SITE_URL}/promociones/${promo.slug}`;
   const telefono = CALLER_NUMBERS[0]?.number ?? "";
 
@@ -47,7 +54,7 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
               solapar el titular ni la foto) en móvil. */}
           <div className="relative mt-4 rounded-[20px] bg-white p-5 shadow-card md:absolute md:-bottom-16 md:right-8 md:mt-0 md:w-[300px]">
             <a
-              href={promo.ctaHref}
+              href={ctaHref}
               className="flex items-center justify-center gap-1.5 rounded-pill bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
             >
               {promo.ctaTexto}
@@ -123,7 +130,7 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
       </main>
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
-      <StickyMobileCta label={promo.ctaTexto} href={promo.ctaHref} secondaryLabel="Llamadme gratis" secondaryHref={llamadmeHref} />
+      <StickyMobileCta label={promo.ctaTexto} href={ctaHref} secondaryLabel="Llamadme gratis" secondaryHref={llamadmeHref} />
     </>
   );
 }
