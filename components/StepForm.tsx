@@ -432,7 +432,10 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     }
   }
 
-  const progress = (Math.min(idx + 1, total) / total) * 100;
+  const currentPhase = current?.phase ?? 0;
+  const phaseSteps = activeSteps.filter((s) => s.phase === currentPhase);
+  const idxInPhase = activeSteps.slice(0, idx + 1).filter((s) => s.phase === currentPhase).length;
+  const progressInPhase = phaseSteps.length > 0 ? idxInPhase / phaseSteps.length : 1;
 
   if (finalizing) {
     const firstName = String(data.nombre ?? "").trim().split(/\s+/)[0] || undefined;
@@ -482,13 +485,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           </button>
         ) : <span aria-hidden="true" className="h-9 w-9 shrink-0" />}
         <div className="min-w-0 flex-1">
-          {/* Solo la barra, sin "Paso X de Y": un contador visible frena más
-              de lo que orienta (ver benchmarks de Typeform/Lemonade/Alan) —
-              el aria-label mantiene la posición accesible para lectores de
-              pantalla sin mostrarla a quien ve la pantalla. */}
-          <div role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={idx + 1} aria-label={`Paso ${idx + 1} de ${total}`} className="h-1.5 w-full overflow-hidden rounded-full bg-hair">
-            <div className="h-full rounded-full bg-brand-red transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} />
-          </div>
+          <PhaseStepper labels={config.phaseLabels} currentPhase={currentPhase} progressInPhase={progressInPhase} />
         </div>
       </div>
       {/* Ancla de accesibilidad: mueve el foco al inicio del paso nuevo para
@@ -519,6 +516,47 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
 }
 
 /* --------------------------- Piezas reutilizables -------------------------- */
+// Indicador de avance por fases con nombre (p.ej. "Tu vehículo" → "Tu seguro"
+// → "Tu precio"), en vez de un "Paso X de Y": orienta sin generar la fricción
+// de un contador que se ve largo desde el primer paso (ver nota en forms.ts).
+function PhaseStepper({ labels, currentPhase, progressInPhase }: { labels: string[]; currentPhase: number; progressInPhase: number }) {
+  const n = labels.length;
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={1}
+      aria-valuemax={n}
+      aria-valuenow={currentPhase + 1}
+      aria-label={`Fase ${currentPhase + 1} de ${n}: ${labels[currentPhase]}`}
+    >
+      <div className="flex gap-1">
+        {labels.map((label, i) => (
+          <p
+            key={label}
+            className={`flex-1 truncate text-[12px] font-semibold tnums ${i === 0 ? "text-left" : i === n - 1 ? "text-right" : "text-center"} ${i === currentPhase ? "text-ink" : "text-slate2"}`}
+          >
+            {label}
+          </p>
+        ))}
+      </div>
+      <div className="mt-1.5 flex items-center">
+        {labels.map((_, i) => (
+          <div key={i} className={`flex items-center ${i === n - 1 ? "shrink-0" : "flex-1"}`}>
+            <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full transition-colors duration-300 ${i <= currentPhase ? "bg-brand-red" : "bg-hair"}`} />
+            {i < n - 1 && (
+              <span aria-hidden="true" className="mx-1 h-[3px] flex-1 overflow-hidden rounded-full bg-hair">
+                <span
+                  className="block h-full rounded-full bg-brand-red transition-[width] duration-300 ease-out"
+                  style={{ width: `${i < currentPhase ? 100 : i === currentPhase ? progressInPhase * 100 : 0}%` }}
+                />
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 function Shell({ title, helper, children }: { title: string; helper?: string; children: React.ReactNode }) {
   return (
     <div className="motion-safe:animate-fade-up">
