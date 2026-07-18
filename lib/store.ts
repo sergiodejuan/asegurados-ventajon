@@ -6,6 +6,7 @@ import {
   type Llamada, type LlamadaDraft, type LlamadaStatus, type LlamadaNote, type ClientNotification,
   type NpsResponse,
   type Agent, type AgentDraft, type AdminModule, type AuditAction, type AuditLog,
+  type EmailLog,
   emptyAvailability,
 } from "./crm";
 import { hashPassword } from "./password";
@@ -149,6 +150,7 @@ export async function upsertLead(
     const lead = await jget<Lead>(`lead:${id}`);
     if (lead) {
       fillEmpty(lead, draft);
+      lead.emails = lead.emails ?? []; // fichas creadas antes de este campo
       lead.updatedAt = now;
       if (!lead.sources.includes(source)) lead.sources.push(source);
       // Solo se conserva el registro de consentimiento más reciente (evita una
@@ -199,6 +201,7 @@ export async function upsertLead(
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
     submissions: [],
+    emails: [],
     anonymizedAt: "",
   };
   const firstSubmission: LeadSubmission = { id: makeSubmissionId(), at: now, source, producto: draft.producto ?? "", data: { ...draft } as Record<string, unknown> };
@@ -328,6 +331,55 @@ export async function updateLead(
   return lead;
 }
 
+/* ---------------------------- Correos enviados ------------------------------ */
+// Traza de cada correo transaccional (resumen de comparativa, verificación de
+// acceso...) en la propia ficha del lead — ver EmailLog en lib/crm.ts. El
+// registro del envío ("enviado") cuenta como actividad real de la ficha
+// (bump de updatedAt/índice); las aperturas y clics posteriores solo
+// actualizan el propio registro, sin "revivir" la ficha en el listado cada
+// vez que alguien abre un correo antiguo.
+
+export async function addEmailLog(
+  leadId: string,
+  entry: { id: string; to: string; subject: string; tipo: string }
+): Promise<void> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return;
+  const now = new Date().toISOString();
+  const log: EmailLog = {
+    id: entry.id, at: now, to: entry.to, subject: entry.subject, tipo: entry.tipo,
+    status: "enviado", openedAt: "", openCount: 0, clickedAt: "", clickCount: 0,
+  };
+  lead.emails = [log, ...(lead.emails ?? [])];
+  lead.updatedAt = now;
+  await jset(`lead:${leadId}`, lead);
+  await zadd("leads:index", Date.parse(now), leadId);
+}
+
+export async function markEmailOpened(leadId: string, logId: string): Promise<void> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return;
+  const log = (lead.emails ?? []).find((e) => e.id === logId);
+  if (!log) return;
+  if (!log.openedAt) log.openedAt = new Date().toISOString();
+  log.openCount += 1;
+  if (log.status === "enviado") log.status = "abierto";
+  await jset(`lead:${leadId}`, lead);
+}
+
+export async function markEmailClicked(leadId: string, logId: string): Promise<void> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return;
+  const log = (lead.emails ?? []).find((e) => e.id === logId);
+  if (!log) return;
+  const now = new Date().toISOString();
+  if (!log.openedAt) log.openedAt = now; // un clic implica que se abrió
+  if (!log.clickedAt) log.clickedAt = now;
+  log.clickCount += 1;
+  log.status = "clic";
+  await jset(`lead:${leadId}`, lead);
+}
+
 /* ------------------------------- RGPD --------------------------------------- */
 // Derechos de acceso/portabilidad y supresión (RGPD arts. 15/17/20). La
 // supresión se implementa como anonimización: se sustituyen los datos
@@ -362,6 +414,7 @@ export async function anonymizeLead(
   lead.fechaNacimiento = "";
   lead.seguroActualServicios = [];
   lead.utm = {};
+  lead.emails = (lead.emails ?? []).map((e) => ({ ...e, to: "[anonimizado]" }));
   lead.anonymizedAt = now;
   lead.updatedAt = now;
   lead.activity.unshift({

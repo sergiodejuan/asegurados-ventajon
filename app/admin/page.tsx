@@ -17,6 +17,11 @@ type ConsentRecord = {
   comercial: { granted: boolean; at?: string };
 };
 type LeadSubmission = { id: string; at: string; source: string; producto: string; data: Record<string, unknown>; precioAprox?: number | null };
+type EmailLog = {
+  id: string; at: string; to: string; subject: string; tipo: string;
+  status: "enviado" | "abierto" | "clic";
+  openedAt: string; openCount: number; clickedAt: string; clickCount: number;
+};
 type Lead = {
   id: string; createdAt: string; updatedAt: string;
   source: string; sources: string[]; producto: string; status: string; nextStep: string;
@@ -33,7 +38,17 @@ type Lead = {
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
   submissions: LeadSubmission[];
+  emails: EmailLog[];
   anonymizedAt: string;
+};
+
+const EMAIL_STATUS_COLORS: Record<EmailLog["status"], string> = {
+  enviado: "bg-navy/10 text-navy",
+  abierto: "bg-amber-100 text-amber-700",
+  clic: "bg-emerald-100 text-emerald-700",
+};
+const EMAIL_STATUS_LABELS: Record<EmailLog["status"], string> = {
+  enviado: "Enviado", abierto: "Abierto", clic: "Clic",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -355,6 +370,10 @@ function LeadsCrm() {
               <NotesPanel activity={l.activity} onSave={(txt) => patch(l.id, { note: txt })} />
             </CollapsiblePanel>
 
+            <CollapsiblePanel title="Emails">
+              <EmailsPanel emails={l.emails} />
+            </CollapsiblePanel>
+
             <CollapsiblePanel title="Presupuestos">
               <PresupuestosPanel leadId={l.id} />
             </CollapsiblePanel>
@@ -501,6 +520,32 @@ function ActivityPanel({ activity }: { activity: Activity[] }) {
           <div>
             <p className="text-[14px] text-ink">{a.note}</p>
             <p className="text-[12px] text-slate2">{fmt(a.at)}{a.meta?.agente ? ` · ${a.meta.agente}` : ""}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function EmailsPanel({ emails }: { emails: EmailLog[] }) {
+  if (!emails || emails.length === 0) return <p className="text-[13px] text-slate2">Sin correos enviados todavía.</p>;
+  return (
+    <ol className="flex flex-col gap-4">
+      {emails.map((e) => (
+        <li key={e.id} className="flex gap-3">
+          <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-navy" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[14px] font-semibold text-ink">{e.subject}</p>
+              <span className={`rounded-pill px-2 py-0.5 text-[11px] font-bold ${EMAIL_STATUS_COLORS[e.status]}`}>
+                {EMAIL_STATUS_LABELS[e.status]}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[12px] text-slate2">
+              Enviado {fmt(e.at)} a {e.to || "—"}
+              {e.openedAt && ` · Abierto ${fmt(e.openedAt)}${e.openCount > 1 ? ` (${e.openCount}×)` : ""}`}
+              {e.clickedAt && ` · Clic ${fmt(e.clickedAt)}${e.clickCount > 1 ? ` (${e.clickCount}×)` : ""}`}
+            </p>
           </div>
         </li>
       ))}

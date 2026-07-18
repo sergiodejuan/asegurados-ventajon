@@ -61,6 +61,14 @@ export function manychatConfigured(): boolean {
   return !!process.env.MANYCHAT_API_TOKEN;
 }
 
+// true solo si el resumen por WhatsApp post-tarificador realmente se va a
+// disparar (ver syncManychatLead más abajo) — para que el correo de
+// comparativa (lib/comparativaEmail.ts) solo diga "también te lo hemos
+// mandado por WhatsApp" cuando eso es cierto.
+export function manychatThankyouConfigured(): boolean {
+  return manychatConfigured() && !!process.env.MANYCHAT_THANKYOU_FLOW_NS;
+}
+
 async function manychatFetch<T>(path: string, body: Record<string, unknown>): Promise<{ ok: boolean; data?: T; error?: string }> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {

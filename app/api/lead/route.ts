@@ -4,9 +4,10 @@ import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
-import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
+import { manychatConfigured, manychatThankyouConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
@@ -137,6 +138,15 @@ export async function POST(request: Request) {
     });
     if (!sync.ok) console.error("[lead] manychat sync error", sync.error);
   }
+
+  // Correo con el resumen de la comparativa + CTA de "solicitar llamada" por
+  // cada aseguradora — mismo momento en el que ya se sincroniza con ManyChat
+  // y se dispara la llamada automática. No-op sin RESEND_API_KEY o sin email.
+  await sendComparativaSummaryEmail({
+    leadId: id, quoteId: submissionId, producto: "salud",
+    nombre: d.nombre, email: d.email, numAsegurados: d.numAsegurados, coberturaDental: d.coberturaDental,
+    whatsappSummarySent: manychatThankyouConfigured() && d.autorizaContacto,
+  });
 
   // Conversions API de Meta: solo si ha marcado la casilla de comunicaciones
   // comerciales (es un envío con fines publicitarios, no de gestión del

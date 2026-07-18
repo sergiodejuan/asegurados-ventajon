@@ -127,6 +127,8 @@ export type Lead = {
   activity: Activity[];
   // Histórico de tarificaciones / presupuestos (uno por envío de formulario).
   submissions: LeadSubmission[];
+  // Cada correo transaccional enviado a esta ficha (ver EmailLog más abajo).
+  emails: EmailLog[];
   // RGPD: fecha de anonimización si el interesado ha ejercido su derecho de
   // supresión ("" = no se ha solicitado). Los datos identificativos se
   // sustituyen por marcadores; se conserva la traza de actividad como
@@ -135,8 +137,40 @@ export type Lead = {
 };
 
 export type LeadDraft = Partial<
-  Omit<Lead, "id" | "createdAt" | "updatedAt" | "status" | "activity" | "sources" | "consents" | "submissions">
+  Omit<Lead, "id" | "createdAt" | "updatedAt" | "status" | "activity" | "sources" | "consents" | "submissions" | "emails">
 >;
+
+/* ------------------------------ Correos enviados ----------------------------- */
+// Traza de cada correo transaccional enviado a un lead (resumen de
+// comparativa, verificación de acceso al área de cliente...) — igual que
+// cualquier CRM, registra cuándo se mandó y si consta que se abrió o se hizo
+// clic en algún enlace. "abierto" depende de que el cliente de correo cargue
+// imágenes (un píxel de 1x1 en el propio correo): algunos clientes (p.ej.
+// Apple Mail con "Protección de la privacidad de Mail") precargan imágenes
+// de forma automática aunque el destinatario no llegue a abrir el correo de
+// verdad, así que esta métrica es orientativa, no una prueba exacta de
+// lectura — limitación común a cualquier email marketing/transaccional, no
+// de este código en concreto.
+
+export const EMAIL_LOG_STATUSES = ["enviado", "abierto", "clic"] as const;
+export type EmailLogStatus = (typeof EMAIL_LOG_STATUSES)[number];
+
+export const EMAIL_LOG_STATUS_LABELS: Record<EmailLogStatus, string> = {
+  enviado: "Enviado", abierto: "Abierto", clic: "Clic",
+};
+
+export type EmailLog = {
+  id: string;
+  at: string; // envío
+  to: string;
+  subject: string;
+  tipo: string; // "comparativa-resumen" | "verificacion-acceso" | ...
+  status: EmailLogStatus; // el más avanzado alcanzado: enviado < abierto < clic
+  openedAt: string; // "" si no consta
+  openCount: number;
+  clickedAt: string; // "" si no consta
+  clickCount: number;
+};
 
 /* ------------------------------ Presupuestos -------------------------------- */
 // Cada tarificación completada (salud o vida) se guarda además como entidad

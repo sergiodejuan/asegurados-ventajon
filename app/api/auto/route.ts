@@ -4,9 +4,10 @@ import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeUsoVehiculo, humanizeCobertura } from "@/lib/bland";
-import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
+import { manychatConfigured, manychatThankyouConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
@@ -125,6 +126,13 @@ export async function POST(request: Request) {
     });
     if (!sync.ok) console.error("[auto] manychat sync error", sync.error);
   }
+
+  // Ver comentario equivalente en app/api/lead/route.ts.
+  await sendComparativaSummaryEmail({
+    leadId: id, quoteId: submissionId, producto: "auto",
+    nombre: d.nombre, email: d.email, antiguedadCarnet: d.antiguedadCarnet, coberturaDeseada: d.coberturaDeseada,
+    whatsappSummarySent: manychatThankyouConfigured() && d.autorizaContacto,
+  });
 
   if (d.aceptaComercial) {
     await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });

@@ -4,9 +4,10 @@ import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeMotivo } from "@/lib/bland";
-import { manychatConfigured, syncManychatLead } from "@/lib/manychat";
+import { manychatConfigured, manychatThankyouConfigured, syncManychatLead } from "@/lib/manychat";
 import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail } from "@/lib/rateLimit";
@@ -119,6 +120,13 @@ export async function POST(request: Request) {
     });
     if (!sync.ok) console.error("[vida] manychat sync error", sync.error);
   }
+
+  // Ver comentario equivalente en app/api/lead/route.ts.
+  await sendComparativaSummaryEmail({
+    leadId: id, quoteId: submissionId, producto: "vida",
+    nombre: d.nombre, email: d.email, fumador: d.fumador,
+    whatsappSummarySent: manychatThankyouConfigured() && d.autorizaContacto,
+  });
 
   if (d.aceptaComercial) {
     await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });
