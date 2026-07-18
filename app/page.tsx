@@ -6,7 +6,7 @@ import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { AutoWidget } from "@/components/AutoWidget";
-import { Check, IconByName, ArrowRight } from "@/components/icons";
+import { Check, IconByName, ArrowRight, Star } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
@@ -50,6 +50,32 @@ export default async function Home() {
                 Comparamos tu seguro de salud, vida, decesos, hogar y auto entre las mejores compañías
                 para que pagues lo justo. Sin trucos, sin letra pequeña.
               </p>
+
+              {/* Prueba social: solo escritorio (en móvil ya hay estadísticas justo debajo del hero). */}
+              <div className="mt-5 hidden items-center gap-3 md:flex">
+                <div className="flex -space-x-3" aria-hidden="true">
+                  {[
+                    { initials: "CR", bg: "bg-navy" },
+                    { initials: "JM", bg: "bg-brand-red" },
+                    { initials: "AT", bg: "bg-navy-deep" },
+                  ].map((a) => (
+                    <span
+                      key={a.initials}
+                      className={`grid h-10 w-10 place-items-center rounded-full border-2 border-white text-[12px] font-bold text-white ${a.bg}`}
+                    >
+                      {a.initials}
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <div className="flex gap-0.5 text-brand-red" aria-hidden="true">
+                    {Array.from({ length: 5 }, (_, i) => <Star key={i} />)}
+                  </div>
+                  <p className="mt-0.5 text-[13px] font-semibold text-ink">
+                    Únete a más de {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Imagen de marca: editable desde /admin/diseno; si no hay foto, placeholder con icono */}
