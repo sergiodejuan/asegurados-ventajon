@@ -106,6 +106,11 @@ export function AreaClienteContent() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSent, setLoginSent] = useState(false);
+  // Recuerda qué canal se usó para el último enlace enviado (para el texto
+  // de loginSentBox) y el dato con el que se localizó la ficha (para poder
+  // reenviar por otro canal sin que el usuario tenga que volver a escribirlo).
+  const [loginSentChannel, setLoginSentChannel] = useState<"email" | "whatsapp">("email");
+  const [lastIdentifier, setLastIdentifier] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -171,8 +176,12 @@ export function AreaClienteContent() {
   // podría, si no, "entrar" como esa persona). Ahora manda un enlace de un
   // solo uso al email ya guardado en la ficha; al hacer clic, ese enlace
   // (app/api/client/verify) concede la sesión y trae de vuelta aquí.
-  async function handleLogin() {
-    if (!loginValue.trim()) {
+  async function handleLogin(channel: "email" | "whatsapp" = "email") {
+    // Al reenviar por WhatsApp desde loginSentBox ya no hay nada en
+    // loginValue (se vació al enviar por email): se reutiliza el dato con
+    // el que se localizó la ficha la primera vez.
+    const identifier = channel === "whatsapp" ? lastIdentifier : loginValue;
+    if (!identifier.trim()) {
       setLoginError("Introduce tu correo, tu teléfono o tu número de presupuesto.");
       return;
     }
@@ -182,7 +191,7 @@ export function AreaClienteContent() {
       const res = await fetch("/api/client/presupuestos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: loginValue }),
+        body: JSON.stringify({ identifier, channel }),
       });
       const body = await res.json();
       if (!res.ok || !body.ok) {
@@ -190,6 +199,8 @@ export function AreaClienteContent() {
         setLoginLoading(false);
         return;
       }
+      setLastIdentifier(identifier);
+      setLoginSentChannel(channel);
       setLoginSent(true);
       setLoginValue("");
       setLoginLoading(false);
@@ -218,16 +229,31 @@ export function AreaClienteContent() {
   );
 
   // Tras pedir el enlace de verificación (ver handleLogin): ya no hay nada
-  // que mostrar al instante, solo pedir que abran el correo.
+  // que mostrar al instante, solo pedir que lo abran. Si se envió por email,
+  // se ofrece WhatsApp como alternativa manual (nunca reintento automático)
+  // por si el correo no llega o tarda — ver sendAreaClienteVerificationWhatsApp.
   const loginSentBox = (
     <div className="mt-5 rounded-card border border-emerald-200 bg-emerald-50 p-4">
-      <p className="text-[14px] font-semibold text-emerald-800">Revisa tu correo</p>
-      <p className="mt-1 text-[13px] leading-relaxed text-emerald-700">
-        Te hemos enviado un enlace para confirmar que eres tú. Ábrelo desde este mismo dispositivo para entrar a tu área de cliente.
+      <p className="text-[14px] font-semibold text-emerald-800">
+        {loginSentChannel === "whatsapp" ? "Revisa tu WhatsApp" : "Revisa tu correo"}
       </p>
-      <button type="button" onClick={() => setLoginSent(false)} className="mt-2 text-[12px] font-semibold text-emerald-800 underline">
-        Usar otro dato
-      </button>
+      <p className="mt-1 text-[13px] leading-relaxed text-emerald-700">
+        Te hemos enviado un enlace{loginSentChannel === "whatsapp" ? " por WhatsApp" : ""} para confirmar que eres tú.
+        Ábrelo desde este mismo dispositivo para entrar a tu área de cliente.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <button type="button" onClick={() => setLoginSent(false)} className="text-[12px] font-semibold text-emerald-800 underline">
+          Usar otro dato
+        </button>
+        {loginSentChannel === "email" && (
+          <button
+            type="button" onClick={() => handleLogin("whatsapp")} disabled={loginLoading}
+            className="text-[12px] font-semibold text-emerald-800 underline disabled:opacity-50"
+          >
+            ¿No te llega? Reenviar por WhatsApp
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -251,7 +277,7 @@ export function AreaClienteContent() {
                 <>
                   {loginField}
                   <button
-                    type="button" onClick={handleLogin} disabled={loginLoading}
+                    type="button" onClick={() => handleLogin()} disabled={loginLoading}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
                   >
                     {loginLoading && <Spinner />}
@@ -349,7 +375,7 @@ export function AreaClienteContent() {
                 </p>
                 {loginField}
                 <button
-                  type="button" onClick={handleLogin} disabled={loginLoading}
+                  type="button" onClick={() => handleLogin()} disabled={loginLoading}
                   className="mt-4 flex items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40"
                 >
                   {loginLoading && <Spinner />}

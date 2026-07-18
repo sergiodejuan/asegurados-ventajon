@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getLead } from "./store";
 import { sendEmail, emailConfigured } from "./email";
+import { manychatConfigured, sendManychatVerificationLink } from "./manychat";
 import { checkRateLimit } from "./rateLimit";
 import { SITE_URL, BRAND_NAME } from "./brand";
 
@@ -77,6 +78,24 @@ function verificationEmailHtml(nombre: string, link: string): string {
   `;
 }
 
+// Genera (y guarda) un enlace de un solo uso nuevo para una ficha, o null si
+// se ha superado el límite de la propia ficha. Compartido entre los dos
+// canales de envío (email y WhatsApp): lo que se protege con el límite es
+// la generación de enlaces en sí, no un canal concreto — si no fuera así,
+// alguien podría esquivar el límite de un canal simplemente pidiendo el
+// otro.
+async function createVerificationLink(leadId: string): Promise<string | null> {
+  // Máximo 3 enlaces de verificación por ficha y hora (entre email y
+  // WhatsApp juntos): evita que se pueda usar esto para bombardear de
+  // mensajes a alguien solo con su teléfono.
+  const limit = await checkRateLimit(`verify-link:${leadId}`, 3, 3600);
+  if (!limit.ok) return null;
+
+  const token = crypto.randomBytes(24).toString("base64url");
+  await storeToken(token, leadId);
+  return `${SITE_URL}/api/client/verify?token=${token}`;
+}
+
 // Punto único que llaman todas las rutas públicas que podrían estar tocando
 // una ficha YA EXISTENTE (dedupe por teléfono/email, o el formulario de
 // "recuperar mis presupuestos"): en vez de conceder la cookie de sesión al
@@ -92,14 +111,8 @@ export async function sendAreaClienteVerificationEmail(leadId: string): Promise<
   const lead = await getLead(leadId);
   if (!lead?.email) return { sent: false };
 
-  // Máximo 3 correos de verificación por ficha y hora: evita que se pueda
-  // usar esto para bombardear de correos a alguien solo con su teléfono.
-  const limit = await checkRateLimit(`verify-email:${leadId}`, 3, 3600);
-  if (!limit.ok) return { sent: false };
-
-  const token = crypto.randomBytes(24).toString("base64url");
-  await storeToken(token, leadId);
-  const link = `${SITE_URL}/api/client/verify?token=${token}`;
+  const link = await createVerificationLink(leadId);
+  if (!link) return { sent: false };
 
   const ok = await sendEmail({
     to: lead.email,
@@ -107,4 +120,22 @@ export async function sendAreaClienteVerificationEmail(leadId: string): Promise<
     html: verificationEmailHtml(lead.nombre, link),
   });
   return { sent: ok };
+}
+
+// Alternativa al email cuando el cliente lo pide expresamente (botón
+// "reenviar por WhatsApp" en /area-cliente): mismo enlace de un solo uso,
+// mandado al teléfono YA GUARDADO en la ficha vía una plantilla de WhatsApp
+// (ver sendManychatVerificationLink en lib/manychat.ts — requiere
+// MANYCHAT_VERIFICATION_FLOW_NS configurado).
+export async function sendAreaClienteVerificationWhatsApp(leadId: string): Promise<{ sent: boolean }> {
+  if (!manychatConfigured()) return { sent: false };
+
+  const lead = await getLead(leadId);
+  if (!lead?.telefono) return { sent: false };
+
+  const link = await createVerificationLink(leadId);
+  if (!link) return { sent: false };
+
+  const result = await sendManychatVerificationLink(lead.telefono, lead.nombre, link);
+  return { sent: result.ok };
 }

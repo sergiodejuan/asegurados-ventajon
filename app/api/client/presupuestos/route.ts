@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findClientPresupuestos } from "@/lib/store";
-import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
+import { sendAreaClienteVerificationEmail, sendAreaClienteVerificationWhatsApp } from "@/lib/clientVerification";
 import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -16,6 +16,10 @@ export const dynamic = "force-dynamic";
 // (como hacía antes): solo manda un enlace de un solo uso al email que YA
 // estaba guardado en la ficha (nunca a uno nuevo que llegue en la propia
 // petición). Sin ese clic, no hay acceso — ver lib/clientVerification.ts.
+//
+// channel: "email" (por defecto) o "whatsapp" — este segundo se ofrece en
+// el área de cliente como alternativa manual si el email falla o el
+// cliente lo prefiere, nunca como reintento automático.
 export async function POST(request: Request) {
   const limited = await rateLimitFail(request, { bucket: "client-recover", limit: 10, windowSeconds: 3600 });
   if (limited) return limited;
@@ -28,21 +32,26 @@ export async function POST(request: Request) {
   if (!identifier.trim()) {
     return NextResponse.json({ ok: false, error: "Introduce tu correo, tu teléfono o tu número de presupuesto." }, { status: 400 });
   }
+  const channel = body.channel === "whatsapp" ? "whatsapp" : "email";
 
   const found = await findClientPresupuestos(identifier);
   if (!found) {
     return NextResponse.json({ ok: false, error: "No hemos encontrado ningún presupuesto con ese dato. Revisa que esté bien escrito." });
   }
 
-  const { sent } = await sendAreaClienteVerificationEmail(found.leadId);
+  const { sent } = channel === "whatsapp"
+    ? await sendAreaClienteVerificationWhatsApp(found.leadId)
+    : await sendAreaClienteVerificationEmail(found.leadId);
   if (!sent) {
     return NextResponse.json({
       ok: false,
-      error: "No hemos podido enviarte un enlace de verificación. Escríbenos por WhatsApp y te ayudamos a acceder.",
+      error: channel === "whatsapp"
+        ? "No hemos podido enviarte el enlace por WhatsApp. Prueba por email o escríbenos y te ayudamos a acceder."
+        : "No hemos podido enviarte un enlace de verificación. Prueba por WhatsApp o escríbenos y te ayudamos a acceder.",
     });
   }
 
-  return NextResponse.json({ ok: true, verificationSent: true });
+  return NextResponse.json({ ok: true, verificationSent: true, channel });
 }
 
 export function GET() {

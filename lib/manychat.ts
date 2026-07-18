@@ -16,12 +16,17 @@ import { quoteNumber } from "./quote";
 //     que envía la plantilla de WhatsApp de agradecimiento/resumen. Sin esta
 //     variable, simplemente no se dispara ningún mensaje de WhatsApp (el resto
 //     de la sincronización sigue funcionando igual).
+//   MANYCHAT_VERIFICATION_FLOW_NS — (opcional) el "flow_ns" de un Flow que
+//     manda el enlace de un solo uso para entrar al área de cliente (ver
+//     sendManychatVerificationLink más abajo y lib/clientVerification.ts).
+//     Sin esta variable, el botón "reenviar por WhatsApp" del área de
+//     cliente no puede completarse (sigue funcionando por email igual).
 //
 // ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
 // los campos de texto: nombre, telefono, producto, email, codigo_postal,
 // precio_aprox, id_presupuesto, servicio_adicional, utm_source, utm_campaign,
-// utm_medium, fuente_web — la API de ManyChat no crea campos nuevos sobre la marcha,
-// solo rellena los que ya existen. Usa {{nombre}} en tus plantillas/Flows
+// utm_medium, fuente_web, link_verificacion — la API de ManyChat no crea campos
+// nuevos sobre la marcha, solo rellena los que ya existen. Usa {{nombre}} en tus plantillas/Flows
 // para el nombre del
 // formulario web: el first_name/last_name "de sistema" de ManyChat NO sirve
 // aquí, porque solo se rellena al crear el suscriptor por primera vez — si el
@@ -202,6 +207,29 @@ export async function sendManychatWhatsAppText(toNumber: string, nombre: string,
   const subscriber = await findOrCreateSubscriber(toNumber, nombre);
   if (!subscriber.ok || !subscriber.subscriberId) return { ok: false, error: subscriber.error || "No se pudo localizar al suscriptor en ManyChat." };
   return sendContent(subscriber.subscriberId, text);
+}
+
+// Enlace de un solo uso para entrar al área de cliente (ver lib/
+// clientVerification.ts), mandado por WhatsApp como alternativa al email
+// cuando el cliente lo pide expresamente. Igual que el mensaje de
+// agradecimiento: al ser (probablemente) fuera de la ventana de 24h desde
+// su último mensaje, no vale texto libre — hace falta una plantilla
+// aprobada por Meta, disparada como Flow. Configuración necesaria en
+// ManyChat antes de que esto funcione:
+//   1. Campo personalizado de texto "link_verificacion".
+//   2. Plantilla de WhatsApp con el placeholder de ese campo, aprobada por Meta.
+//   3. Un Flow que envíe esa plantilla; copia su flow_ns en MANYCHAT_VERIFICATION_FLOW_NS.
+// Sin MANYCHAT_VERIFICATION_FLOW_NS (o sin MANYCHAT_API_TOKEN), no-op: el
+// botón de "reenviar por WhatsApp" del área de cliente mostrará que no se
+// pudo enviar, sin afectar al resto de la sincronización con ManyChat.
+export async function sendManychatVerificationLink(toNumber: string, nombre: string, link: string): Promise<{ ok: boolean; error?: string }> {
+  if (!manychatConfigured()) return { ok: false, error: "ManyChat no configurado (falta MANYCHAT_API_TOKEN)." };
+  const flowNs = process.env.MANYCHAT_VERIFICATION_FLOW_NS;
+  if (!flowNs) return { ok: false, error: "Falta configurar MANYCHAT_VERIFICATION_FLOW_NS." };
+  const subscriber = await findOrCreateSubscriber(toNumber, nombre);
+  if (!subscriber.ok || !subscriber.subscriberId) return { ok: false, error: subscriber.error || "No se pudo localizar al suscriptor en ManyChat." };
+  await setCustomField(subscriber.subscriberId, "link_verificacion", link);
+  return triggerFlow(subscriber.subscriberId, flowNs);
 }
 
 export async function syncManychatLead(opts: {
