@@ -374,7 +374,7 @@ export function npsCategory(score: number): NpsCategory {
 
 export const ADMIN_MODULES = [
   "leads", "presupuestos", "llamadas", "tareas", "blog", "campana",
-  "productos", "informes", "rgpd", "configuracion", "agentes", "exitintents",
+  "productos", "informes", "rgpd", "configuracion", "agentes", "exitintents", "promociones",
 ] as const;
 export type AdminModule = (typeof ADMIN_MODULES)[number];
 
@@ -382,7 +382,7 @@ export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
   leads: "Leads", presupuestos: "Presupuestos", llamadas: "Llamadas", tareas: "Tareas",
   blog: "Blog", campana: "Campaña", productos: "Productos", informes: "Informes y analítica",
   rgpd: "RGPD", configuracion: "Configuración y diseño", agentes: "Agentes y permisos",
-  exitintents: "Exit-intent (web general)",
+  exitintents: "Exit-intent (web general)", promociones: "Promociones",
 };
 
 export const AGENT_ROLES = ["admin", "agente"] as const;

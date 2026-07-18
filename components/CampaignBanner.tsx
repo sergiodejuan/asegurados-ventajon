@@ -58,12 +58,17 @@ export function CampaignBanner() {
         </span>
         <h2 className="mt-4 max-w-xl text-[26px] font-extrabold leading-tight md:text-[34px]">{slide.headline}</h2>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-white/85 md:text-[16px]">{slide.sub}</p>
-        <a
-          href={slide.ctaHref}
-          className="mt-6 inline-flex items-center justify-center rounded-card bg-white px-6 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-white/90"
-        >
-          {slide.ctaLabel}
-        </a>
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <a
+            href={slide.ctaHref}
+            className="inline-flex items-center justify-center rounded-card bg-white px-6 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-white/90"
+          >
+            {slide.ctaLabel}
+          </a>
+          <a href="/promociones" className="text-[13px] font-semibold text-white/85 underline underline-offset-2 transition-colors hover:text-white">
+            Ver todas las promociones
+          </a>
+        </div>
 
         {slides.length > 1 && (
           <div role="tablist" aria-label="Diapositivas de la campaña" className="mt-8 flex gap-2">

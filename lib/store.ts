@@ -13,6 +13,7 @@ import { hashPassword } from "./password";
 import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
+import { DEFAULT_PROMOTIONS, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { saludPrice, vidaPrice, autoPrice, quoteNumber } from "./quote";
@@ -474,8 +475,12 @@ const PRODUCTS_KEY = "products:all";
 async function readProducts(): Promise<Product[]> {
   const stored = await jget<Product[]>(PRODUCTS_KEY);
   if (!stored || !stored.length) {
-    await jset(PRODUCTS_KEY, DEFAULT_PRODUCTS);
-    return DEFAULT_PRODUCTS;
+    // Copia, no la referencia: en modo memoria (sin KV) devolver el array
+    // por defecto tal cual y luego hacerle .push() en create() mutaría la
+    // constante compartida DEFAULT_PRODUCTS para siempre en este proceso.
+    const seeded = [...DEFAULT_PRODUCTS];
+    await jset(PRODUCTS_KEY, seeded);
+    return seeded;
   }
   // Añade de forma aditiva cualquier producto por defecto que todavía no
   // exista en lo guardado (p.ej. al lanzar un producto nuevo como "auto" en
@@ -550,8 +555,10 @@ const POSTS_KEY = "posts:all";
 async function readPosts(): Promise<Post[]> {
   const stored = await jget<Post[]>(POSTS_KEY);
   if (!stored || !stored.length) {
-    await jset(POSTS_KEY, DEFAULT_POSTS);
-    return DEFAULT_POSTS;
+    // Copia, no la referencia: ver nota equivalente en readProducts().
+    const seeded = [...DEFAULT_POSTS];
+    await jset(POSTS_KEY, seeded);
+    return seeded;
   }
   const knownIds = new Set(stored.map((p) => p.id));
   const missing = DEFAULT_POSTS.filter((p) => !knownIds.has(p.id));
@@ -636,6 +643,108 @@ export async function deletePost(id: string): Promise<boolean> {
   const next = all.filter((p) => p.id !== id);
   if (next.length === all.length) return false;
   await jset(POSTS_KEY, next);
+  return true;
+}
+
+/* ----------------------------- Promociones ----------------------------- */
+// "/promociones" y "/promociones/[slug]", editables desde /admin/promociones.
+// Mismo patrón que el blog: un único documento JSON, con semilla aditiva.
+
+const PROMOTIONS_KEY = "promotions:all";
+
+async function readPromotions(): Promise<Promotion[]> {
+  const stored = await jget<Promotion[]>(PROMOTIONS_KEY);
+  if (!stored || !stored.length) {
+    // Copia, no la referencia: ver nota equivalente en readProducts().
+    const seeded = [...DEFAULT_PROMOTIONS];
+    await jset(PROMOTIONS_KEY, seeded);
+    return seeded;
+  }
+  const knownIds = new Set(stored.map((p) => p.id));
+  const missing = DEFAULT_PROMOTIONS.filter((p) => !knownIds.has(p.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(PROMOTIONS_KEY, next);
+    return next;
+  }
+  return stored;
+}
+
+function sortPromotions(promotions: Promotion[]): Promotion[] {
+  return [...promotions].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+}
+
+export async function listPromotions(opts?: { onlyPublished?: boolean }): Promise<Promotion[]> {
+  let all = await readPromotions();
+  if (opts?.onlyPublished) all = all.filter((p) => p.status === "publicado");
+  return sortPromotions(all);
+}
+
+export async function getPromotion(id: string): Promise<Promotion | null> {
+  const all = await readPromotions();
+  return all.find((p) => p.id === id) ?? null;
+}
+
+export async function getPromotionBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Promotion | null> {
+  const all = await readPromotions();
+  const promo = all.find((p) => p.slug === slug) ?? null;
+  if (promo && opts?.onlyPublished && promo.status !== "publicado") return null;
+  return promo;
+}
+
+export async function otherPromotions(id: string, limit = 3): Promise<Promotion[]> {
+  const all = await listPromotions({ onlyPublished: true });
+  return all.filter((p) => p.id !== id).slice(0, limit);
+}
+
+// true si el slug ya está en uso por OTRA promoción (excludeId = la que se está editando).
+export async function promotionSlugTaken(slug: string, excludeId?: string): Promise<boolean> {
+  const all = await readPromotions();
+  return all.some((p) => p.slug === slug && p.id !== excludeId);
+}
+
+export async function createPromotion(draft: PromotionDraft): Promise<Promotion> {
+  const all = await readPromotions();
+  const now = new Date().toISOString();
+  const promo: Promotion = {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: draft.slug ?? "",
+    status: draft.status ?? "borrador",
+    categoria: draft.categoria ?? "",
+    imagenUrl: draft.imagenUrl ?? "",
+    tituloTarjeta: draft.tituloTarjeta ?? "",
+    h1: draft.h1 ?? "",
+    validoHasta: draft.validoHasta ?? "",
+    subtitulo: draft.subtitulo ?? "",
+    introParrafos: draft.introParrafos ?? [],
+    bases: draft.bases ?? [],
+    ctaTexto: draft.ctaTexto ?? "Calcula tu precio",
+    ctaHref: draft.ctaHref ?? "/tarificador",
+    producto: draft.producto ?? "",
+    metaTitle: draft.metaTitle ?? "",
+    metaDescription: draft.metaDescription ?? "",
+    publishedAt: draft.publishedAt ?? now.slice(0, 10),
+    updatedAt: now,
+  };
+  all.push(promo);
+  await jset(PROMOTIONS_KEY, all);
+  return promo;
+}
+
+export async function updatePromotion(id: string, patch: PromotionDraft): Promise<Promotion | null> {
+  const all = await readPromotions();
+  const idx = all.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(PROMOTIONS_KEY, all);
+  return all[idx];
+}
+
+export async function deletePromotion(id: string): Promise<boolean> {
+  const all = await readPromotions();
+  const next = all.filter((p) => p.id !== id);
+  if (next.length === all.length) return false;
+  await jset(PROMOTIONS_KEY, next);
   return true;
 }
 

@@ -268,6 +268,9 @@ function SlideEditor({
               className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
           </label>
         </div>
+        <p className="text-[11px] leading-relaxed text-slate2">
+          También puedes enlazar directamente a una promoción de /admin/promociones, p.ej. /promociones/mi-promocion.
+        </p>
       </div>
     </div>
   );

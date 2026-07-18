@@ -3,7 +3,7 @@ import { SITE_URL } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
 import { SEO_LANDING_PAGES } from "@/lib/seoLandingPages";
-import { listPosts } from "@/lib/store";
+import { listPosts, listPromotions } from "@/lib/store";
 
 // Las landings de captación SEO (/seguro-de-salud-las-palmas, .../barato…)
 // están hechas a propósito para no aparecer en el menú de navegación — se
@@ -13,11 +13,13 @@ import { listPosts } from "@/lib/store";
 // que las hace descubribles para Google sin necesidad de estar en el menú.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await listPosts({ onlyPublished: true }).catch(() => []);
+  const promotions = await listPromotions({ onlyPublished: true }).catch(() => []);
 
   const estaticas: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_URL}/quienes-somos`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/actualidad`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${SITE_URL}/promociones`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${SITE_URL}/recursos-seguros-canarias-baleares`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/mes-gratis`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/quiero-que-me-llamen`, changeFrequency: "monthly", priority: 0.5 },
@@ -45,5 +47,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.4,
   }));
 
-  return [...estaticas, ...productos, ...geo, ...seo, ...blog];
+  const promos: MetadataRoute.Sitemap = promotions.map((promo) => ({
+    url: `${SITE_URL}/promociones/${promo.slug}`,
+    lastModified: promo.updatedAt || promo.publishedAt || undefined,
+    changeFrequency: "weekly",
+    priority: 0.7,
+  }));
+
+  return [...estaticas, ...productos, ...geo, ...seo, ...blog, ...promos];
 }

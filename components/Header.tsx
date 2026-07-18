@@ -27,6 +27,7 @@ export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
 
 const NAV_LINKS = [
   { href: "/#otros", label: "Seguros" },
+  { href: "/promociones", label: "Promociones" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/actualidad", label: "Actualidad" },
 ];
@@ -46,6 +47,7 @@ const BREADCRUMB_MAP: Record<string, Crumb[]> = {
   "/comparativa": [{ label: "Tu comparativa" }],
   "/quienes-somos": [{ label: "Quiénes somos" }],
   "/actualidad": [{ label: "Actualidad" }],
+  "/promociones": [{ label: "Promociones" }],
   "/area-cliente": [{ label: "Área de cliente" }],
 };
 
