@@ -286,7 +286,7 @@ export function AreaClienteContent() {
           </div>
         </div>
 
-        <footer className="safe-bottom border-t border-hair bg-white px-6 py-4 sm:px-10 md:px-16 lg:px-20">
+        <footer className="border-t border-hair bg-white px-6 py-4 sm:px-10 md:px-16 lg:px-20">
           <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
             <p className="text-[12px] text-slate2">© {new Date().getFullYear()} {BRAND_NAME} · Todos los derechos reservados</p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
