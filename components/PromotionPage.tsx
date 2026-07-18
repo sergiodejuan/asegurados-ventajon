@@ -1,6 +1,7 @@
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { StickyMobileCta } from "./StickyMobileCta";
+import { PromotionStickyDesktopCta } from "./PromotionStickyDesktopCta";
 import { PromotionCard } from "./PromotionCard";
 import { Check, Phone, WhatsApp, ChevronRight } from "./icons";
 import { CALLER_NUMBERS, SITE_URL } from "@/lib/brand";
@@ -51,8 +52,10 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
           </div>
 
           {/* Tarjeta flotante: superpuesta en escritorio, apilada debajo (sin
-              solapar el titular ni la foto) en móvil. */}
-          <div className="relative mt-4 rounded-[20px] bg-white p-5 shadow-card md:absolute md:-bottom-16 md:right-8 md:mt-0 md:w-[300px]">
+              solapar el titular ni la foto) en móvil. Lleva id propio: es lo
+              que observa la barra sticky de escritorio para saber cuándo ha
+              quedado fuera de vista y debe tomar el relevo. */}
+          <div id="promo-floating-cta" className="relative mt-4 rounded-[20px] bg-white p-5 shadow-card md:absolute md:-bottom-16 md:right-8 md:mt-0 md:w-[300px]">
             <a
               href={ctaHref}
               className="flex items-center justify-center gap-1.5 rounded-pill bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
@@ -131,6 +134,14 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
       <StickyMobileCta label={promo.ctaTexto} href={ctaHref} secondaryLabel="Llamadme gratis" secondaryHref={llamadmeHref} />
+      <PromotionStickyDesktopCta
+        targetId="promo-floating-cta"
+        text={promo.tituloTarjeta}
+        ctaLabel={promo.ctaTexto}
+        ctaHref={ctaHref}
+        secondaryLabel="Llamadme gratis"
+        secondaryHref={llamadmeHref}
+      />
     </>
   );
 }

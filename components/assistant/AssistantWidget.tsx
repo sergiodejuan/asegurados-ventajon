@@ -271,7 +271,7 @@ export function AssistantWidget() {
           aria-label="Abrir el asistente de Ventajon"
           aria-hidden={!scrolled}
           tabIndex={scrolled ? 0 : -1}
-          className={`fixed bottom-28 left-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-navy text-white shadow-card transition-all duration-500 ease-out hover:scale-105 lg:bottom-6 lg:left-6 ${
+          className={`fixed bottom-28 left-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-navy text-white shadow-card transition-all duration-500 ease-out hover:scale-105 lg:bottom-[var(--assistant-bottom,1.5rem)] lg:left-6 ${
             scrolled ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-4 scale-75 opacity-0"
           }`}
         >
@@ -285,7 +285,7 @@ export function AssistantWidget() {
           tabIndex={0}
           onClick={openWidget}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") openWidget(); }}
-          className="fixed bottom-[184px] left-4 z-40 max-w-[240px] cursor-pointer rounded-2xl rounded-bl-sm border border-hair bg-white px-4 py-3 text-[13px] leading-relaxed text-ink shadow-[0_8px_28px_-8px_rgba(18,32,79,0.35)] motion-safe:animate-fade-up lg:bottom-24 lg:left-6"
+          className="fixed bottom-[184px] left-4 z-40 max-w-[240px] cursor-pointer rounded-2xl rounded-bl-sm border border-hair bg-white px-4 py-3 text-[13px] leading-relaxed text-ink shadow-[0_8px_28px_-8px_rgba(18,32,79,0.35)] transition-[bottom] duration-300 ease-out motion-safe:animate-fade-up lg:bottom-[calc(var(--assistant-bottom,1.5rem)_+_4.5rem)] lg:left-6"
         >
           <button
             type="button"
@@ -304,7 +304,7 @@ export function AssistantWidget() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="assistant-heading"
-          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white motion-safe:animate-fade-up lg:inset-auto lg:bottom-6 lg:left-6 lg:h-[600px] lg:max-h-[calc(100vh-3rem)] lg:w-[380px] lg:rounded-[24px] lg:border lg:border-hair lg:shadow-[0_8px_40px_-6px_rgba(18,32,79,0.35)]"
+          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white transition-[bottom] duration-300 ease-out motion-safe:animate-fade-up lg:inset-auto lg:bottom-[var(--assistant-bottom,1.5rem)] lg:left-6 lg:h-[600px] lg:max-h-[calc(100vh-3rem)] lg:w-[380px] lg:rounded-[24px] lg:border lg:border-hair lg:shadow-[0_8px_40px_-6px_rgba(18,32,79,0.35)]"
         >
           <div className="safe-top flex shrink-0 items-center justify-between border-b border-hair px-5 py-4">
             <div className="flex min-w-0 items-center gap-2">
