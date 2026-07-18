@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { listPresupuestos } from "@/lib/store";
 import { requireModule } from "@/lib/agentAuth";
+import { csvField as esc } from "@/lib/csv";
 import type { Presupuesto } from "@/lib/crm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function esc(v: unknown): string {
-  const s = v === null || v === undefined ? "" : String(v);
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 const COLUMNS: { key: string; get: (p: Presupuesto) => unknown }[] = [
   { key: "id", get: (p) => p.id },

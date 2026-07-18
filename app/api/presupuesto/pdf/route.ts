@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import QRCode from "qrcode";
 import { BRAND_NAME } from "@/lib/brand";
 import { buildWhatsAppText, whatsAppUrl, quoteNumber, ageFromDob, type QuoteProfile } from "@/lib/quote";
+import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,9 @@ function euros(n: number) {
 }
 
 export async function POST(request: Request) {
+  const limited = await rateLimitFail(request, { bucket: "presupuesto-pdf", limit: 30, windowSeconds: 3600 });
+  if (limited) return limited;
+
   let body: PdfRequest;
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
@@ -53,6 +57,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Datos incompletos." }, { status: 400 });
   }
 
+  // pdf-lib con la fuente estándar Helvetica solo soporta WinAnsi: un texto
+  // con emoji u otros caracteres fuera de ese rango lanza una excepción al
+  // dibujarlo. Se captura aquí para devolver un 400 controlado en vez de un
+  // 500 sin más — y de paso, limita el endpoint a no poder usarse para
+  // generar PDFs en bucle sin ningún control (ver rateLimitFail arriba).
+  try {
+    return await buildPresupuestoPdf(body);
+  } catch {
+    return NextResponse.json({ ok: false, error: "No se pudo generar el PDF con esos datos." }, { status: 400 });
+  }
+}
+
+async function buildPresupuestoPdf(body: PdfRequest): Promise<NextResponse> {
   const quote = body.quote ?? null;
   const presupuestoId = quote?.id ? quoteNumber(quote.id) : quoteNumber(`${Date.now()}`);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });

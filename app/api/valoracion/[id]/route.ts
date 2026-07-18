@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLlamada, getPresupuesto, getNpsResponse, saveNpsResponse } from "@/lib/store";
+import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,10 @@ async function resolveRef(id: string) {
   return null;
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const limited = await rateLimitFail(request, { bucket: "valoracion", limit: 60, windowSeconds: 3600 });
+  if (limited) return limited;
+
   const ref = await resolveRef(params.id);
   if (!ref) return NextResponse.json({ ok: false, error: "Encuesta no encontrada." }, { status: 404 });
 
@@ -31,6 +35,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const limited = await rateLimitFail(request, { bucket: "valoracion", limit: 60, windowSeconds: 3600 });
+  if (limited) return limited;
+
   const ref = await resolveRef(params.id);
   if (!ref) return NextResponse.json({ ok: false, error: "Encuesta no encontrada." }, { status: 404 });
 

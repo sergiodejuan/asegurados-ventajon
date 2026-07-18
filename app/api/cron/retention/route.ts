@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { purgeStaleLeads, createAuditLog } from "@/lib/store";
 
@@ -11,6 +12,12 @@ export const maxDuration = 60;
 // automáticamente a partir de la variable de entorno CRON_SECRET.
 const RETENTION_DAYS = 730;
 
+function safeEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   // Cierra en falso si no hay secreto configurado: mejor que este endpoint
@@ -19,8 +26,8 @@ export async function GET(request: Request) {
   if (!secret) {
     return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado." }, { status: 503 });
   }
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
+  const auth = request.headers.get("authorization") ?? "";
+  if (!safeEquals(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 401 });
   }
 
