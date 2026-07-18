@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
-import type { Promotion } from "@/lib/promotions";
+import { isPromotionActive, type Promotion } from "@/lib/promotions";
 
 function fmt(iso: string) {
   if (!iso) return "—";
@@ -79,10 +79,18 @@ function PromocionesAdmin() {
                   <span className={`rounded-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.status === "publicado" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                     {p.status === "publicado" ? "Publicada" : "Borrador"}
                   </span>
+                  {p.status === "publicado" && !isPromotionActive(p) && (
+                    <span className="rounded-pill bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                      Expirada
+                    </span>
+                  )}
                   <p className="truncate text-[12px] font-medium text-slate2">{p.categoria || "Sin categoría"}</p>
                 </div>
                 <p className="mt-1 truncate text-[15px] font-bold text-ink">{p.tituloTarjeta || "(sin título)"}</p>
-                <p className="mt-0.5 truncate text-[12px] text-slate2">/promociones/{p.slug || "—"} · {fmt(p.publishedAt)}</p>
+                <p className="mt-0.5 truncate text-[12px] text-slate2">
+                  /promociones/{p.slug || "—"} · {fmt(p.publishedAt)}
+                  {p.finPromocion && <> · hasta {fmt(p.finPromocion)}</>}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">

@@ -13,7 +13,7 @@ import { hashPassword } from "./password";
 import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
-import { DEFAULT_PROMOTIONS, type Promotion, type PromotionDraft } from "./promotions";
+import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { saludPrice, vidaPrice, autoPrice, quoteNumber } from "./quote";
@@ -676,7 +676,7 @@ function sortPromotions(promotions: Promotion[]): Promotion[] {
 
 export async function listPromotions(opts?: { onlyPublished?: boolean }): Promise<Promotion[]> {
   let all = await readPromotions();
-  if (opts?.onlyPublished) all = all.filter((p) => p.status === "publicado");
+  if (opts?.onlyPublished) all = all.filter((p) => isPromotionActive(p));
   return sortPromotions(all);
 }
 
@@ -688,7 +688,7 @@ export async function getPromotion(id: string): Promise<Promotion | null> {
 export async function getPromotionBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Promotion | null> {
   const all = await readPromotions();
   const promo = all.find((p) => p.slug === slug) ?? null;
-  if (promo && opts?.onlyPublished && promo.status !== "publicado") return null;
+  if (promo && opts?.onlyPublished && !isPromotionActive(promo)) return null;
   return promo;
 }
 
@@ -721,9 +721,11 @@ export async function createPromotion(draft: PromotionDraft): Promise<Promotion>
     ctaTexto: draft.ctaTexto ?? "Calcula tu precio",
     ctaHref: draft.ctaHref ?? "/tarificador",
     producto: draft.producto ?? "",
+    linkExterno: draft.linkExterno ?? "",
     metaTitle: draft.metaTitle ?? "",
     metaDescription: draft.metaDescription ?? "",
     publishedAt: draft.publishedAt ?? now.slice(0, 10),
+    finPromocion: draft.finPromocion ?? "",
     updatedAt: now,
   };
   all.push(promo);

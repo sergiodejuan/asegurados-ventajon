@@ -6,9 +6,10 @@ import type { Promotion } from "@/lib/promotions";
 // Directa). Toda la tarjeta es un único enlace, a diferencia de PostCard,
 // porque aquí no hay una franja de texto aparte donde poner un segundo enlace.
 export function PromotionCard({ promo }: { promo: Promotion }) {
+  const href = promo.linkExterno || `/promociones/${promo.slug}`;
   return (
     <li className="overflow-hidden rounded-[20px] shadow-soft">
-      <a href={`/promociones/${promo.slug}`} className="group relative block h-64 w-full overflow-hidden bg-navy-deep">
+      <a href={href} className="group relative block h-64 w-full overflow-hidden bg-navy-deep">
         {promo.imagenUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={promo.imagenUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -17,7 +18,10 @@ export function PromotionCard({ promo }: { promo: Promotion }) {
             <IconByName name="shield" width={40} height={40} />
           </div>
         )}
-        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/25 to-transparent" />
+        {/* Degradado reforzado (estilo Línea Directa): oscuro sólido en la
+            mitad inferior donde va el texto, para que se lea bien encima de
+            cualquier foto, clara u oscura. */}
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink from-0% via-ink/85 via-45% to-transparent to-95%" />
         <div className="absolute inset-x-0 bottom-0 p-5">
           {promo.categoria && (
             <p className="text-[11px] font-bold uppercase tracking-wide text-white/70">{promo.categoria}</p>

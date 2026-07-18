@@ -21,8 +21,8 @@ const BLANK: Promotion = {
   id: "", slug: "", status: "borrador", categoria: "", imagenUrl: "",
   tituloTarjeta: "", h1: "", validoHasta: "", subtitulo: "",
   introParrafos: [], bases: [], ctaTexto: "Calcula tu precio", ctaHref: "/tarificador",
-  producto: "", metaTitle: "", metaDescription: "",
-  publishedAt: new Date().toISOString().slice(0, 10), updatedAt: "",
+  producto: "", linkExterno: "", metaTitle: "", metaDescription: "",
+  publishedAt: new Date().toISOString().slice(0, 10), finPromocion: "", updatedAt: "",
 };
 
 export default function AdminPromocionEditorPage({ params }: { params: { id: string } }) {
@@ -179,6 +179,15 @@ function PromocionEditor({ id }: { id: string }) {
               placeholder="Promoción válida hasta el 31/12/2026."
               className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
           </label>
+          <label className="mt-3 block max-w-xs">
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Fecha de fin (opcional)</span>
+            <input type="date" value={promo.finPromocion} onChange={(e) => setPromo((p) => ({ ...p, finPromocion: e.target.value }))}
+              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px] tnums" />
+            <p className="mt-1 text-[11px] leading-relaxed text-slate2">
+              Pasada esa fecha, la promoción se oculta sola del listado y de su página, sin que tengas que editarla.
+              Déjalo en blanco si no caduca.
+            </p>
+          </label>
         </section>
 
         {/* Imagen */}
@@ -256,6 +265,15 @@ function PromocionEditor({ id }: { id: string }) {
               className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]">
               {PRODUCTO_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+          </label>
+          <label className="mt-3 block">
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Enlace propio (opcional)</span>
+            <input value={promo.linkExterno} onChange={(e) => setPromo((p) => ({ ...p, linkExterno: e.target.value }))} placeholder="/mes-gratis"
+              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+            <p className="mt-1 text-[11px] leading-relaxed text-slate2">
+              Solo si esta promoción ya tiene su propia página en la web (p.ej. /mes-gratis): la tarjeta del listado
+              enlazará ahí directamente en vez de crear una página nueva en /promociones/{promo.slug || "…"}.
+            </p>
           </label>
         </section>
 

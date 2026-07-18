@@ -47,12 +47,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.4,
   }));
 
-  const promos: MetadataRoute.Sitemap = promotions.map((promo) => ({
-    url: `${SITE_URL}/promociones/${promo.slug}`,
-    lastModified: promo.updatedAt || promo.publishedAt || undefined,
-    changeFrequency: "weekly",
-    priority: 0.7,
-  }));
+  // Las promociones con enlace propio (ver lib/promotions.ts) solo
+  // redirigen a esa URL, que ya se envía por su cuenta si corresponde
+  // (p.ej. /mes-gratis arriba); no tiene sentido enviar la redirección.
+  const promos: MetadataRoute.Sitemap = promotions
+    .filter((promo) => !promo.linkExterno)
+    .map((promo) => ({
+      url: `${SITE_URL}/promociones/${promo.slug}`,
+      lastModified: promo.updatedAt || promo.publishedAt || undefined,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    }));
 
   return [...estaticas, ...productos, ...geo, ...seo, ...blog, ...promos];
 }

@@ -3,12 +3,36 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { PromotionCard } from "@/components/PromotionCard";
+import { FaqAccordion, type FaqItem } from "@/components/FaqAccordion";
 import { BRAND_NAME, SITE_URL } from "@/lib/brand";
 import { listPromotions } from "@/lib/store";
 
 const TITLE = `Promociones de seguros — ${BRAND_NAME}`;
 const DESCRIPTION =
   "Descubre las promociones y ofertas activas de Asegurados Ventajon: mejor precio garantizado, condiciones especiales y descuentos en seguros de salud, vida, hogar, auto y decesos.";
+
+const FAQ_PROMOCIONES: FaqItem[] = [
+  {
+    q: "¿Las promociones tienen algún coste oculto?",
+    a: "No. Comparar y acogerte a cualquiera de nuestras promociones es gratuito y sin compromiso de contratación. Las condiciones exactas de cada una están siempre detalladas en su propia página, en el apartado \"Bases\".",
+  },
+  {
+    q: "¿Puedo combinar varias promociones a la vez?",
+    a: "Por lo general, las promociones no son acumulables entre sí ni con otras campañas comerciales vigentes: se aplica la que más te convenga según tu situación. Tu asesor te lo confirma antes de contratar.",
+  },
+  {
+    q: "¿Qué significa \"mejor precio garantizado\"?",
+    a: "Significa que, si comparamos tu seguro y el precio que te ofrecemos fuera superior al de tu compañía actual para una cobertura equivalente, ajustamos nuestra propuesta para igualarlo o mejorarlo, dentro de las condiciones descritas en las bases de cada promoción.",
+  },
+  {
+    q: "¿Hasta cuándo están activas las promociones?",
+    a: "Cada promoción indica su fecha de validez en su propia página. Pasada esa fecha, deja de mostrarse automáticamente en este listado; si ves una promoción publicada aquí, significa que sigue vigente en este momento.",
+  },
+  {
+    q: "¿Cómo me acojo a una promoción?",
+    a: "Entra en la promoción que te interese y calcula tu precio o pide que te llamemos desde su propia página. Un asesor te confirma si tu perfil cumple las condiciones antes de formalizar cualquier contratación.",
+  },
+];
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -38,6 +62,14 @@ export default async function PromocionesPage() {
         name: TITLE,
         description: DESCRIPTION,
         url: `${SITE_URL}/promociones`,
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: FAQ_PROMOCIONES.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
       },
     ],
   };
@@ -70,6 +102,29 @@ export default async function PromocionesPage() {
             </ul>
           )}
         </section>
+
+        {/* Texto enriquecido: refuerza el posicionamiento de "promociones
+            seguros" más allá de las tarjetas, que apenas llevan texto propio. */}
+        <section aria-labelledby="sobre-promociones" className="mx-auto mt-4 max-w-app px-5 pb-4 md:mt-8 md:max-w-3xl">
+          <h2 id="sobre-promociones" className="text-[20px] font-extrabold text-navy md:text-[24px]">
+            Promociones de seguros: cómo funcionan en {BRAND_NAME}
+          </h2>
+          <p className="mt-3 text-[14px] leading-relaxed text-slate2">
+            Como correduría de seguros, comparamos tu perfil entre varias aseguradoras para encontrar la póliza que
+            mejor se ajusta a ti, no la que más nos conviene vender. Nuestras promociones son la forma en la que
+            premiamos a quien compara con nosotros: mejor precio garantizado frente a tu compañía actual, meses de
+            regalo en tu primera mensualidad o condiciones especiales según el ramo, siempre explicadas sin letra
+            pequeña en la página de cada promoción.
+          </p>
+          <p className="mt-3 text-[14px] leading-relaxed text-slate2">
+            Todas las promociones activas se muestran en esta página, con su fecha de validez y sus condiciones
+            completas (bases legales) accesibles antes de que decidas nada. Si una promoción caduca, desaparece de
+            este listado automáticamente, así que lo que ves aquí siempre está vigente hoy. Comparar nunca tiene
+            coste ni te compromete a contratar.
+          </p>
+        </section>
+
+        <FaqAccordion heading="Preguntas frecuentes sobre las promociones" items={FAQ_PROMOCIONES} />
 
         <section className="mx-auto mt-4 max-w-app px-5 pb-14 md:max-w-5xl lg:max-w-6xl">
           <div className="rounded-[24px] bg-navy p-6 text-white md:flex md:items-center md:justify-between md:gap-10 md:p-12">

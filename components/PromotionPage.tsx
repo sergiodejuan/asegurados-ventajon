@@ -34,15 +34,18 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-navy to-navy-deep" />
             )}
-            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/20 to-transparent" />
+            {/* Degradado reforzado (estilo Línea Directa): ver nota en
+                PromotionCard.tsx. */}
+            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink from-0% via-ink/85 via-45% to-transparent to-95%" />
             <div className="absolute inset-x-0 bottom-0 p-6 md:max-w-md md:p-10">
               <p className="text-[26px] font-extrabold leading-[1.1] text-white md:text-[36px]">{promo.h1}</p>
               {promo.validoHasta && <p className="mt-2 text-[13px] text-white/85 md:text-[14px]">{promo.validoHasta}</p>}
             </div>
           </div>
 
-          {/* Tarjeta flotante: superpuesta en escritorio, apilada en móvil */}
-          <div className="relative -mt-10 mx-4 rounded-[20px] bg-white p-5 shadow-card md:absolute md:-bottom-16 md:right-8 md:mx-0 md:mt-0 md:w-[300px]">
+          {/* Tarjeta flotante: superpuesta en escritorio, apilada debajo (sin
+              solapar el titular ni la foto) en móvil. */}
+          <div className="relative mt-4 rounded-[20px] bg-white p-5 shadow-card md:absolute md:-bottom-16 md:right-8 md:mt-0 md:w-[300px]">
             <a
               href={promo.ctaHref}
               className="flex items-center justify-center gap-1.5 rounded-pill bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
