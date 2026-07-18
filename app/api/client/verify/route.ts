@@ -5,21 +5,29 @@ import { setClientSessionCookie } from "@/lib/clientSession";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Enlace de un solo clic desde el correo de verificación (ver
-// lib/clientVerification.ts): confirma el token, concede la sesión y manda
-// al área de cliente. Es un GET navegable a propósito, porque lo abre el
-// cliente de correo del usuario, no un fetch de la propia web.
-export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get("token") ?? "";
-  const leadId = await consumeVerificationToken(token);
+// Consume el token de un solo uso enviado por email o WhatsApp (ver
+// lib/clientVerification.ts) y concede la sesión. Es un POST a propósito,
+// disparado solo por el clic explícito del usuario en la página intermedia
+// /area-cliente/verificar — nunca por la simple carga del enlace del
+// correo/WhatsApp: varios proveedores de correo (Gmail, Outlook...)
+// escanean automáticamente los enlaces de un mensaje nada más llegar, y esa
+// petición automática consumiría un token de un solo uso si el enlace en sí
+// fuera un GET a este endpoint (como ocurría antes de este cambio).
+export async function POST(request: Request) {
+  let body: Record<string, unknown>;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
 
-  const dest = new URL("/area-cliente", request.url);
+  const token = typeof body.token === "string" ? body.token : "";
+  const leadId = await consumeVerificationToken(token);
   if (!leadId) {
-    dest.searchParams.set("error", "token-invalido");
-    return NextResponse.redirect(dest);
+    return NextResponse.json({ ok: false, error: "Ese enlace ya no es válido o ha caducado. Pide uno nuevo con tu correo o teléfono." });
   }
 
   setClientSessionCookie(leadId);
-  dest.searchParams.set("verificado", "1");
-  return NextResponse.redirect(dest);
+  return NextResponse.json({ ok: true });
+}
+
+export function GET() {
+  return NextResponse.json({ ok: false, error: "Método no permitido." }, { status: 405 });
 }

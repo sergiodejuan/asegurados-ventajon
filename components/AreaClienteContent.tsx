@@ -174,8 +174,10 @@ export function AreaClienteContent() {
   // devuelve los presupuestos en la respuesta (un teléfono, un correo o un
   // número de presupuesto no son un secreto: cualquiera que los conociera
   // podría, si no, "entrar" como esa persona). Ahora manda un enlace de un
-  // solo uso al email ya guardado en la ficha; al hacer clic, ese enlace
-  // (app/api/client/verify) concede la sesión y trae de vuelta aquí.
+  // solo uso al email o WhatsApp ya guardado en la ficha; ese enlace lleva a
+  // /area-cliente/verificar, donde un clic explícito del usuario concede la
+  // sesión y trae de vuelta aquí (ver el porqué de esa página intermedia en
+  // lib/clientVerification.ts).
   async function handleLogin(channel: "email" | "whatsapp" = "email") {
     // Al reenviar por WhatsApp desde loginSentBox ya no hay nada en
     // loginValue (se vació al enviar por email): se reutiliza el dato con

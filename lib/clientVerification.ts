@@ -68,7 +68,7 @@ function verificationEmailHtml(nombre: string, link: string): string {
       </p>
       <p style="text-align:center;margin:28px 0">
         <a href="${link}" style="background:#1B2B6B;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
-          Acceder a mi área de cliente
+          Confirmar mi acceso
         </a>
       </p>
       <p style="font-size:13px;color:#5a6473;line-height:1.6">
@@ -84,6 +84,16 @@ function verificationEmailHtml(nombre: string, link: string): string {
 // la generación de enlaces en sí, no un canal concreto — si no fuera así,
 // alguien podría esquivar el límite de un canal simplemente pidiendo el
 // otro.
+//
+// Apunta a una página (/area-cliente/verificar), NO directamente al endpoint
+// que consume el token: varios proveedores de correo (Gmail, Outlook...)
+// escanean automáticamente los enlaces de un mensaje nada más llegar, antes
+// de que el usuario lo abra — si el enlace fuera él mismo el que consume el
+// token de un solo uso (como hacía antes), ese escaneo automático lo
+// invalidaría y el usuario real vería siempre "enlace no válido" al hacer
+// clic. Con una página intermedia que exige un clic explícito ("Confirmar
+// acceso"), ese escaneo automático (que solo descarga el HTML, no simula
+// clics) deja de poder consumir el token.
 async function createVerificationLink(leadId: string): Promise<string | null> {
   // Máximo 3 enlaces de verificación por ficha y hora (entre email y
   // WhatsApp juntos): evita que se pueda usar esto para bombardear de
@@ -93,7 +103,7 @@ async function createVerificationLink(leadId: string): Promise<string | null> {
 
   const token = crypto.randomBytes(24).toString("base64url");
   await storeToken(token, leadId);
-  return `${SITE_URL}/api/client/verify?token=${token}`;
+  return `${SITE_URL}/area-cliente/verificar?token=${token}`;
 }
 
 // Punto único que llaman todas las rutas públicas que podrían estar tocando
