@@ -126,6 +126,34 @@ export const vidaSchema = z.object({
 });
 export type VidaInput = z.input<typeof vidaSchema>;
 
+/* ------------------------- Tarificador de decesos -------------------------- */
+
+export const decesosSchema = z.object({
+  paraQuien: z.enum(["para_mi", "familiar", "toda_familia"]),
+  // Si es "para_mi" el paso de nº de asegurados no llega a mostrarse (ver
+  // lib/forms.ts showIf), así que el valor nunca llega en el envío.
+  numAsegurados: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? 1 : Number(v)),
+    z.number().int().min(1).max(9)
+  ).optional().default(1),
+  codigoPostal: zonaField,
+  fechaNacimiento: dobField,
+  sexo: z.enum(["hombre", "mujer"]),
+  yaTieneSeguro: z.boolean(),
+  ...seguroActual,
+  nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  telefono: phoneField,
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  aceptaComercial: z.boolean().default(false),
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+  origen: origenField,
+});
+export type DecesosInput = z.input<typeof decesosSchema>;
+
 /* -------------------------- Tarificador de auto ---------------------------- */
 
 export const autoSchema = z.object({

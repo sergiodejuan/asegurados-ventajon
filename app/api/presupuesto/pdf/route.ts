@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type PdfRequest = {
-  producto: "salud" | "vida" | "auto";
+  producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
   quote: Partial<QuoteProfile> | null;
   precio: { conCopago?: number; sinCopago?: number; precio?: number };
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
 
-  if (!body.compania || (body.producto !== "salud" && body.producto !== "vida" && body.producto !== "auto")) {
+  if (!body.compania || (body.producto !== "salud" && body.producto !== "vida" && body.producto !== "auto" && body.producto !== "decesos")) {
     return NextResponse.json({ ok: false, error: "Datos incompletos." }, { status: 400 });
   }
 
@@ -120,6 +120,8 @@ async function buildPresupuestoPdf(body: PdfRequest): Promise<NextResponse> {
   } else if (body.producto === "auto") {
     clientRows.push(["Vehículo", quote?.tipoVehiculo || "—"]);
     clientRows.push(["Matrícula", quote?.matricula || "—"]);
+  } else if (body.producto === "decesos") {
+    clientRows.push(["Personas a asegurar", String(quote?.numAsegurados ?? 1)]);
   } else {
     clientRows.push(["Motivo", quote?.motivo || "—"]);
     clientRows.push(["Fumador", quote?.fumador ? "Sí" : "No"]);

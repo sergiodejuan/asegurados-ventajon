@@ -160,3 +160,11 @@ export const SERVICIOS_AUTO = [
   "Asistencia en viaje",
   "Vehículo de sustitución",
 ];
+
+export const SERVICIOS_DECESOS = [
+  "Sepelio",
+  "Traslado",
+  "Gestión de trámites",
+  "Asistencia jurídica",
+  "Capital adicional",
+];

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
 
   if (!body.compania?.trim()) return NextResponse.json({ ok: false, error: "Falta el nombre de la compañía." }, { status: 400 });
-  if (body.producto !== "salud" && body.producto !== "vida") {
+  if (body.producto !== "salud" && body.producto !== "vida" && body.producto !== "auto" && body.producto !== "decesos") {
     return NextResponse.json({ ok: false, error: "Producto no válido." }, { status: 400 });
   }
   if (typeof body.logoUrl === "string" && body.logoUrl.length > MAX_LOGO_LENGTH) {

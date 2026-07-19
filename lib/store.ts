@@ -16,7 +16,7 @@ import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
-import { saludPrice, vidaPrice, autoPrice, quoteNumber } from "./quote";
+import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
 function makeSubmissionId() {
@@ -187,6 +187,7 @@ export async function upsertLead(
     nombre: draft.nombre ?? "", telefono: phone, email, codigoPostal: draft.codigoPostal ?? "",
     inicio: draft.inicio ?? "", numAsegurados: draft.numAsegurados ?? null, coberturaDental: draft.coberturaDental ?? null,
     motivo: draft.motivo ?? "", fumador: draft.fumador ?? null,
+    paraQuien: draft.paraQuien ?? "",
     tipoVehiculo: draft.tipoVehiculo ?? "", matricula: draft.matricula ?? "",
     marcaVehiculo: draft.marcaVehiculo ?? "", modeloVehiculo: draft.modeloVehiculo ?? "", anioVehiculo: draft.anioVehiculo ?? "",
     usoVehiculo: draft.usoVehiculo ?? "", antiguedadCarnet: draft.antiguedadCarnet ?? "", coberturaDeseada: draft.coberturaDeseada ?? "",
@@ -834,7 +835,7 @@ export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
 // (no es una cotización en firme). Compartido entre la creación del
 // presupuesto (al completar el tarificador) y cualquier recálculo posterior.
 export async function estimatePrecio(producto: string, data: Record<string, unknown>): Promise<number | null> {
-  if (producto !== "salud" && producto !== "vida" && producto !== "auto") return null;
+  if (producto !== "salud" && producto !== "vida" && producto !== "auto" && producto !== "decesos") return null;
   const products = await listProducts(producto, true);
   if (!products.length) return null;
   const rec = products.find((p) => p.destacado) ?? products[0];
@@ -850,6 +851,10 @@ export async function estimatePrecio(producto: string, data: Record<string, unkn
       { precio: rec.precio ?? 0 },
       { antiguedadCarnet: data.antiguedadCarnet as string | undefined, coberturaDeseada: data.coberturaDeseada as string | undefined }
     );
+    return price.precio;
+  }
+  if (producto === "decesos") {
+    const price = decesosPrice({ precio: rec.precio ?? 0 }, { numAsegurados: Number(data.numAsegurados) || 1 });
     return price.precio;
   }
   const price = vidaPrice({ precio: rec.precio ?? 0 }, { fumador: !!data.fumador });

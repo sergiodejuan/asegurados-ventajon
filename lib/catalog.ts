@@ -5,7 +5,7 @@
 
 export type Product = {
   id: string;
-  producto: "salud" | "vida" | "auto";
+  producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
   activo: boolean; // se muestra en la comparativa pública
   destacado: boolean; // insignia "Recomendado" + se ordena primero
@@ -14,7 +14,7 @@ export type Product = {
   // Salud
   precioConCopago?: number;
   precioSinCopago?: number;
-  // Vida y auto (precio único de partida)
+  // Vida, auto y decesos (precio único de partida)
   precio?: number;
   condiciones: string;
   servicios: string[];
@@ -129,6 +129,41 @@ export const DEFAULT_PRODUCTS: Product[] = [
     precio: 29,
     condiciones: "Precio orientativo a terceros para un turismo estándar, conductor con más de 5 años de carnet. Sujeto a las características del vehículo.",
     servicios: ["Responsabilidad civil", "Lunas", "Robo"],
+    updatedAt: now,
+  },
+  {
+    id: "decesos-asisa", producto: "decesos", compania: "Asisa", activo: true, destacado: true, orden: 1,
+    precio: 8,
+    condiciones: "Precio orientativo por asegurado. Sujeto a la edad de las personas a asegurar.",
+    servicios: ["Sepelio", "Traslado", "Gestión de trámites"],
+    updatedAt: now,
+  },
+  {
+    id: "decesos-mapfre", producto: "decesos", compania: "Mapfre", activo: true, destacado: false, orden: 2,
+    precio: 9,
+    condiciones: "Precio orientativo por asegurado. Sujeto a la edad de las personas a asegurar.",
+    servicios: ["Sepelio", "Traslado", "Asistencia jurídica"],
+    updatedAt: now,
+  },
+  {
+    id: "decesos-generali", producto: "decesos", compania: "Generali", activo: true, destacado: false, orden: 3,
+    precio: 9,
+    condiciones: "Precio orientativo por asegurado. Sujeto a la edad de las personas a asegurar.",
+    servicios: ["Sepelio", "Traslado", "Capital adicional"],
+    updatedAt: now,
+  },
+  {
+    id: "decesos-zurich", producto: "decesos", compania: "Zurich", activo: true, destacado: false, orden: 4,
+    precio: 10,
+    condiciones: "Precio orientativo por asegurado. Sujeto a la edad de las personas a asegurar.",
+    servicios: ["Sepelio", "Gestión de trámites", "Asistencia jurídica"],
+    updatedAt: now,
+  },
+  {
+    id: "decesos-adeslas", producto: "decesos", compania: "Adeslas", activo: true, destacado: false, orden: 5,
+    precio: 11,
+    condiciones: "Precio orientativo por asegurado. Sujeto a la edad de las personas a asegurar.",
+    servicios: ["Sepelio", "Traslado", "Capital adicional"],
     updatedAt: now,
   },
 ];

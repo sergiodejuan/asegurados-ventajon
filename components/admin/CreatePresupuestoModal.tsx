@@ -15,7 +15,7 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [leadQuery, setLeadQuery] = useState("");
   const [leadId, setLeadId] = useState("");
-  const [producto, setProducto] = useState<"salud" | "vida" | "auto">("salud");
+  const [producto, setProducto] = useState<"salud" | "vida" | "auto" | "decesos">("salud");
   const [mode, setMode] = useState<"catalog" | "custom">("catalog");
   const [catalog, setCatalog] = useState<ProductOption[]>([]);
   const [productId, setProductId] = useState("");
@@ -104,7 +104,7 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
         </label>
 
         <div className="mt-4 flex gap-2">
-          {(["salud", "vida", "auto"] as const).map((p) => (
+          {(["salud", "vida", "auto", "decesos"] as const).map((p) => (
             <button key={p} type="button" onClick={() => setProducto(p)}
               className={`rounded-pill px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors ${producto === p ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
               Seguro de {p}

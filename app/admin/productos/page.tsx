@@ -5,7 +5,7 @@ import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 
 type Product = {
   id: string;
-  producto: "salud" | "vida" | "auto";
+  producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
   activo: boolean;
   destacado: boolean;
@@ -58,7 +58,7 @@ export default function AdminProductosPage() {
 
 function ProductsAdmin() {
   const { token } = useAdminToken();
-  const [producto, setProducto] = useState<"salud" | "vida" | "auto">("salud");
+  const [producto, setProducto] = useState<"salud" | "vida" | "auto" | "decesos">("salud");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +129,7 @@ function ProductsAdmin() {
       </p>
 
       <div role="tablist" aria-label="Producto" className="mt-4 flex gap-2">
-        {(["salud", "vida", "auto"] as const).map((p) => (
+        {(["salud", "vida", "auto", "decesos"] as const).map((p) => (
           <button key={p} onClick={() => setProducto(p)}
             className={`rounded-pill px-4 py-1.5 text-[13px] font-semibold capitalize transition-colors ${producto === p ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
             Seguro de {p}

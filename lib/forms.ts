@@ -1,4 +1,4 @@
-import { SERVICIOS_SALUD, SERVICIOS_VIDA, SERVICIOS_AUTO } from "./brand";
+import { SERVICIOS_SALUD, SERVICIOS_VIDA, SERVICIOS_AUTO, SERVICIOS_DECESOS } from "./brand";
 
 export type Option = { value: string; label: string; requiresDate?: boolean };
 
@@ -85,6 +85,34 @@ export const VIDA_CONFIG: FormConfig = {
     { type: "yesno", key: "fumador", field: "fumador", phase: 1, title: "¿Fumas?", helper: "Es un dato clave para calcular tu seguro de vida." },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes un seguro de vida?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de vida actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_VIDA, showIf: (d) => d.yaTieneSeguro === true },
+    { type: "contact", key: "contacto", phase: 2, title: "Ya casi está" },
+  ],
+};
+
+export const DECESOS_CONFIG: FormConfig = {
+  producto: "decesos",
+  endpoint: "/api/decesos",
+  phaseLabels: ["Tu seguro", "Tus datos", "Tu precio"],
+  steps: [
+    {
+      type: "choice", key: "paraQuien", field: "paraQuien", phase: 0,
+      title: "¿Para quién es el seguro de decesos?",
+      helper: "Nos ayuda a orientar tu comparativa.",
+      options: [
+        { value: "para_mi", label: "Para mí" },
+        { value: "familiar", label: "Para un familiar" },
+        { value: "toda_familia", label: "Para toda la familia" },
+      ],
+    },
+    { type: "choice", key: "zona", field: "codigoPostal", phase: 0, title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
+    {
+      type: "numbergrid", key: "asegurados", field: "numAsegurados", phase: 0,
+      title: "¿Cuántas personas queréis asegurar?", helper: "Cuéntalas incluyéndote a ti.",
+      showIf: (d) => d.paraQuien !== "para_mi",
+    },
+    { type: "dobsex", key: "titular", phase: 1, title: "Datos de la persona titular", helper: "La edad influye en el precio del seguro de decesos." },
+    { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes un seguro de decesos?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
+    { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de decesos actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_DECESOS, showIf: (d) => d.yaTieneSeguro === true },
     { type: "contact", key: "contacto", phase: 2, title: "Ya casi está" },
   ],
 };

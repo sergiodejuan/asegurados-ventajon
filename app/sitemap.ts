@@ -27,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/tarificador`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/tarificador-vida`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/tarificador-auto`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/tarificador-decesos`, changeFrequency: "monthly", priority: 0.6 },
   ];
 
   const productos: MetadataRoute.Sitemap = PRODUCT_PAGES.map((p) => ({

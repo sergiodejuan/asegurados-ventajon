@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
-import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, type FormData, type Step } from "@/lib/forms";
+import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, DECESOS_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
@@ -24,8 +24,8 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" }) {
-  const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : SALUD_CONFIG;
+export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto" | "decesos"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" }) {
+  const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : variant === "decesos" ? DECESOS_CONFIG : SALUD_CONFIG;
   const router = useRouter();
 
   const [data, setData] = useState<FormData>({ seguroActualPeriodo: "mes", seguroActualServicios: [] });
@@ -194,12 +194,14 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           producto: variant,
           createdAt: new Date().toISOString(),
           codigoPostal: String(data.codigoPostal ?? ""),
-          numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1 : undefined,
+          numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1
+            : variant === "decesos" ? Number(data.numAsegurados) || 1 : undefined,
           coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
           fechaNacimiento: payload.fechaNacimiento,
           sexo: data.sexo as "hombre" | "mujer" | undefined,
           motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
           fumador: variant === "vida" ? !!data.fumador : undefined,
+          paraQuien: variant === "decesos" ? String(data.paraQuien ?? "") : undefined,
           inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
           tipoVehiculo: variant === "auto" ? String(data.tipoVehiculo ?? "") : undefined,
           matricula: variant === "auto" ? String(data.matricula ?? "") : undefined,

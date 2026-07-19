@@ -50,6 +50,15 @@ export function humanizeMotivo(motivo: string | undefined): string {
   }
 }
 
+export function humanizeParaQuien(paraQuien: string | undefined): string {
+  switch (paraQuien) {
+    case "para_mi": return "para sí mismo";
+    case "familiar": return "para un familiar";
+    case "toda_familia": return "para toda la familia";
+    default: return paraQuien ?? "";
+  }
+}
+
 export function humanizeUsoVehiculo(uso: string | undefined): string {
   switch (uso) {
     case "particular": return "uso particular";

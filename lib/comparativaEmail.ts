@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { emailConfigured, sendEmail } from "./email";
 import { listProducts, getTheme, addEmailLog } from "./store";
-import { saludPrice, vidaPrice, autoPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify } from "./quote";
+import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify } from "./quote";
 import { BRAND_NAME, SITE_URL, CONTACT_HOURS } from "./brand";
 import type { Product } from "./catalog";
 
@@ -23,7 +23,7 @@ import type { Product } from "./catalog";
 // lib/crm.ts y los tres estados (enviado/abierto/clic) que se muestran en
 // el panel "Emails" de la ficha del lead en /admin.
 
-type Producto = "salud" | "vida" | "auto";
+type Producto = "salud" | "vida" | "auto" | "decesos";
 
 type PriceInput = {
   numAsegurados?: number | null;
@@ -46,7 +46,7 @@ export type ComparativaEmailInput = PriceInput & {
 };
 
 const PRODUCTO_LABELS: Record<Producto, string> = {
-  salud: "seguro de salud", vida: "seguro de vida", auto: "seguro de auto",
+  salud: "seguro de salud", vida: "seguro de vida", auto: "seguro de auto", decesos: "seguro de decesos",
 };
 
 function euros(n: number): string {
@@ -84,6 +84,9 @@ function priceRows(producto: Producto, p: Product, rawInput: PriceInput): { labe
   if (producto === "auto") {
     return [{ label: "Desde", value: `${euros(autoPrice({ precio: p.precio ?? 0 }, input).precio)} €/mes` }];
   }
+  if (producto === "decesos") {
+    return [{ label: "Desde", value: `${euros(decesosPrice({ precio: p.precio ?? 0 }, input).precio)} €/mes` }];
+  }
   return [{ label: "Desde", value: `${euros(vidaPrice({ precio: p.precio ?? 0 }, input).precio)} €/mes` }];
 }
 
@@ -91,6 +94,7 @@ function headlinePrice(producto: Producto, p: Product, rawInput: PriceInput): nu
   const input = normalized(rawInput);
   if (producto === "salud") return saludPrice({ conCopago: p.precioConCopago ?? 0, sinCopago: p.precioSinCopago ?? 0 }, input).conCopago;
   if (producto === "auto") return autoPrice({ precio: p.precio ?? 0 }, input).precio;
+  if (producto === "decesos") return decesosPrice({ precio: p.precio ?? 0 }, input).precio;
   return vidaPrice({ precio: p.precio ?? 0 }, input).precio;
 }
 

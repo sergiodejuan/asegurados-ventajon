@@ -9,7 +9,7 @@ import { CompanyLogo } from "./Comparativa";
 import { Check } from "./icons";
 import type { Product } from "@/lib/catalog";
 import {
-  loadQuote, saludPrice, vidaPrice, autoPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
+  loadQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
 
 function euros(n: number) {
@@ -20,13 +20,14 @@ const PRODUCTO_TITLES: Record<string, string> = {
   salud: "Seguro de salud",
   vida: "Seguro de vida",
   auto: "Seguro de auto",
+  decesos: "Seguro de decesos",
 };
 
 export function CompanyDetail() {
   const params = useParams<{ compania: string }>();
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
-  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : "salud";
+  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -62,7 +63,8 @@ export function CompanyDetail() {
   const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
   const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
   const precioAuto = autoPrice({ precio: entry.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada });
-  const precioUnico = producto === "auto" ? precioAuto.precio : precioVida.precio;
+  const precioDecesos = decesosPrice({ precio: entry.precio ?? 0 }, { numAsegurados: quote?.numAsegurados });
+  const precioUnico = producto === "auto" ? precioAuto.precio : producto === "decesos" ? precioDecesos.precio : precioVida.precio;
 
   async function downloadPdf() {
     setDownloading(true);

@@ -94,6 +94,8 @@ export type Lead = {
   // Vida
   motivo: string;
   fumador: boolean | null;
+  // Decesos
+  paraQuien: string;
   // Auto
   tipoVehiculo: string;
   matricula: string;

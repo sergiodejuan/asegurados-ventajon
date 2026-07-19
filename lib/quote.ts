@@ -5,7 +5,7 @@ import { WHATSAPP_URL } from "./brand";
 // mientras dura la sesión del navegador, no es información persistida en servidor.
 export type QuoteProfile = {
   id: string;
-  producto: "salud" | "vida" | "auto";
+  producto: "salud" | "vida" | "auto" | "decesos";
   createdAt: string;
   codigoPostal?: string;
   numAsegurados?: number;
@@ -14,6 +14,7 @@ export type QuoteProfile = {
   sexo?: "hombre" | "mujer";
   motivo?: string; // vida
   fumador?: boolean; // vida
+  paraQuien?: string; // decesos
   inicio?: string;
   // Auto
   tipoVehiculo?: string;
@@ -88,6 +89,14 @@ export function vidaPrice(base: { precio: number }, profile: Pick<QuoteProfile, 
   return { precio: base.precio + smokerExtra };
 }
 
+// A diferencia de vida/auto (precio único de partida), el de decesos escala
+// con el nº de personas a asegurar — igual que salud — porque cada persona
+// añade su propia prima a la póliza familiar.
+export function decesosPrice(base: { precio: number }, profile: Pick<QuoteProfile, "numAsegurados">) {
+  const n = Math.max(1, Math.min(9, profile.numAsegurados ?? 1));
+  return { precio: base.precio * n };
+}
+
 export function autoPrice(base: { precio: number }, profile: Pick<QuoteProfile, "antiguedadCarnet" | "coberturaDeseada">) {
   const carnetExtra = profile.antiguedadCarnet === "menos_2" ? Math.round(base.precio * 0.35)
     : profile.antiguedadCarnet === "2_5" ? Math.round(base.precio * 0.12)
@@ -102,6 +111,7 @@ const PRODUCTO_LABELS: Record<string, string> = {
   salud: "Seguro de salud",
   vida: "Seguro de vida",
   auto: "Seguro de auto",
+  decesos: "Seguro de decesos",
 };
 
 export function buildWhatsAppText(opts: { producto: string; compania?: string; quote?: QuoteProfile | null; origen?: string }) {

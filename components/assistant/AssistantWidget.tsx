@@ -14,7 +14,6 @@ import { getProductPage, quoteHref } from "@/lib/productPages";
 import {
   isAssistantAllowed,
   getAssistantContext,
-  DECESOS_FLOW,
   HOGAR_FLOW,
   summarizeAnswers,
   TICKET_TOPICS,
@@ -89,8 +88,8 @@ const PRODUCT_MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
 ];
 
 // Enlace del tarificador/página propia por ramo, para el botón "Ir al
-// Calculador" (salud/vida/auto) o "Ver seguro de X" (decesos/hogar, que no
-// tienen tarificador propio) — mismo criterio que el selector de seguros
+// Calculador" (salud/vida/auto/decesos) o "Ver seguro de X" (hogar, que no
+// tiene tarificador propio) — mismo criterio que el selector de seguros
 // del CTA general (ver lib/productPages.ts).
 function productoHref(slug: "salud" | "vida" | "auto" | "decesos" | "hogar"): string {
   return quoteHref(getProductPage(slug)!);
@@ -105,7 +104,6 @@ const LLAMADA_PRODUCTO_OPTIONS = [
 ];
 
 const MINIFLOWS: Partial<Record<Intent, MiniFlowQuestion[]>> = {
-  decesos: DECESOS_FLOW,
   hogar: HOGAR_FLOW,
 };
 
@@ -160,13 +158,13 @@ function formatDate(iso: string): string {
 }
 
 // Widget flotante presente en (casi) toda la web: triaje por botones (nunca
-// texto libre), tarificadores completos embebidos para salud/vida/auto con
-// el mismo formulario y campos que sus páginas dedicadas, un mini-flujo +
-// captura de contacto propios para decesos/hogar (que no tienen
-// tarificador), y un flujo de "abrir ticket" para dudas sobre un presupuesto
-// ya existente. Montado una única vez en el layout raíz: al vivir fuera de
-// cada página, el estado de la conversación no se pierde al navegar entre
-// páginas donde el asistente está disponible.
+// texto libre), tarificadores completos embebidos para salud/vida/auto/decesos
+// con el mismo formulario y campos que sus páginas dedicadas, un mini-flujo +
+// captura de contacto propios para hogar (que no tiene tarificador), y un
+// flujo de "abrir ticket" para dudas sobre un presupuesto ya existente.
+// Montado una única vez en el layout raíz: al vivir fuera de cada página, el
+// estado de la conversación no se pierde al navegar entre páginas donde el
+// asistente está disponible.
 export function AssistantWidget() {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
@@ -296,7 +294,7 @@ export function AssistantWidget() {
   }
 
   function continueInline() {
-    if (intent === "salud" || intent === "vida" || intent === "auto") setStage("tarificador");
+    if (intent === "salud" || intent === "vida" || intent === "auto" || intent === "decesos") setStage("tarificador");
     else setStage("miniflow");
   }
 
@@ -475,7 +473,7 @@ export function AssistantWidget() {
 
             {stage === "precio-link" && (intent === "salud" || intent === "vida" || intent === "auto" || intent === "decesos" || intent === "hogar") && (
               <div className="motion-safe:animate-fade-up">
-                {intent === "salud" || intent === "vida" || intent === "auto" ? (
+                {intent === "salud" || intent === "vida" || intent === "auto" || intent === "decesos" ? (
                   <>
                     <BotBubble>
                       <p className="font-semibold text-navy">¡Genial!</p>
@@ -563,7 +561,7 @@ export function AssistantWidget() {
               </div>
             )}
 
-            {stage === "tarificador" && (intent === "salud" || intent === "vida" || intent === "auto") && (
+            {stage === "tarificador" && (intent === "salud" || intent === "vida" || intent === "auto" || intent === "decesos") && (
               <StepForm variant={intent} origen="asistente" />
             )}
 
@@ -971,7 +969,7 @@ function TicketConfirm({
   );
 }
 
-/* ------------------------------- Llamada / decesos / hogar ------------------------------- */
+/* ------------------------------- Llamada / hogar ------------------------------- */
 
 function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: Record<string, string>; onDone: () => void }) {
   const [nombre, setNombre] = useState("");

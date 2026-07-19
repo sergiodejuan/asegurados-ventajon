@@ -121,8 +121,8 @@ export const PRODUCT_PAGES: ProductPage[] = [
     h1: "Seguro de decesos: tranquilidad para tu familia, sin tabúes",
     subheadline: "Un asesor compara por ti entre las mejores compañías para que tu familia no tenga que preocuparse de nada, sin coste ni compromiso.",
     heroIcon: "flower",
-    cta: { label: "Que te llamen gratis", href: "/quiero-que-me-llamen?producto=decesos" },
-    ctaSecondary: { label: "Escríbenos por WhatsApp", href: "/quiero-que-me-llamen?producto=decesos" },
+    cta: { label: "Calcula tu precio", href: "/tarificador-decesos" },
+    ctaSecondary: { label: "Que te llamen gratis", href: "/quiero-que-me-llamen?producto=decesos" },
     benefits: [
       { icon: "shield", t: "De tu lado", d: "Te acompañamos en un tema delicado, sin prisas ni presión." },
       { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores compañías de decesos del país." },
@@ -241,8 +241,8 @@ export function getProductPage(slug: string): ProductPage | undefined {
 }
 
 // Enlace "directo a la acción" de un ramo: su tarificador si lo tiene
-// (salud/vida/auto), o su propia página si no (decesos/hogar, que no
-// tienen calculadora propia) — usado por el selector de seguros del CTA
+// (salud/vida/auto/decesos), o su propia página si no (hogar, que no
+// tiene calculadora propia) — usado por el selector de seguros del CTA
 // general y por el asistente, para no duplicar este criterio en cada sitio.
 export function quoteHref(p: ProductPage): string {
   return p.cta.href.startsWith("/tarificador") ? p.cta.href : p.path;

@@ -14,6 +14,10 @@ function eur(n: number) {
   return n.toLocaleString("es-ES", { maximumFractionDigits: 0 }) + " €";
 }
 
+const PRODUCTO_INFORME_LABELS: Record<string, string> = {
+  salud: "Salud", vida: "Vida", auto: "Auto", decesos: "Decesos", hogar: "Hogar",
+};
+
 // Valor de un presupuesto ganado: el precio realmente elegido si existe,
 // si no el orientativo del catálogo.
 function valorGanado(p: Presupuesto): number {
@@ -60,7 +64,7 @@ function InformesAdmin() {
   const porProducto = useMemo(() => {
     const acc = new Map<string, number>();
     for (const p of ganados) {
-      const key = p.producto === "vida" ? "Vida" : p.producto === "auto" ? "Auto" : "Salud";
+      const key = PRODUCTO_INFORME_LABELS[p.producto] ?? (p.producto ? p.producto[0].toUpperCase() + p.producto.slice(1) : "Sin especificar");
       acc.set(key, (acc.get(key) ?? 0) + valorGanado(p));
     }
     return Array.from(acc.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);

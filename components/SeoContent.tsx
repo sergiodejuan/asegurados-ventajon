@@ -99,9 +99,41 @@ const CONTENT = {
       },
     ],
   },
+  decesos: {
+    h1: "Comparador de seguros de decesos",
+    intro: `Un seguro de decesos cubre los gastos y trámites del sepelio en un momento difícil, para que tu familia no tenga que preocuparse por ello. ${BRAND_NAME} compara tu perfil entre varias compañías —como ${PARTNERS_TEXT}— para encontrar la cobertura adecuada al precio justo.`,
+    sections: [
+      {
+        h2: "¿Qué cubre un seguro de decesos?",
+        p: "Lo habitual es que cubra el sepelio completo (tanatorio, ataúd, traslado) y la gestión de todos los trámites administrativos. Muchas pólizas añaden asistencia jurídica o un capital adicional para la familia. Qué combinación te conviene depende de si lo quieres solo para ti o para toda la familia; te ayudamos a decidirlo.",
+      },
+      {
+        h2: "¿Qué influye en el precio de un seguro de decesos?",
+        p: "El factor que más pesa es la edad de cada persona a asegurar, seguido del número de asegurados en la póliza (individual, familiar). También influye si ya tienes un seguro de decesos que quieras mejorar o sustituir. Por eso una comparativa genérica dice poco: lo que importa es tu comparativa, con tus datos.",
+      },
+      {
+        h2: `¿Por qué comparar con ${BRAND_NAME}?`,
+        p: `Somos correduría, no agentes de una única aseguradora: comparamos por ti entre las mejores compañías del país y te explicamos en claro lo que cubre cada póliza, sin letra pequeña. Trabajamos en toda España, en horario ${CONTACT_HOURS} y con cercanía especial en Canarias y Baleares, dentro del ecosistema Ventajon con ${ECOSYSTEM_MEMBERS}.`,
+      },
+    ],
+    faq: [
+      {
+        q: "¿Cuánto cuesta un seguro de decesos?",
+        a: "Depende sobre todo de la edad de cada persona a asegurar y de cuántas personas queráis incluir en la póliza. Calcula tu precio con el formulario de arriba y un asesor te confirma la propuesta final, sin compromiso.",
+      },
+      {
+        q: "¿Puedo asegurar a toda mi familia en la misma póliza?",
+        a: "Sí. Puedes calcular el precio para ti solo, para un familiar o para toda la familia junta: el formulario se adapta a cuántas personas queráis asegurar.",
+      },
+      {
+        q: "¿La comparativa tiene algún coste?",
+        a: "No. Comparar y recibir asesoramiento es gratuito y sin compromiso de contratación.",
+      },
+    ],
+  },
 } as const;
 
-export function SeoContent({ variant }: { variant: "salud" | "vida" | "auto" }) {
+export function SeoContent({ variant }: { variant: "salud" | "vida" | "auto" | "decesos" }) {
   const c = CONTENT[variant];
   return (
     <section aria-labelledby="seo-heading" className="mx-auto mt-16 max-w-app px-5 pb-14 md:mt-24 md:max-w-5xl lg:max-w-6xl">

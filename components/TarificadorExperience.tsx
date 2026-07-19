@@ -12,7 +12,7 @@ export function TarificadorExperience({
   headingLevel = "h1",
   origen,
 }: {
-  variant: "salud" | "vida" | "auto";
+  variant: "salud" | "vida" | "auto" | "decesos";
   heading: string;
   subheading: string;
   // Las páginas /tarificador* son dueñas de su propio H1 (esta es toda la

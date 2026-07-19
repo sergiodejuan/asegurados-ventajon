@@ -1,11 +1,10 @@
 // Configuración del asistente flotante: en qué páginas aparece, qué saludo
-// contextual mostrar en cada una, y las preguntas de los mini-flujos nativos
-// para los productos que no tienen tarificador propio (decesos, hogar) o
-// para "tengo una duda". Todo lo que responde el usuario son botones con
-// opciones fijas, nunca texto libre — igual que el resto de tarificadores
-// de la web.
+// contextual mostrar en cada una, y las preguntas del mini-flujo nativo
+// para hogar (el único producto sin tarificador propio) o para "tengo una
+// duda". Todo lo que responde el usuario son botones con opciones fijas,
+// nunca texto libre — igual que el resto de tarificadores de la web.
 
-export type AssistantProducto = "salud" | "vida" | "auto";
+export type AssistantProducto = "salud" | "vida" | "auto" | "decesos";
 
 export type AssistantContext = {
   greeting: string;
@@ -56,7 +55,8 @@ const CONTEXTS: { test: (p: string) => boolean; context: AssistantContext }[] = 
     suggestedProducto: "auto",
   } },
   { test: (p) => p.startsWith("/seguro-de-decesos"), context: {
-    greeting: "Cuéntame un poco sobre lo que necesitas y te paso con un asesor de seguros de decesos.",
+    greeting: "¿Te preparo un cálculo orientativo de tu seguro de decesos? Solo son un par de minutos.",
+    suggestedProducto: "decesos",
   } },
   { test: (p) => p.startsWith("/seguro-de-hogar"), context: {
     greeting: "Cuéntame un poco sobre tu vivienda y te paso con un asesor de seguro de hogar.",
@@ -74,34 +74,14 @@ export function getAssistantContext(pathname: string): AssistantContext {
 }
 
 /* ------------------------- Mini-flujos nativos ---------------------------- */
-// Decesos, hogar y "tengo una duda" no tienen tarificador propio: se
-// recogen unas pocas respuestas fijas que luego se resumen en un texto
-// legible (`detalleConsulta`), visible como nota en la ficha del lead en
-// /admin, y se piden los datos de contacto con el mismo formulario/consentimientos
+// Hogar y "tengo una duda" no tienen tarificador propio: se recogen unas
+// pocas respuestas fijas que luego se resumen en un texto legible
+// (`detalleConsulta`), visible como nota en la ficha del lead en /admin, y
+// se piden los datos de contacto con el mismo formulario/consentimientos
 // que el resto de la web.
 
 export type MiniFlowOption = { label: string; value: string };
 export type MiniFlowQuestion = { key: string; title: string; options: MiniFlowOption[] };
-
-export const DECESOS_FLOW: MiniFlowQuestion[] = [
-  {
-    key: "para_quien",
-    title: "¿Para quién es el seguro de decesos?",
-    options: [
-      { label: "Para mí", value: "para mí" },
-      { label: "Para un familiar", value: "para un familiar" },
-      { label: "Para toda la familia", value: "para toda la familia" },
-    ],
-  },
-  {
-    key: "tiene_seguro",
-    title: "¿Ya tienes un seguro de decesos contratado?",
-    options: [
-      { label: "Sí, quiero comparar precio", value: "ya tiene seguro de decesos, quiere comparar" },
-      { label: "No, quiero contratar uno", value: "no tiene seguro de decesos, quiere contratar" },
-    ],
-  },
-];
 
 export const HOGAR_FLOW: MiniFlowQuestion[] = [
   {
@@ -136,7 +116,7 @@ export function summarizeAnswers(productoLabel: string, answers: Record<string, 
 }
 
 /* --------------------------- "Tengo una duda" ----------------------------- */
-// A diferencia de decesos/hogar, aquí primero se intenta localizar el
+// A diferencia de hogar, aquí primero se intenta localizar el
 // presupuesto del cliente (mismo dato único que usa el área de cliente:
 // correo, teléfono o nº de presupuesto) para poder "abrir un ticket" sobre
 // esa tarificación concreta. Los temas son botones fijos, pero siempre se
