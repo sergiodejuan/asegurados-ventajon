@@ -6,6 +6,7 @@ import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { AutoWidget } from "@/components/AutoWidget";
+import { HomeStickyDesktopCta } from "@/components/HomeStickyDesktopCta";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
@@ -70,7 +71,7 @@ export default async function Home() {
               )}
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
+            <div id="home-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
               <a href="/tarificador"
                 className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
                 Calcula tu precio
@@ -206,6 +207,7 @@ export default async function Home() {
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
       <StickyMobileCta label="Calcula tu precio" href="/tarificador" secondaryLabel="Que te llamen" secondaryHref="/quiero-que-me-llamen" />
+      <HomeStickyDesktopCta targetId="home-hero-ctas" />
       <AutoWidget />
     </>
   );

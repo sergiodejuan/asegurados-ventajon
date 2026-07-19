@@ -1,41 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useStickyDesktopBar } from "@/lib/useStickyDesktopBar";
 import { ChevronRight } from "./icons";
 
 // Barra de CTA fija, solo en escritorio (en móvil ya existe StickyMobileCta):
 // aparece al perder de vista la tarjeta flotante del hero (donde están los
-// CTA "de verdad"), para que la promoción siga siendo accionable el resto
-// del scroll de la página. Estilo Línea Directa: fondo rojo de marca con las
-// esquinas superiores redondeadas, ancorada al fondo del viewport.
+// CTA "de verdad"), para que la promoción/ramo siga siendo accionable el
+// resto del scroll de la página. Estilo Línea Directa: fondo rojo de marca
+// con las esquinas superiores redondeadas, anclada al fondo del viewport.
+// También la reutilizan las páginas de producto (ver ProductLandingPage.tsx).
 export function PromotionStickyDesktopCta({
   targetId, text, ctaLabel, ctaHref, secondaryLabel, secondaryHref,
 }: {
   targetId: string; text: string; ctaLabel: string; ctaHref: string; secondaryLabel: string; secondaryHref: string;
 }) {
-  const [visible, setVisible] = useState(false);
-  const barRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0),
-      { threshold: 0 }
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [targetId]);
-
-  // El botón del asistente (abajo a la izquierda) vive en otro componente
-  // montado en el layout: se coordina con él vía una variable CSS en vez de
-  // pasarle props, para que suba justo lo necesario y no quede tapado por
-  // esta barra al desplegarse.
-  useEffect(() => {
-    const height = visible ? barRef.current?.offsetHeight ?? 0 : 0;
-    document.documentElement.style.setProperty("--assistant-bottom", height ? `${height + 24}px` : "1.5rem");
-    return () => { document.documentElement.style.setProperty("--assistant-bottom", "1.5rem"); };
-  }, [visible]);
+  const { visible, barRef } = useStickyDesktopBar(targetId);
 
   return (
     <div

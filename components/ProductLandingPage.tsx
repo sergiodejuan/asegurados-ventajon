@@ -1,6 +1,7 @@
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { StickyMobileCta } from "./StickyMobileCta";
+import { PromotionStickyDesktopCta } from "./PromotionStickyDesktopCta";
 import { Testimonials } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
@@ -10,11 +11,18 @@ import { ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES, type ProductPage } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
 import { getTheme } from "@/lib/store";
+import { withUtmParams } from "@/lib/attribution";
 
 export async function ProductLandingPage({ page }: { page: ProductPage }) {
   const otros = PRODUCT_PAGES.filter((p) => p.slug !== page.slug);
   const theme = await getTheme();
   const heroImage = theme.heroImages[page.slug];
+
+  // Los CTA de la barra sticky de escritorio llevan UTM propio (stickybar),
+  // igual que el mega menú y el resto de placements medibles del header.
+  function stickyUtm(href: string): string {
+    return withUtmParams(href, { source: "web", medium: "stickybar", campaign: `stickybar-${page.slug}` });
+  }
 
   return (
     <>
@@ -51,7 +59,7 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
               )}
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
+            <div id="product-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
               <a href={page.cta.href}
                 className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
                 {page.cta.label}
@@ -189,6 +197,14 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
       <StickyMobileCta label={page.cta.label} href={page.cta.href} secondaryLabel={page.ctaSecondary.label} secondaryHref={page.ctaSecondary.href} />
+      <PromotionStickyDesktopCta
+        targetId="product-hero-ctas"
+        text={page.h1}
+        ctaLabel={page.cta.label}
+        ctaHref={stickyUtm(page.cta.href)}
+        secondaryLabel={page.ctaSecondary.label}
+        secondaryHref={stickyUtm(page.ctaSecondary.href)}
+      />
     </>
   );
 }
