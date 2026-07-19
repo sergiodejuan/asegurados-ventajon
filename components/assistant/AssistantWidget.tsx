@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { StepForm } from "@/components/StepForm";
 import { callRequestSchema } from "@/lib/schema";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME, CALLER_NUMBERS } from "@/lib/brand";
 import { getAttribution, withUtmParams } from "@/lib/attribution";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
@@ -68,13 +68,17 @@ const TEASER_DELAY_MS = 1200;
 const TEASER_AUTOHIDE_MS = 10000;
 const TEASER_SEEN_KEY = "ventajon:assistantTeaserSeen";
 
-const TOP_MENU_ITEMS: { intent: TopIntent; label: string; icon: string }[] = [
-  { intent: "precio", label: "Busco mejorar precio", icon: "compare" },
-  { intent: "presupuesto", label: "Pedir presupuesto", icon: "doc" },
-  { intent: "llamada", label: "Quiero que me llamen", icon: "phone" },
-  { intent: "duda", label: "Tengo una duda", icon: "doc" },
-  { intent: "info", label: "Necesito información", icon: "shield" },
+const TOP_MENU_ITEMS: { intent: TopIntent; label: string; description: string; icon: string }[] = [
+  { intent: "precio", label: "Busco mejorar precio", description: "Compara tu seguro actual y ahorra", icon: "compare" },
+  { intent: "presupuesto", label: "Pedir presupuesto", description: "Te ayudamos a elegir y contratar", icon: "doc" },
+  { intent: "llamada", label: "Quiero que me llamen", description: "Un asesor te llama cuando quieras", icon: "phone" },
+  { intent: "duda", label: "Tengo una duda", description: "Resolvemos tus preguntas al momento", icon: "doc" },
+  { intent: "info", label: "Necesito información", description: "Descubre todos nuestros seguros", icon: "shield" },
 ];
+
+function telHref(n: string): string {
+  return "tel:" + n.replace(/[^\d+]/g, "");
+}
 
 const PRODUCT_MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
   { intent: "salud", label: "Seguro de salud", icon: "shield" },
@@ -129,6 +133,27 @@ function assistantUtm(href: string, action: string): string {
   return withUtmParams(href, { source: "web", medium: "asistente", campaign: `asistente-${action}` });
 }
 
+// Migas de pan del propio widget: con varios niveles de profundidad (menú
+// general → ramo → calculadora/formulario), sin esto es fácil perder de
+// vista en qué paso del flujo se está. El botón "volver" ya existe y
+// siempre regresa al menú general (no paso a paso), así que esto es solo
+// orientación, no navegación.
+function getBreadcrumb(topIntent: TopIntent | null, stage: Stage, intent: Intent | null): string[] {
+  if (!topIntent) return [];
+  const topLabel = TOP_MENU_ITEMS.find((t) => t.intent === topIntent)?.label;
+  if (!topLabel) return [];
+  const segs = [topLabel];
+  if (stage === "precio-link" && intent) segs.push(PRODUCTO_LABELS[intent]);
+  else if (stage === "tarificador" && intent) segs.push(PRODUCTO_LABELS[intent], "Calculadora");
+  else if (stage === "miniflow" && topIntent === "precio" && intent) segs.push(PRODUCTO_LABELS[intent]);
+  else if (stage === "contact") segs.push("Tus datos");
+  else if (stage === "duda-contact") segs.push("Buscar presupuesto");
+  else if (stage === "duda-select") segs.push("Elige tu presupuesto");
+  else if (stage === "duda-topic") segs.push("Cuéntanos tu duda");
+  else if (stage === "duda-confirm") segs.push("Tus datos");
+  return segs;
+}
+
 function formatDate(iso: string): string {
   try { return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }); }
   catch { return ""; }
@@ -152,6 +177,7 @@ export function AssistantWidget() {
     return loadClientProfile()?.nombre ?? "";
   });
   const [intent, setIntent] = useState<Intent | null>(null);
+  const [topIntent, setTopIntent] = useState<TopIntent | null>(null);
   const [stage, setStage] = useState<Stage>(() => {
     if (typeof window === "undefined") return "menu";
     return loadClientProfile()?.nombre ? "menu" : "name";
@@ -209,6 +235,9 @@ export function AssistantWidget() {
 
   if (!allowed) return null;
 
+  const showBack = stage !== "menu" && stage !== "done" && stage !== "name";
+  const breadcrumb = showBack ? getBreadcrumb(topIntent, stage, intent) : [];
+
   const activeFlow: MiniFlowQuestion[] = intent === "llamada"
     ? [{ key: "producto", title: "¿Con qué seguro necesitas ayuda?", options: LLAMADA_PRODUCTO_OPTIONS }]
     : intent
@@ -217,6 +246,7 @@ export function AssistantWidget() {
 
   function resetToMenu() {
     setIntent(null);
+    setTopIntent(null);
     setStage("menu");
     setMiniflowIdx(0);
     setAnswers({});
@@ -225,6 +255,7 @@ export function AssistantWidget() {
   // Primer nivel del menú (calcado del funnel de WhatsApp): la intención
   // general antes de preguntar el ramo.
   function chooseTopIntent(t: TopIntent) {
+    setTopIntent(t);
     setAnswers({});
     setMiniflowIdx(0);
     if (t === "precio") {
@@ -329,7 +360,7 @@ export function AssistantWidget() {
         <button
           type="button"
           onClick={openWidget}
-          aria-label="Abrir el asistente de Ventajon"
+          aria-label="Abrir Coti, el asistente de Ventajon"
           aria-hidden={!scrolled}
           tabIndex={scrolled ? 0 : -1}
           className={`fixed bottom-28 left-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-navy text-white shadow-card transition-all duration-500 ease-out hover:scale-105 lg:bottom-[var(--assistant-bottom,1.5rem)] lg:left-6 ${
@@ -356,7 +387,7 @@ export function AssistantWidget() {
           >
             <Close width={11} height={11} />
           </button>
-          <span className="font-semibold text-navy">¡Hola! 👋</span> Soy el asistente de {BRAND_NAME}. ¿Necesitas ayuda?
+          <span className="font-semibold text-navy">¡Hola! 👋</span> Soy Coti, el asistente de {BRAND_NAME}. ¿Necesitas ayuda?
         </div>
       )}
 
@@ -369,19 +400,25 @@ export function AssistantWidget() {
         >
           <div className="safe-top flex shrink-0 items-center justify-between border-b border-hair px-5 py-4">
             <div className="flex min-w-0 items-center gap-2">
-              {stage !== "menu" && stage !== "done" && stage !== "name" && (
+              {showBack && (
                 <button type="button" onClick={resetToMenu} aria-label="Volver al menú" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-navy transition-colors hover:bg-mist">
                   <ChevronLeft width={18} height={18} />
                 </button>
               )}
-              <h2 id="assistant-heading" className="truncate text-[15px] font-bold text-navy">Asistente {BRAND_NAME}</h2>
+              <h2 id="assistant-heading" className="truncate text-[15px] font-bold text-navy">Coti</h2>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-navy transition-colors hover:bg-mist">
               <Close width={16} height={16} />
             </button>
           </div>
 
-          <div className="safe-bottom min-h-0 flex-1 overflow-y-auto p-5">
+          {breadcrumb.length > 0 && (
+            <p className="shrink-0 truncate border-b border-hair bg-mist px-5 py-2 text-[12px] font-medium text-slate2">
+              {breadcrumb.join(" · ")}
+            </p>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {stage === "name" && (
               <NameStep onSubmit={handleNameSubmit} onSkip={() => setStage("menu")} />
             )}
@@ -389,8 +426,8 @@ export function AssistantWidget() {
             {stage === "menu" && (
               <div>
                 <BotBubble>
-                  <p className="font-semibold text-navy">{firstName ? `¡Hola, ${firstName}! 👋` : "Hola 👋"}</p>
-                  <p className="mt-1">{context.greeting}</p>
+                  <p className="font-semibold text-navy">{firstName ? `¡Hola, ${firstName}! 👋` : "¡Hola! 👋"}</p>
+                  <p className="mt-1">Soy Coti. {context.greeting}</p>
                 </BotBubble>
                 <div className="mt-4 flex flex-col gap-2">
                   {TOP_MENU_ITEMS.map((item) => (
@@ -398,12 +435,15 @@ export function AssistantWidget() {
                       key={item.intent}
                       type="button"
                       onClick={() => chooseTopIntent(item.intent)}
-                      className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy hover:bg-navy/5"
+                      className="flex items-start gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left transition-all hover:border-navy hover:bg-navy/5 active:scale-[0.98]"
                     >
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
+                      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy text-white">
                         {item.icon === "phone" ? <Phone width={17} height={17} /> : <IconByName name={item.icon} width={17} height={17} />}
                       </span>
-                      {item.label}
+                      <span className="min-w-0">
+                        <span className="block text-[14px] font-semibold text-ink">{item.label}</span>
+                        <span className="block text-[12px] leading-snug text-slate2">{item.description}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -421,9 +461,9 @@ export function AssistantWidget() {
                       key={item.intent}
                       type="button"
                       onClick={() => chooseProducto(item.intent)}
-                      className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy hover:bg-navy/5"
+                      className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-all hover:border-navy hover:bg-navy/5 active:scale-[0.98]"
                     >
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy text-white">
                         <IconByName name={item.icon} width={17} height={17} />
                       </span>
                       {item.label}
@@ -447,7 +487,7 @@ export function AssistantWidget() {
                     <AssistantLinkButton href={assistantUtm(productoHref(intent), `calculador-${intent}`)} action={`calculador-${intent}`}>
                       Ir al Calculador
                     </AssistantLinkButton>
-                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline active:scale-[0.98]">
                       Prefiero calcularlo aquí mismo
                     </button>
                   </>
@@ -460,7 +500,7 @@ export function AssistantWidget() {
                     <AssistantLinkButton href={assistantUtm(productoHref(intent), `ver-${intent}`)} action={`ver-${intent}`}>
                       Ver {PRODUCTO_LABELS[intent].toLowerCase()}
                     </AssistantLinkButton>
-                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline active:scale-[0.98]">
                       Que me llamen sobre esto
                     </button>
                   </>
@@ -495,7 +535,7 @@ export function AssistantWidget() {
                 <AssistantLinkButton href={assistantUtm("/preguntas-frecuentes", "preguntas-frecuentes")} action="preguntas-frecuentes">
                   Ver preguntas frecuentes
                 </AssistantLinkButton>
-                <button type="button" onClick={() => setStage("duda-contact")} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                <button type="button" onClick={() => setStage("duda-contact")} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline active:scale-[0.98]">
                   Prefiero contarte mi duda directamente
                 </button>
               </div>
@@ -515,7 +555,7 @@ export function AssistantWidget() {
                 <a
                   href={assistantUtm("/promociones", "promociones")}
                   onClick={() => pushDataLayerEvent("assistant_link_click", { action: "promociones" })}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-navy/15 px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:border-navy hover:bg-navy/5"
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-navy/15 px-5 py-3.5 text-[15px] font-semibold text-navy transition-all hover:border-navy hover:bg-navy/5 active:scale-[0.98]"
                 >
                   Ver promociones
                   <ChevronRight width={16} height={16} />
@@ -579,12 +619,26 @@ export function AssistantWidget() {
                   <p className="font-semibold text-navy">¡Gracias{firstName ? `, ${firstName}` : ""}! 🎉</p>
                   <p className="mt-1">Hemos recibido tus datos. Un asesor se pondrá en contacto contigo en breve.</p>
                 </BotBubble>
-                <button type="button" onClick={resetToMenu} className="mt-4 rounded-2xl border border-navy/15 px-5 py-2.5 text-[14px] font-semibold text-navy transition-colors hover:border-navy hover:bg-navy/5">
+                <button type="button" onClick={resetToMenu} className="mt-4 rounded-2xl border border-navy/15 px-5 py-2.5 text-[14px] font-semibold text-navy transition-colors hover:border-navy hover:bg-navy/5 active:scale-[0.98]">
                   Volver al menú
                 </button>
               </div>
             )}
           </div>
+
+          {/* Acceso fijo a llamada directa: siempre visible, en cualquier
+              paso de la conversación, para quien prefiera no completar nada
+              y hablar directamente con un asesor. */}
+          {CALLER_NUMBERS[0]?.number && (
+            <a
+              href={telHref(CALLER_NUMBERS[0].number)}
+              onClick={() => pushDataLayerEvent("phone_click", { placement: "asistente" })}
+              className="safe-bottom flex shrink-0 items-center justify-center gap-2 border-t border-hair bg-mist px-5 py-3 text-[13px] font-semibold text-navy transition-colors hover:bg-hair active:scale-[0.98]"
+            >
+              <Phone width={15} height={15} />
+              Llamar ahora · {CALLER_NUMBERS[0].number}
+            </a>
+          )}
         </div>
       )}
     </>
@@ -595,7 +649,7 @@ function NameStep({ onSubmit, onSkip }: { onSubmit: (name: string) => void; onSk
   const [value, setValue] = useState("");
   return (
     <div className="motion-safe:animate-fade-up">
-      <BotBubble>¡Hola! 👋 Antes de nada, ¿cómo te llamas?</BotBubble>
+      <BotBubble>¡Hola! 👋 Soy Coti. Antes de nada, ¿cómo te llamas?</BotBubble>
       <form
         onSubmit={(e) => { e.preventDefault(); const v = value.trim(); if (v) onSubmit(v); else onSkip(); }}
         className="mt-4"
@@ -606,11 +660,11 @@ function NameStep({ onSubmit, onSkip }: { onSubmit: (name: string) => void; onSk
           placeholder="Tu nombre…" autoFocus
           className="w-full rounded-2xl border border-navy/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60"
         />
-        <button type="submit" className="mt-3 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+        <button type="submit" className="mt-3 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98]">
           Continuar
         </button>
       </form>
-      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline active:scale-[0.98]">
         Prefiero no decirlo
       </button>
     </div>
@@ -627,7 +681,7 @@ function MiniFlowStep({ question, onAnswer }: { question: MiniFlowQuestion; onAn
             key={o.value}
             type="button"
             onClick={() => onAnswer(o.value)}
-            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-medium text-ink transition-colors hover:border-navy hover:bg-navy/5"
+            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-medium text-ink transition-all hover:border-navy hover:bg-navy/5 active:scale-[0.98]"
           >
             {o.label}
           </button>
@@ -661,13 +715,13 @@ function TicketSearch({
         {error && <p role="alert" className="mt-2 text-[12px] font-medium text-brand-red">{error}</p>}
         <button
           type="submit" disabled={searching || !identifier.trim()} aria-busy={searching || undefined}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98] disabled:bg-slate2/40"
         >
           {searching && <Spinner />}
           {searching ? "Buscando…" : "Buscar mi presupuesto"}
         </button>
       </form>
-      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+      <button type="button" onClick={onSkip} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline active:scale-[0.98]">
         No tengo presupuesto, quiero contarlo directamente
       </button>
     </div>
@@ -689,7 +743,7 @@ function TicketPresupuestoSelect({
             key={p.id}
             type="button"
             onClick={() => onSelect(p)}
-            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] transition-colors hover:border-navy hover:bg-navy/5"
+            className="rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] transition-all hover:border-navy hover:bg-navy/5 active:scale-[0.98]"
           >
             <span className="block font-semibold text-navy">{PRODUCTO_LABELS[p.producto as Intent] ?? p.producto}</span>
             <span className="block text-[12px] text-slate2">{formatDate(p.createdAt)}</span>
@@ -722,7 +776,7 @@ function TicketTopicStep({
             type="button"
             aria-pressed={topic === o.value}
             onClick={() => onSelectTopic(topic === o.value ? null : o.value)}
-            className={`rounded-2xl border px-4 py-3 text-left text-[14px] font-medium transition-colors ${topic === o.value ? "border-navy bg-navy text-white" : "border-navy/15 bg-white text-ink hover:border-navy hover:bg-navy/5"}`}
+            className={`rounded-2xl border px-4 py-3 text-left text-[14px] font-medium transition-all active:scale-[0.98] ${topic === o.value ? "border-navy bg-navy text-white" : "border-navy/15 bg-white text-ink hover:border-navy hover:bg-navy/5"}`}
           >
             {o.label}
           </button>
@@ -740,7 +794,7 @@ function TicketTopicStep({
       </div>
       <button
         type="button" disabled={!canContinue} onClick={onContinue}
-        className="mt-4 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:cursor-not-allowed disabled:bg-slate2/40"
+        className="mt-4 flex w-full items-center justify-center rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate2/40"
       >
         Continuar
       </button>
@@ -898,7 +952,7 @@ function TicketConfirm({
       )}
 
       <button type="submit" disabled={submitting} aria-busy={submitting || undefined}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40">
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98] disabled:bg-slate2/40">
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar consulta"}
       </button>
@@ -1056,7 +1110,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
       )}
 
       <button type="submit" disabled={submitting} aria-busy={submitting || undefined}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40">
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98] disabled:bg-slate2/40">
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar"}
       </button>
@@ -1092,7 +1146,7 @@ function AssistantLinkButton({ href, action, children }: { href: string; action:
     <a
       href={href}
       onClick={() => pushDataLayerEvent("assistant_link_click", { action })}
-      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand-red-deep active:scale-[0.98]"
     >
       {children}
       <ChevronRight width={16} height={16} />
@@ -1100,17 +1154,37 @@ function AssistantLinkButton({ href, action, children }: { href: string; action:
   );
 }
 
+// Tres puntos animados antes de que "aparezca" cada mensaje del asistente:
+// aunque el contenido está guionizado, este pequeño retraso hace que se
+// lea como una conversación en marcha y no como un texto que salta de golpe.
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1 py-0.5" aria-hidden="true">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate2/50 [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate2/50 [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate2/50" />
+    </span>
+  );
+}
+
 // Burbuja "tipo chat" para el texto que dice el asistente: mismo avatar en
 // todas las pantallas, para que se lea como una conversación y no como un
-// formulario suelto.
+// formulario suelto. Cada vez que se monta (es decir, cada vez que la
+// conversación avanza a un mensaje nuevo) muestra primero unos puntos de
+// "escribiendo…" durante un instante antes de revelar el texto real.
 function BotBubble({ children }: { children: React.ReactNode }) {
+  const [typing, setTyping] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setTyping(false), 550);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <div className="flex items-start gap-2.5">
       <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-navy text-white">
         <ChatIcon width={15} height={15} />
       </span>
       <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-mist px-4 py-3 text-[14px] leading-relaxed text-ink">
-        {children}
+        {typing ? <TypingDots /> : children}
       </div>
     </div>
   );
