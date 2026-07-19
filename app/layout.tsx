@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { BRAND_NAME } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
+import { ThemeProvider } from "@/lib/ThemeContext";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { GoogleTagManager } from "@/components/GoogleTagManager";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
@@ -92,21 +93,23 @@ export default async function RootLayout({
         </head>
       )}
       <body>
-        <GoogleTagManager gtmId={theme.gtmId} />
-        {theme.ga4.enabled && <GoogleAnalytics measurementId={theme.ga4.measurementId} />}
-        {theme.metaPixel.enabled && <MetaPixel pixelId={theme.metaPixel.pixelId} />}
-        <a
-          href="#contenido"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-navy focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
-        >
-          Saltar al contenido
-        </a>
-        {children}
-        <Analytics />
-        <AssistantWidget />
-        <AccessibilityWidget />
-        <GeneralExitIntentModal />
-        <CookieConsentBanner />
+        <ThemeProvider theme={theme}>
+          <GoogleTagManager gtmId={theme.gtmId} />
+          {theme.ga4.enabled && <GoogleAnalytics measurementId={theme.ga4.measurementId} />}
+          {theme.metaPixel.enabled && <MetaPixel pixelId={theme.metaPixel.pixelId} />}
+          <a
+            href="#contenido"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-navy focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+          >
+            Saltar al contenido
+          </a>
+          {children}
+          <Analytics />
+          <AssistantWidget />
+          <AccessibilityWidget />
+          <GeneralExitIntentModal />
+          <CookieConsentBanner />
+        </ThemeProvider>
       </body>
     </html>
   );

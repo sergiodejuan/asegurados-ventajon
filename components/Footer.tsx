@@ -1,15 +1,20 @@
+"use client";
+
 import { BRAND_NAME, CONTACT_HOURS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
+import { useSiteTheme } from "@/lib/useTheme";
+import { Wordmark } from "./Header";
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const theme = useSiteTheme();
   return (
     <footer className="safe-bottom mt-14 border-t border-hair bg-white md:mt-24">
       <div className="mx-auto max-w-app px-5 py-8 md:max-w-5xl md:py-12 lg:max-w-6xl">
         <div className="md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr] md:gap-8 lg:gap-10">
           <div>
-            <p className="font-display text-[15px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
+            <Wordmark logoUrl={theme.logoUrl} />
             <p className="mt-2 text-[13px] leading-relaxed text-slate2 md:max-w-sm">Correduría de seguros. Trabajamos en toda España. Atención {CONTACT_HOURS}.</p>
             <p className="mt-2 text-[12px] leading-relaxed text-slate2 md:max-w-sm">
               Datos identificativos, inscripción en el registro de la DGSFP y política de privacidad completa en{" "}
