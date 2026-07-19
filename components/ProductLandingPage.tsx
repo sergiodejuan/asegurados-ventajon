@@ -2,6 +2,7 @@ import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { StickyMobileCta } from "./StickyMobileCta";
 import { PromotionStickyDesktopCta } from "./PromotionStickyDesktopCta";
+import { AutoCoverageComparator } from "./AutoCoverageComparator";
 import { Testimonials } from "./Testimonials";
 import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
@@ -110,6 +111,9 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
             </p>
           </div>
         </section>
+
+        {/* COMPARADOR TERCEROS / TODO RIESGO (solo en la página de auto) */}
+        {page.slug === "auto" && <AutoCoverageComparator />}
 
         {/* CONFIANZA */}
         <section aria-labelledby="conf" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
