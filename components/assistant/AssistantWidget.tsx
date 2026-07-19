@@ -10,6 +10,7 @@ import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Close, IconByName, Spinner, ChevronLeft, ChevronRight, Phone } from "@/components/icons";
 import { ConsentNudgeModal } from "@/components/ConsentNudgeModal";
+import { getProductPage, quoteHref } from "@/lib/productPages";
 import {
   isAssistantAllowed,
   getAssistantContext,
@@ -83,16 +84,13 @@ const PRODUCT_MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
   { intent: "hogar", label: "Seguro de hogar", icon: "home" },
 ];
 
-// Enlaces del tarificador/página propia por ramo, para el botón "Ir al
+// Enlace del tarificador/página propia por ramo, para el botón "Ir al
 // Calculador" (salud/vida/auto) o "Ver seguro de X" (decesos/hogar, que no
-// tienen tarificador propio).
-const PRODUCTO_HREF: Record<"salud" | "vida" | "auto" | "decesos" | "hogar", string> = {
-  salud: "/tarificador",
-  vida: "/tarificador-vida",
-  auto: "/tarificador-auto",
-  decesos: "/seguro-de-decesos",
-  hogar: "/seguro-de-hogar",
-};
+// tienen tarificador propio) — mismo criterio que el selector de seguros
+// del CTA general (ver lib/productPages.ts).
+function productoHref(slug: "salud" | "vida" | "auto" | "decesos" | "hogar"): string {
+  return quoteHref(getProductPage(slug)!);
+}
 
 const LLAMADA_PRODUCTO_OPTIONS = [
   { label: "Salud", value: "salud" },
@@ -446,7 +444,7 @@ export function AssistantWidget() {
                         diferentes opciones según tu caso.
                       </p>
                     </BotBubble>
-                    <AssistantLinkButton href={assistantUtm(PRODUCTO_HREF[intent], `calculador-${intent}`)} action={`calculador-${intent}`}>
+                    <AssistantLinkButton href={assistantUtm(productoHref(intent), `calculador-${intent}`)} action={`calculador-${intent}`}>
                       Ir al Calculador
                     </AssistantLinkButton>
                     <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
@@ -459,7 +457,7 @@ export function AssistantWidget() {
                       <p className="font-semibold text-navy">¡Genial!</p>
                       <p className="mt-1">Te dejamos un enlace donde puedes ver toda la información de tu {PRODUCTO_LABELS[intent]}.</p>
                     </BotBubble>
-                    <AssistantLinkButton href={assistantUtm(PRODUCTO_HREF[intent], `ver-${intent}`)} action={`ver-${intent}`}>
+                    <AssistantLinkButton href={assistantUtm(productoHref(intent), `ver-${intent}`)} action={`ver-${intent}`}>
                       Ver {PRODUCTO_LABELS[intent].toLowerCase()}
                     </AssistantLinkButton>
                     <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">

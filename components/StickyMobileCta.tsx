@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 // landings de producto) donde el CTA del hero deja de estar a la vista al
 // hacer scroll. No se muestra en desktop (el nav-isla ya lleva su propio CTA).
 export function StickyMobileCta({
-  label, href, secondaryLabel, secondaryHref,
+  label, href, onClick, secondaryLabel, secondaryHref,
 }: {
-  label: string; href: string; secondaryLabel?: string; secondaryHref?: string;
+  label: string; href?: string; onClick?: () => void; secondaryLabel?: string; secondaryHref?: string;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -36,13 +36,24 @@ export function StickyMobileCta({
             {secondaryLabel}
           </a>
         )}
-        <a
-          href={href}
-          tabIndex={visible ? 0 : -1}
-          className="flex-1 rounded-card bg-brand-red px-4 py-3 text-center text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
-        >
-          {label}
-        </a>
+        {onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            tabIndex={visible ? 0 : -1}
+            className="flex-1 rounded-card bg-brand-red px-4 py-3 text-center text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+          >
+            {label}
+          </button>
+        ) : (
+          <a
+            href={href}
+            tabIndex={visible ? 0 : -1}
+            className="flex-1 rounded-card bg-brand-red px-4 py-3 text-center text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+          >
+            {label}
+          </a>
+        )}
       </div>
     </div>
   );

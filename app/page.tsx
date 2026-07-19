@@ -1,12 +1,13 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { CoverageTabs } from "@/components/CoverageTabs";
 import { CampaignBanner } from "@/components/CampaignBanner";
 import { Testimonials } from "@/components/Testimonials";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { AutoWidget } from "@/components/AutoWidget";
 import { HomeStickyDesktopCta } from "@/components/HomeStickyDesktopCta";
+import { HomeMobileQuoteCta } from "@/components/HomeMobileQuoteCta";
+import { InsuranceQuoteCta } from "@/components/InsuranceQuoteCta";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
@@ -72,10 +73,9 @@ export default async function Home() {
             </div>
 
             <div id="home-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
-              <a href="/tarificador"
-                className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
+              <InsuranceQuoteCta className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
                 Calcula tu precio
-              </a>
+              </InsuranceQuoteCta>
               <a href="/quiero-que-me-llamen"
                 className="flex items-center justify-center rounded-card bg-navy px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-navy-deep sm:flex-1">
                 Te llamamos gratis
@@ -197,7 +197,9 @@ export default async function Home() {
               </p>
             </div>
             <div className="mt-5 flex flex-col gap-3 md:mt-0 md:flex-row md:shrink-0">
-              <a href="/tarificador" className="flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep">Calcula tu precio</a>
+              <InsuranceQuoteCta className="flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+                Calcula tu precio
+              </InsuranceQuoteCta>
               <a href="/quiero-que-me-llamen" className="flex items-center justify-center rounded-card border border-white/30 px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-white/10">Te llamamos gratis</a>
             </div>
           </div>
@@ -206,7 +208,7 @@ export default async function Home() {
 
       <div className="h-20 lg:hidden" aria-hidden="true" />
       <Footer />
-      <StickyMobileCta label="Calcula tu precio" href="/tarificador" secondaryLabel="Que te llamen" secondaryHref="/quiero-que-me-llamen" />
+      <HomeMobileQuoteCta />
       <HomeStickyDesktopCta targetId="home-hero-ctas" />
       <AutoWidget />
     </>

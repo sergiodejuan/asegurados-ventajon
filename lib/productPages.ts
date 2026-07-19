@@ -239,3 +239,11 @@ export const PRODUCT_PAGES: ProductPage[] = [
 export function getProductPage(slug: string): ProductPage | undefined {
   return PRODUCT_PAGES.find((p) => p.slug === slug);
 }
+
+// Enlace "directo a la acción" de un ramo: su tarificador si lo tiene
+// (salud/vida/auto), o su propia página si no (decesos/hogar, que no
+// tienen calculadora propia) — usado por el selector de seguros del CTA
+// general y por el asistente, para no duplicar este criterio en cada sitio.
+export function quoteHref(p: ProductPage): string {
+  return p.cta.href.startsWith("/tarificador") ? p.cta.href : p.path;
+}

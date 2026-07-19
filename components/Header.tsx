@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { BRAND_NAME, WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { useSiteTheme } from "@/lib/useTheme";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
+import { PRODUCT_PAGES } from "@/lib/productPages";
 import { WhatsApp, Menu } from "./icons";
 import { MobileNavMenu } from "./MobileNavMenu";
 import { MegaMenu } from "./MegaMenu";
+import { InsuranceQuoteCta } from "./InsuranceQuoteCta";
 
 export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
   if (logoUrl) {
@@ -90,6 +92,13 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
   const theme = useSiteTheme();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // El CTA "Calcula tu precio" del menú es dinámico según la página: en una
+  // página de producto lleva directo a su propio tarificador (o a su propia
+  // página si el ramo no tiene calculadora); en el resto de páginas
+  // generales (Home incluida) no hay un ramo de contexto, así que abre el
+  // selector de seguros a pantalla completa en vez de asumir "salud".
+  const productContext = PRODUCT_PAGES.find((p) => pathname === p.path || pathname.startsWith(`${p.path}/`));
+
   return (
     <>
     <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md xl:mx-12">
@@ -121,12 +130,18 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
             <WhatsApp className="text-[#25D366]" />
             Escríbenos
           </a>
-          <a
-            href="/tarificador"
-            className="hidden items-center rounded-pill bg-brand-red px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep lg:inline-flex"
-          >
-            Calcula tu precio
-          </a>
+          {productContext ? (
+            <a
+              href={productContext.cta.href}
+              className="hidden items-center rounded-pill bg-brand-red px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep lg:inline-flex"
+            >
+              Calcula tu precio
+            </a>
+          ) : (
+            <InsuranceQuoteCta className="hidden items-center rounded-pill bg-brand-red px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep lg:inline-flex">
+              Calcula tu precio
+            </InsuranceQuoteCta>
+          )}
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
