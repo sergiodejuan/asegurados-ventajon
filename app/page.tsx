@@ -9,10 +9,9 @@ import { AutoWidget } from "@/components/AutoWidget";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
-import { PromotionCard } from "@/components/PromotionCard";
-import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
+import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
-import { getTheme, listPromotions } from "@/lib/store";
+import { getTheme } from "@/lib/store";
 
 const PRODUCT_BLURBS: Record<string, string> = {
   salud: "Con o sin copago. Calcula tu precio al instante.",
@@ -33,7 +32,6 @@ const FAQ_GENERAL = [
 export default async function Home() {
   const theme = await getTheme();
   const heroImage = theme.heroImages.home;
-  const homePromotions = (await listPromotions({ onlyPublished: true })).filter((p) => p.mostrarEnHome);
   return (
     <>
       <Header />
@@ -125,25 +123,6 @@ export default async function Home() {
         </section>
 
         <CampaignBanner />
-
-        {/* NUEVAS PROMOCIONES (carrusel deslizable en mobile, grid en
-            escritorio), al estilo de la referencia de Línea Directa: solo
-            las promociones que el admin ha marcado "Mostrar en la Home"
-            desde /admin/promociones. */}
-        {homePromotions.length > 0 && (
-          <section aria-labelledby="promos-home" className="mt-14 md:mt-24">
-            <div className="mx-auto max-w-app px-5 md:max-w-5xl lg:max-w-6xl">
-              <h2 id="promos-home" className="text-[24px] font-extrabold text-navy md:text-[30px]">
-                Nuevas promociones de {BRAND_NAME}
-              </h2>
-            </div>
-            <ul aria-label="Promociones" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-3 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
-              {homePromotions.map((p) => (
-                <PromotionCard key={p.id} promo={p} className="w-[280px] shrink-0 snap-start md:w-auto" />
-              ))}
-            </ul>
-          </section>
-        )}
 
         {/* VENTAJAS (carrusel en mobile, grid en escritorio) */}
         <section aria-labelledby="ventajas" className="mt-14 md:mt-24">
