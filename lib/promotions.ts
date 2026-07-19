@@ -30,6 +30,11 @@ export type Promotion = {
   // de mostrarse en el listado y en su propia página sin tener que editarla
   // ni cambiar su estado a mano. "" = no caduca.
   finPromocion: string;
+  // Además de su tarjeta en /promociones, esta promoción se ofrece también
+  // como banner en el carrusel de la Home (junto a los banners de campaña
+  // manuales) — opt-in explícito por promoción, para que el admin controle
+  // qué se destaca en portada sin que crear una promoción la ponga ahí sola.
+  mostrarEnHome: boolean;
   updatedAt: string;
 };
 
@@ -111,6 +116,7 @@ export const DEFAULT_PROMOTIONS: Promotion[] = [
     metaDescription: "Del 1 de octubre al 31 de diciembre, te regalamos una tarjeta de 20 € por cada nuevo asegurado en tu seguro de salud. Renovaciones con efecto desde enero de 2027.",
     publishedAt: now.slice(0, 10),
     finPromocion: "2026-12-31",
+    mostrarEnHome: true,
     updatedAt: now,
   },
   {
@@ -141,6 +147,7 @@ export const DEFAULT_PROMOTIONS: Promotion[] = [
     metaDescription: "Comparamos tu seguro de coche entre las principales aseguradoras y te garantizamos el mejor precio. Sin coste ni compromiso.",
     publishedAt: now.slice(0, 10),
     finPromocion: "2026-12-31",
+    mostrarEnHome: false,
     updatedAt: now,
   },
   {
@@ -172,6 +179,7 @@ export const DEFAULT_PROMOTIONS: Promotion[] = [
     metaDescription: "Contrata ahora tu seguro de salud y te regalamos 1 mes. Compara gratis entre las mejores aseguradoras, sin compromiso.",
     publishedAt: now.slice(0, 10),
     finPromocion: "",
+    mostrarEnHome: false,
     updatedAt: now,
   },
 ];

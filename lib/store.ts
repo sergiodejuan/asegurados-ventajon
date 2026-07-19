@@ -726,6 +726,7 @@ export async function createPromotion(draft: PromotionDraft): Promise<Promotion>
     metaDescription: draft.metaDescription ?? "",
     publishedAt: draft.publishedAt ?? now.slice(0, 10),
     finPromocion: draft.finPromocion ?? "",
+    mostrarEnHome: draft.mostrarEnHome ?? false,
     updatedAt: now,
   };
   all.push(promo);

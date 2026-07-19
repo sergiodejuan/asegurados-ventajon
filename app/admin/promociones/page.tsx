@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { CampaignBannersPanel } from "@/components/admin/CampaignBannersPanel";
 import { isPromotionActive, type Promotion } from "@/lib/promotions";
 
 function fmt(iso: string) {
@@ -10,10 +12,54 @@ function fmt(iso: string) {
   catch { return iso; }
 }
 
+type Tab = "promociones" | "campana";
+
 export default function AdminPromocionesPage() {
   return (
-    <AdminShell active="promociones">
-      <PromocionesAdmin />
+    <Suspense fallback={null}>
+      <AdminPromocionesPageInner />
+    </Suspense>
+  );
+}
+
+function AdminPromocionesPageInner() {
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(searchParams.get("tab") === "campana" ? "campana" : "promociones");
+
+  return (
+    <AdminShell active={tab === "campana" ? "campana" : "promociones"}>
+      <main className="mx-auto max-w-3xl px-5 py-6 pb-24">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-extrabold text-navy">Promociones</h1>
+            <p className="mt-1 text-[13px] leading-relaxed text-slate2">
+              Promociones (con página propia en /promociones) y banners de campaña de la Home, en un mismo sitio:
+              ambos alimentan el carrusel de la portada, así que aquí eliges qué se muestra ahí.
+            </p>
+          </div>
+          {tab === "promociones" && (
+            <a href="/admin/promociones/nueva"
+              className="shrink-0 rounded-card bg-brand-red px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+              + Nueva promoción
+            </a>
+          )}
+        </div>
+
+        <div className="mt-5 flex overflow-hidden rounded-pill border border-hair" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === "promociones"} onClick={() => setTab("promociones")}
+            className={`px-4 py-2 text-[13px] font-semibold transition-colors ${tab === "promociones" ? "bg-navy text-white" : "bg-white text-navy hover:bg-mist"}`}>
+            Promociones
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "campana"} onClick={() => setTab("campana")}
+            className={`px-4 py-2 text-[13px] font-semibold transition-colors ${tab === "campana" ? "bg-navy text-white" : "bg-white text-navy hover:bg-mist"}`}>
+            Banners de campaña
+          </button>
+        </div>
+
+        <div className="mt-5">
+          {tab === "promociones" ? <PromocionesAdmin /> : <CampaignBannersPanel />}
+        </div>
+      </main>
     </AdminShell>
   );
 }
@@ -43,28 +89,25 @@ function PromocionesAdmin() {
     if (res.ok) setPromotions((ps) => ps.filter((p) => p.id !== id));
   }
 
-  return (
-    <main className="mx-auto max-w-3xl px-5 py-6 pb-16">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-extrabold text-navy">Promociones</h1>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Se muestran en /promociones (listado) y cada una en su propia página. Título, foto, CTA, bases legales y SEO,
-            editables como en un CMS.
-          </p>
-        </div>
-        <a href="/admin/promociones/nueva"
-          className="shrink-0 rounded-card bg-brand-red px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
-          + Nueva promoción
-        </a>
-      </div>
+  async function toggleMostrarEnHome(p: Promotion) {
+    const mostrarEnHome = !p.mostrarEnHome;
+    setPromotions((ps) => ps.map((x) => (x.id === p.id ? { ...x, mostrarEnHome } : x)));
+    const res = await fetch(`/api/admin/promotions/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-admin-token": token },
+      body: JSON.stringify({ mostrarEnHome }),
+    });
+    if (!res.ok) setPromotions((ps) => ps.map((x) => (x.id === p.id ? { ...x, mostrarEnHome: !mostrarEnHome } : x)));
+  }
 
+  return (
+    <>
       {error && <p role="alert" className="mt-4 text-[13px] font-medium text-brand-red">{error}</p>}
       {loading && <p className="mt-4 text-[13px] text-slate2">Cargando…</p>}
 
       {!loading && promotions.length === 0 && <p className="mt-6 text-[13px] text-slate2">Todavía no hay promociones.</p>}
 
-      <ul className="mt-5 flex flex-col gap-3">
+      <ul className="mt-1 flex flex-col gap-3">
         {promotions.map((p) => (
           <li key={p.id} className="flex flex-col gap-3 rounded-card border border-hair bg-white p-4 shadow-soft sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -84,6 +127,11 @@ function PromocionesAdmin() {
                       Expirada
                     </span>
                   )}
+                  {p.mostrarEnHome && (
+                    <span className="rounded-pill bg-navy/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-navy">
+                      En la Home
+                    </span>
+                  )}
                   <p className="truncate text-[12px] font-medium text-slate2">{p.categoria || "Sin categoría"}</p>
                 </div>
                 <p className="mt-1 truncate text-[15px] font-bold text-ink">{p.tituloTarjeta || "(sin título)"}</p>
@@ -93,7 +141,12 @@ function PromocionesAdmin() {
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button onClick={() => toggleMostrarEnHome(p)}
+                title="Mostrar u ocultar esta promoción en el carrusel de la Home"
+                className={`rounded-pill px-3 py-1.5 text-[12px] font-semibold transition-colors ${p.mostrarEnHome ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
+                {p.mostrarEnHome ? "Quitar de la Home" : "Mostrar en la Home"}
+              </button>
               <a href={`/promociones/${p.slug}`} target="_blank" rel="noopener noreferrer"
                 className="rounded-pill border border-hair bg-white px-3 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-mist">
                 Ver
@@ -110,6 +163,6 @@ function PromocionesAdmin() {
           </li>
         ))}
       </ul>
-    </main>
+    </>
   );
 }

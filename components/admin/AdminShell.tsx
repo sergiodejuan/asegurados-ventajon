@@ -45,7 +45,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     children: [
       { href: "/admin/blog", label: "Blog", key: "blog", modulo: "blog" },
       { href: "/admin/promociones", label: "Promociones", key: "promociones", modulo: "promociones" },
-      { href: "/admin/campana", label: "Campaña", key: "campana", modulo: "campana" },
+      { href: "/admin/promociones?tab=campana", label: "Campaña", key: "campana", modulo: "campana" },
       { href: "/admin/exit-intents", label: "Exit-intent", key: "exitintents", modulo: "exitintents" },
     ],
   },

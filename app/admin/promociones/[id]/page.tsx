@@ -22,7 +22,7 @@ const BLANK: Promotion = {
   tituloTarjeta: "", h1: "", validoHasta: "", subtitulo: "",
   introParrafos: [], bases: [], ctaTexto: "Calcula tu precio", ctaHref: "/tarificador",
   producto: "", linkExterno: "", metaTitle: "", metaDescription: "",
-  publishedAt: new Date().toISOString().slice(0, 10), finPromocion: "", updatedAt: "",
+  publishedAt: new Date().toISOString().slice(0, 10), finPromocion: "", mostrarEnHome: false, updatedAt: "",
 };
 
 export default function AdminPromocionEditorPage({ params }: { params: { id: string } }) {
@@ -187,6 +187,18 @@ function PromocionEditor({ id }: { id: string }) {
               Pasada esa fecha, la promoción se oculta sola del listado y de su página, sin que tengas que editarla.
               Déjalo en blanco si no caduca.
             </p>
+          </label>
+          <label className="mt-3 flex items-start gap-2.5 rounded-card border border-hair bg-mist/60 px-3.5 py-3">
+            <input type="checkbox" checked={promo.mostrarEnHome}
+              onChange={(e) => setPromo((p) => ({ ...p, mostrarEnHome: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-hair text-brand-red focus:ring-brand-red" />
+            <span>
+              <span className="block text-[13px] font-semibold text-ink">Mostrar también como banner en la Home</span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-slate2">
+                Se añade al carrusel de banners de la portada (junto a los de la pestaña "Banners de campaña"),
+                usando esta misma foto, título y CTA.
+              </span>
+            </span>
           </label>
         </section>
 
