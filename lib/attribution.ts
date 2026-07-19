@@ -65,3 +65,18 @@ export function captureAttribution(pathname: string, search: string): void {
 export function getAttribution(): Attribution {
   return readStored() ?? {};
 }
+
+// UTM genérico para enlaces internos de un placement concreto (p.ej. el
+// mega menú de "Seguros" en el header). Mismo criterio que
+// lib/promotions.ts withPromotionUtm: el UTM del placement siempre
+// sobrescribe uno que ya trajera el href, nunca se concatena (dos
+// utm_campaign en la misma URL sería un bug, URLSearchParams.get() solo lee
+// el primero).
+export function withUtmParams(href: string, utm: { source: string; medium: string; campaign: string }): string {
+  const [path, query = ""] = href.split("?");
+  const params = new URLSearchParams(query);
+  params.set("utm_source", utm.source);
+  params.set("utm_medium", utm.medium);
+  params.set("utm_campaign", utm.campaign);
+  return `${path}?${params.toString()}`;
+}

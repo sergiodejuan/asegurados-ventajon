@@ -51,6 +51,7 @@ export type FontOption = { id: string; label: string; css: string; google: strin
 // como Google Fonts en tiempo real solo si el admin elige una distinta.
 export const DISPLAY_FONT_OPTIONS: FontOption[] = [
   { id: "bricolage", label: "Bricolage Grotesque (por defecto)", css: "'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif", google: "" },
+  { id: "hostgrotesk", label: "Host Grotesk", css: "'Host Grotesk', ui-sans-serif, system-ui, sans-serif", google: "Host+Grotesk:wght@500;600;700;800" },
   { id: "sora", label: "Sora", css: "'Sora', ui-sans-serif, system-ui, sans-serif", google: "Sora:wght@500;600;700;800" },
   { id: "outfit", label: "Outfit", css: "'Outfit', ui-sans-serif, system-ui, sans-serif", google: "Outfit:wght@500;600;700;800" },
   { id: "manrope", label: "Manrope", css: "'Manrope', ui-sans-serif, system-ui, sans-serif", google: "Manrope:wght@500;600;700;800" },

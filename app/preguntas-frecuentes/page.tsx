@@ -97,7 +97,11 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, locale: "es_ES", type: "website" },
 };
 
-export default function PreguntasFrecuentesPage() {
+// El mega menú de "Seguros" enlaza directamente a la categoría de cada ramo
+// (p.ej. /preguntas-frecuentes?cat=salud) — la key fuerza el remonte del
+// componente cliente cuando se navega aquí desde otra categoría distinta a
+// la ya abierta, aunque la ruta en sí no cambie.
+export default function PreguntasFrecuentesPage({ searchParams }: { searchParams: { cat?: string } }) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -138,7 +142,7 @@ export default function PreguntasFrecuentesPage() {
         </section>
 
         <section aria-label="Preguntas frecuentes por categoría" className="mx-auto mt-6 max-w-app pb-14 md:max-w-3xl">
-          <FaqCategoryTabs categories={CATEGORIES} />
+          <FaqCategoryTabs key={searchParams.cat ?? "default"} categories={CATEGORIES} initialCategoryId={searchParams.cat} />
         </section>
 
         <section className="mx-auto mt-4 max-w-app px-5 pb-14 md:max-w-3xl">

@@ -12,8 +12,10 @@ export type FaqCategory = { id: string; label: string; items: FaqItem[] };
 // que FaqAccordion, pero filtrando qué preguntas se muestran según la
 // pestaña activa. El listado completo de todas las categorías igualmente
 // vive en el JSON-LD de la página (no depende de qué pestaña esté abierta).
-export function FaqCategoryTabs({ categories }: { categories: FaqCategory[] }) {
-  const [active, setActive] = useState(categories[0]?.id ?? "");
+export function FaqCategoryTabs({ categories, initialCategoryId }: { categories: FaqCategory[]; initialCategoryId?: string }) {
+  const [active, setActive] = useState(
+    categories.find((c) => c.id === initialCategoryId)?.id ?? categories[0]?.id ?? "",
+  );
   const current = categories.find((c) => c.id === active) ?? categories[0];
   if (!current) return null;
 

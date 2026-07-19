@@ -7,6 +7,7 @@ import { useSiteTheme } from "@/lib/useTheme";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { WhatsApp, Menu } from "./icons";
 import { MobileNavMenu } from "./MobileNavMenu";
+import { MegaMenu } from "./MegaMenu";
 
 export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
   if (logoUrl) {
@@ -26,7 +27,6 @@ export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
 }
 
 const NAV_LINKS = [
-  { href: "/#otros", label: "Seguros" },
   { href: "/promociones", label: "Promociones" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/actualidad", label: "Actualidad" },
@@ -103,6 +103,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
           <Wordmark logoUrl={theme.logoUrl} />
         </a>
         <nav aria-label="Principal" className="hidden items-center gap-8 lg:flex">
+          <MegaMenu />
           {NAV_LINKS.map((l) => (
             <a key={l.href} href={l.href} className="text-[14px] font-semibold text-slate2 transition-colors hover:text-navy">
               {l.label}
