@@ -44,6 +44,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     kind: "group", label: "Contenido", key: "contenido",
     children: [
       { href: "/admin/blog", label: "Blog", key: "blog", modulo: "blog" },
+      { href: "/admin/testimonios", label: "Testimonios", key: "testimonios", modulo: "testimonios" },
       { href: "/admin/promociones", label: "Promociones", key: "promociones", modulo: "promociones" },
       { href: "/admin/promociones?tab=campana", label: "Campaña", key: "campana", modulo: "campana" },
       { href: "/admin/exit-intents", label: "Exit-intent", key: "exitintents", modulo: "exitintents" },
@@ -86,7 +87,7 @@ function groupKeyForActive(active: string): string | null {
 
 export type AdminActiveKey =
   | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
-  | "exitintents" | "promociones"
+  | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "cookies" | "analitica" | "accesibilidad" | "rgpd" | "agentes" | "permisos" | "registro";
 
 function visibleFor(identity: Identity | null) {

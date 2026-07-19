@@ -44,6 +44,7 @@ export function Footer() {
             <p className="text-[13px] font-bold text-navy">Empresa</p>
             <ul className="mt-3 flex flex-col gap-2 text-[13px]">
               <li><a href="/quienes-somos" className="font-medium text-slate2 transition-colors hover:text-navy">Quiénes somos</a></li>
+              <li><a href="/testimonios" className="font-medium text-slate2 transition-colors hover:text-navy">Testimonios</a></li>
               <li><a href="/actualidad" className="font-medium text-slate2 transition-colors hover:text-navy">Actualidad</a></li>
               <li><a href="/preguntas-frecuentes" className="font-medium text-slate2 transition-colors hover:text-navy">Preguntas frecuentes</a></li>
               <li><a href="/quiero-que-me-llamen" className="font-medium text-slate2 transition-colors hover:text-navy">Te llamamos gratis</a></li>

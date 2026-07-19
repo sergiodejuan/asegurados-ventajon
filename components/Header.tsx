@@ -30,6 +30,7 @@ export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
 
 const NAV_LINKS = [
   { href: "/promociones", label: "Promociones" },
+  { href: "/testimonios", label: "Testimonios" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/actualidad", label: "Actualidad" },
 ];
@@ -50,6 +51,7 @@ const BREADCRUMB_MAP: Record<string, Crumb[]> = {
   "/quienes-somos": [{ label: "Quiénes somos" }],
   "/actualidad": [{ label: "Actualidad" }],
   "/promociones": [{ label: "Promociones" }],
+  "/testimonios": [{ label: "Testimonios" }],
   "/preguntas-frecuentes": [{ label: "Preguntas frecuentes" }],
   "/area-cliente": [{ label: "Área de cliente" }],
 };

@@ -12,6 +12,7 @@ import { Close, WhatsApp, ArrowRight } from "./icons";
 const LINKS = [
   { href: "/", label: "Inicio" },
   { href: "/promociones", label: "Promociones" },
+  { href: "/testimonios", label: "Testimonios" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/actualidad", label: "Actualidad" },
   { href: "/area-cliente", label: "Mi área de cliente" },

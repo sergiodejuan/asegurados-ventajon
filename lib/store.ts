@@ -14,6 +14,7 @@ import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
+import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
@@ -749,6 +750,99 @@ export async function deletePromotion(id: string): Promise<boolean> {
   const next = all.filter((p) => p.id !== id);
   if (next.length === all.length) return false;
   await jset(PROMOTIONS_KEY, next);
+  return true;
+}
+
+/* ----------------------------- Testimonios ------------------------------ */
+// "/testimonios" y "/testimonios/[slug]", editables desde /admin/testimonios.
+// Mismo patrón que promociones, pero sin semilla de ejemplo (ver lib/testimonios.ts).
+
+const TESTIMONIOS_KEY = "testimonios:all";
+
+async function readTestimonios(): Promise<Testimonio[]> {
+  const stored = await jget<Testimonio[]>(TESTIMONIOS_KEY);
+  if (!stored) {
+    const seeded = [...DEFAULT_TESTIMONIOS];
+    await jset(TESTIMONIOS_KEY, seeded);
+    return seeded;
+  }
+  return stored;
+}
+
+function sortTestimonios(testimonios: Testimonio[]): Testimonio[] {
+  return [...testimonios].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+}
+
+export async function listTestimonios(opts?: { onlyPublished?: boolean }): Promise<Testimonio[]> {
+  let all = await readTestimonios();
+  if (opts?.onlyPublished) all = all.filter((t) => t.status === "publicado");
+  return sortTestimonios(all);
+}
+
+export async function getTestimonio(id: string): Promise<Testimonio | null> {
+  const all = await readTestimonios();
+  return all.find((t) => t.id === id) ?? null;
+}
+
+export async function getTestimonioBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Testimonio | null> {
+  const all = await readTestimonios();
+  const testimonio = all.find((t) => t.slug === slug) ?? null;
+  if (testimonio && opts?.onlyPublished && testimonio.status !== "publicado") return null;
+  return testimonio;
+}
+
+export async function otherTestimonios(id: string, limit = 3): Promise<Testimonio[]> {
+  const all = await listTestimonios({ onlyPublished: true });
+  return all.filter((t) => t.id !== id).slice(0, limit);
+}
+
+// true si el slug ya está en uso por OTRO testimonio (excludeId = el que se está editando).
+export async function testimonioSlugTaken(slug: string, excludeId?: string): Promise<boolean> {
+  const all = await readTestimonios();
+  return all.some((t) => t.slug === slug && t.id !== excludeId);
+}
+
+export async function createTestimonio(draft: TestimonioDraft): Promise<Testimonio> {
+  const all = await readTestimonios();
+  const now = new Date().toISOString();
+  const testimonio: Testimonio = {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: draft.slug ?? "",
+    status: draft.status ?? "borrador",
+    nombre: draft.nombre ?? "",
+    ubicacion: draft.ubicacion ?? "",
+    producto: draft.producto ?? "",
+    resumen: draft.resumen ?? "",
+    cita: draft.cita ?? "",
+    fotoDestacada: draft.fotoDestacada ?? "",
+    galeria: draft.galeria ?? [],
+    capitulos: draft.capitulos ?? [],
+    ctaTexto: draft.ctaTexto ?? "Calcula tu precio",
+    ctaHref: draft.ctaHref ?? "/tarificador",
+    metaTitle: draft.metaTitle ?? "",
+    metaDescription: draft.metaDescription ?? "",
+    publishedAt: draft.publishedAt ?? now.slice(0, 10),
+    updatedAt: now,
+  };
+  all.push(testimonio);
+  await jset(TESTIMONIOS_KEY, all);
+  return testimonio;
+}
+
+export async function updateTestimonio(id: string, patch: TestimonioDraft): Promise<Testimonio | null> {
+  const all = await readTestimonios();
+  const idx = all.findIndex((t) => t.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(TESTIMONIOS_KEY, all);
+  return all[idx];
+}
+
+export async function deleteTestimonio(id: string): Promise<boolean> {
+  const all = await readTestimonios();
+  const next = all.filter((t) => t.id !== id);
+  if (next.length === all.length) return false;
+  await jset(TESTIMONIOS_KEY, next);
   return true;
 }
 
