@@ -45,6 +45,7 @@ export function Footer() {
             <ul className="mt-3 flex flex-col gap-2 text-[13px]">
               <li><a href="/quienes-somos" className="font-medium text-slate2 transition-colors hover:text-navy">Quiénes somos</a></li>
               <li><a href="/actualidad" className="font-medium text-slate2 transition-colors hover:text-navy">Actualidad</a></li>
+              <li><a href="/preguntas-frecuentes" className="font-medium text-slate2 transition-colors hover:text-navy">Preguntas frecuentes</a></li>
               <li><a href="/quiero-que-me-llamen" className="font-medium text-slate2 transition-colors hover:text-navy">Te llamamos gratis</a></li>
               <li><a href="/recursos-seguros-canarias-baleares" className="font-medium text-slate2 transition-colors hover:text-navy">Guías gratis (Canarias y Baleares)</a></li>
               <li><a href="/area-cliente" className="font-medium text-slate2 transition-colors hover:text-navy">Mi área de cliente</a></li>

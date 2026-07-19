@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/quienes-somos`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/actualidad`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${SITE_URL}/promociones`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE_URL}/preguntas-frecuentes`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/recursos-seguros-canarias-baleares`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/mes-gratis`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/quiero-que-me-llamen`, changeFrequency: "monthly", priority: 0.5 },

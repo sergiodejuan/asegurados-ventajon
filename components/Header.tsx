@@ -48,6 +48,7 @@ const BREADCRUMB_MAP: Record<string, Crumb[]> = {
   "/quienes-somos": [{ label: "Quiénes somos" }],
   "/actualidad": [{ label: "Actualidad" }],
   "/promociones": [{ label: "Promociones" }],
+  "/preguntas-frecuentes": [{ label: "Preguntas frecuentes" }],
   "/area-cliente": [{ label: "Área de cliente" }],
 };
 
