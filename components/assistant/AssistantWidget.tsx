@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { StepForm } from "@/components/StepForm";
 import { callRequestSchema } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
-import { getAttribution } from "@/lib/attribution";
+import { getAttribution, withUtmParams } from "@/lib/attribution";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { Close, IconByName, Spinner, ChevronLeft } from "@/components/icons";
+import { Close, IconByName, Spinner, ChevronLeft, ChevronRight, Phone } from "@/components/icons";
 import { ConsentNudgeModal } from "@/components/ConsentNudgeModal";
 import {
   isAssistantAllowed,
@@ -24,9 +24,21 @@ import {
 } from "@/lib/assistantConfig";
 
 type Intent = "salud" | "vida" | "auto" | "decesos" | "hogar" | "llamada" | "duda";
+// Menú de entrada, calcado del funnel conversacional del bot de WhatsApp
+// (ManyChat) que reciben los usuarios que llegan desde la web: primero se
+// pregunta la intención general, y solo dentro de "precio" se pregunta el
+// ramo. Igual que el bot, las acciones terminales son enlaces a páginas
+// internas (con UTM propio) en vez de solo formularios embebidos — así el
+// asistente también ayuda a que la gente navegue por la web de verdad.
+type TopIntent = "precio" | "presupuesto" | "llamada" | "duda" | "info";
 type Stage =
   | "name"
   | "menu"
+  | "producto-menu"
+  | "precio-link"
+  | "presupuesto-link"
+  | "duda-intro"
+  | "info"
   | "tarificador"
   | "miniflow"
   | "contact"
@@ -55,15 +67,32 @@ const TEASER_DELAY_MS = 1200;
 const TEASER_AUTOHIDE_MS = 10000;
 const TEASER_SEEN_KEY = "ventajon:assistantTeaserSeen";
 
-const MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
+const TOP_MENU_ITEMS: { intent: TopIntent; label: string; icon: string }[] = [
+  { intent: "precio", label: "Busco mejorar precio", icon: "compare" },
+  { intent: "presupuesto", label: "Pedir presupuesto", icon: "doc" },
+  { intent: "llamada", label: "Quiero que me llamen", icon: "phone" },
+  { intent: "duda", label: "Tengo una duda", icon: "doc" },
+  { intent: "info", label: "Necesito información", icon: "shield" },
+];
+
+const PRODUCT_MENU_ITEMS: { intent: Intent; label: string; icon: string }[] = [
   { intent: "salud", label: "Seguro de salud", icon: "shield" },
   { intent: "vida", label: "Seguro de vida", icon: "life" },
   { intent: "auto", label: "Seguro de auto", icon: "car" },
   { intent: "decesos", label: "Seguro de decesos", icon: "flower" },
   { intent: "hogar", label: "Seguro de hogar", icon: "home" },
-  { intent: "llamada", label: "Quiero que me llamen", icon: "compare" },
-  { intent: "duda", label: "Tengo una duda", icon: "doc" },
 ];
+
+// Enlaces del tarificador/página propia por ramo, para el botón "Ir al
+// Calculador" (salud/vida/auto) o "Ver seguro de X" (decesos/hogar, que no
+// tienen tarificador propio).
+const PRODUCTO_HREF: Record<"salud" | "vida" | "auto" | "decesos" | "hogar", string> = {
+  salud: "/tarificador",
+  vida: "/tarificador-vida",
+  auto: "/tarificador-auto",
+  decesos: "/seguro-de-decesos",
+  hogar: "/seguro-de-hogar",
+};
 
 const LLAMADA_PRODUCTO_OPTIONS = [
   { label: "Salud", value: "salud" },
@@ -88,11 +117,18 @@ const PRODUCTO_LABELS: Record<Intent, string> = {
   duda: "Consulta general",
 };
 
-function orderedMenu(suggested?: AssistantProducto) {
-  if (!suggested) return MENU_ITEMS;
-  const suggestedItem = MENU_ITEMS.find((m) => m.intent === suggested);
-  if (!suggestedItem) return MENU_ITEMS;
-  return [suggestedItem, ...MENU_ITEMS.filter((m) => m.intent !== suggested)];
+function orderedMenu(items: typeof PRODUCT_MENU_ITEMS, suggested?: AssistantProducto) {
+  if (!suggested) return items;
+  const suggestedItem = items.find((m) => m.intent === suggested);
+  if (!suggestedItem) return items;
+  return [suggestedItem, ...items.filter((m) => m.intent !== suggested)];
+}
+
+// UTM propio del asistente para los botones que navegan a una página
+// interna (mismo criterio que el mega menú y las barras sticky: el
+// medio/campaña identifican el placement para poder medirlo aparte).
+function assistantUtm(href: string, action: string): string {
+  return withUtmParams(href, { source: "web", medium: "asistente", campaign: `asistente-${action}` });
 }
 
 function formatDate(iso: string): string {
@@ -188,13 +224,22 @@ export function AssistantWidget() {
     setAnswers({});
   }
 
-  function chooseIntent(i: Intent) {
-    setIntent(i);
+  // Primer nivel del menú (calcado del funnel de WhatsApp): la intención
+  // general antes de preguntar el ramo.
+  function chooseTopIntent(t: TopIntent) {
     setAnswers({});
     setMiniflowIdx(0);
-    if (i === "salud" || i === "vida" || i === "auto") {
-      setStage("tarificador");
-    } else if (i === "duda") {
+    if (t === "precio") {
+      setIntent(null);
+      setStage("producto-menu");
+    } else if (t === "presupuesto") {
+      setIntent(null);
+      setStage("presupuesto-link");
+    } else if (t === "llamada") {
+      setIntent("llamada");
+      setStage("miniflow");
+    } else if (t === "duda") {
+      setIntent("duda");
       setTicketIdentifier("");
       setTicketSearching(false);
       setTicketSearchError(null);
@@ -202,10 +247,28 @@ export function AssistantWidget() {
       setTicketSelected(null);
       setTicketTopic(null);
       setTicketComment("");
-      setStage("duda-contact");
+      setStage("duda-intro");
     } else {
-      setStage("miniflow");
+      setIntent(null);
+      setStage("info");
     }
+  }
+
+  // Segundo nivel, solo para "Busco mejorar precio": qué ramo, y luego un
+  // enlace real a su tarificador/página (con UTM) — igual que el bot manda
+  // un enlace en vez de completar la cotización dentro del chat. Quien
+  // prefiera seguir sin salir del asistente puede hacerlo igualmente (ver
+  // botón secundario en el stage "precio-link").
+  function chooseProducto(i: Intent) {
+    setIntent(i);
+    setAnswers({});
+    setMiniflowIdx(0);
+    setStage("precio-link");
+  }
+
+  function continueInline() {
+    if (intent === "salud" || intent === "vida" || intent === "auto") setStage("tarificador");
+    else setStage("miniflow");
   }
 
   function answerMiniflow(key: string, value: string) {
@@ -332,11 +395,34 @@ export function AssistantWidget() {
                   <p className="mt-1">{context.greeting}</p>
                 </BotBubble>
                 <div className="mt-4 flex flex-col gap-2">
-                  {orderedMenu(context.suggestedProducto).map((item) => (
+                  {TOP_MENU_ITEMS.map((item) => (
                     <button
                       key={item.intent}
                       type="button"
-                      onClick={() => chooseIntent(item.intent)}
+                      onClick={() => chooseTopIntent(item.intent)}
+                      className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy hover:bg-navy/5"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
+                        {item.icon === "phone" ? <Phone width={17} height={17} /> : <IconByName name={item.icon} width={17} height={17} />}
+                      </span>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stage === "producto-menu" && (
+              <div className="motion-safe:animate-fade-up">
+                <BotBubble>
+                  <span className="font-semibold text-navy">¿Con qué tipo de seguro te ayudamos?</span>
+                </BotBubble>
+                <div className="mt-4 flex flex-col gap-2">
+                  {orderedMenu(PRODUCT_MENU_ITEMS, context.suggestedProducto).map((item) => (
+                    <button
+                      key={item.intent}
+                      type="button"
+                      onClick={() => chooseProducto(item.intent)}
                       className="flex items-center gap-3 rounded-2xl border border-navy/15 bg-white px-4 py-3 text-left text-[14px] font-semibold text-ink transition-colors hover:border-navy hover:bg-navy/5"
                     >
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy/10 text-navy">
@@ -346,6 +432,96 @@ export function AssistantWidget() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {stage === "precio-link" && (intent === "salud" || intent === "vida" || intent === "auto" || intent === "decesos" || intent === "hogar") && (
+              <div className="motion-safe:animate-fade-up">
+                {intent === "salud" || intent === "vida" || intent === "auto" ? (
+                  <>
+                    <BotBubble>
+                      <p className="font-semibold text-navy">¡Genial!</p>
+                      <p className="mt-1">
+                        Te vamos a dejar un enlace desde el cual puedes calcular fácilmente tu {PRODUCTO_LABELS[intent]} y conocer las
+                        diferentes opciones según tu caso.
+                      </p>
+                    </BotBubble>
+                    <AssistantLinkButton href={assistantUtm(PRODUCTO_HREF[intent], `calculador-${intent}`)} action={`calculador-${intent}`}>
+                      Ir al Calculador
+                    </AssistantLinkButton>
+                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                      Prefiero calcularlo aquí mismo
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <BotBubble>
+                      <p className="font-semibold text-navy">¡Genial!</p>
+                      <p className="mt-1">Te dejamos un enlace donde puedes ver toda la información de tu {PRODUCTO_LABELS[intent]}.</p>
+                    </BotBubble>
+                    <AssistantLinkButton href={assistantUtm(PRODUCTO_HREF[intent], `ver-${intent}`)} action={`ver-${intent}`}>
+                      Ver {PRODUCTO_LABELS[intent].toLowerCase()}
+                    </AssistantLinkButton>
+                    <button type="button" onClick={continueInline} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                      Que me llamen sobre esto
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {stage === "presupuesto-link" && (
+              <div className="motion-safe:animate-fade-up">
+                <BotBubble>
+                  <p className="font-semibold text-navy">Claro, estamos aquí para eso.</p>
+                  <p className="mt-1">
+                    Desde nuestra web puedes agendar fácilmente una llamada con uno de nuestros asesores. Ellos te asesorarán y
+                    responderán todas tus consultas.
+                  </p>
+                </BotBubble>
+                <AssistantLinkButton href={assistantUtm("/quiero-que-me-llamen", "presupuesto")} action="presupuesto">
+                  Agendar llamada
+                </AssistantLinkButton>
+              </div>
+            )}
+
+            {stage === "duda-intro" && (
+              <div className="motion-safe:animate-fade-up">
+                <BotBubble>
+                  <p className="font-semibold text-navy">Es normal tener dudas</p>
+                  <p className="mt-1">
+                    Sobre todo cuando elegir un seguro es algo complicado. Te dejamos un enlace donde puedes resolver las preguntas
+                    frecuentes de nuestros clientes.
+                  </p>
+                </BotBubble>
+                <AssistantLinkButton href={assistantUtm("/preguntas-frecuentes", "preguntas-frecuentes")} action="preguntas-frecuentes">
+                  Ver preguntas frecuentes
+                </AssistantLinkButton>
+                <button type="button" onClick={() => setStage("duda-contact")} className="mt-3 block w-full text-center text-[12px] font-medium text-slate2 underline">
+                  Prefiero contarte mi duda directamente
+                </button>
+              </div>
+            )}
+
+            {stage === "info" && (
+              <div className="motion-safe:animate-fade-up">
+                <BotBubble>
+                  <p className="font-semibold text-navy">¡Genial!</p>
+                  <p className="mt-1">
+                    Desde aquí puedes acceder a todas las coberturas y tipos de seguros de {BRAND_NAME}, y ver las promociones activas.
+                  </p>
+                </BotBubble>
+                <AssistantLinkButton href={`${assistantUtm("/", "seguros")}#elige`} action="seguros">
+                  Ver seguros
+                </AssistantLinkButton>
+                <a
+                  href={assistantUtm("/promociones", "promociones")}
+                  onClick={() => pushDataLayerEvent("assistant_link_click", { action: "promociones" })}
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-navy/15 px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:border-navy hover:bg-navy/5"
+                >
+                  Ver promociones
+                  <ChevronRight width={16} height={16} />
+                </a>
               </div>
             )}
 
@@ -906,6 +1082,23 @@ function ChatIcon({ width = 26, height = 26 }: { width?: number; height?: number
     <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
     </svg>
+  );
+}
+
+// Botón que navega de verdad a una página interna (con UTM), en vez de
+// avanzar de stage dentro del propio widget — igual que el bot de WhatsApp
+// manda un enlace en vez de completar la gestión dentro del chat. Además de
+// medirse por UTM, se registra como evento propio en el dataLayer.
+function AssistantLinkButton({ href, action, children }: { href: string; action: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      onClick={() => pushDataLayerEvent("assistant_link_click", { action })}
+      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+    >
+      {children}
+      <ChevronRight width={16} height={16} />
+    </a>
   );
 }
 
