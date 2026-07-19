@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PRODUCT_PAGES, type ProductSlug } from "@/lib/productPages";
 import { withUtmParams } from "@/lib/attribution";
 
@@ -11,21 +12,50 @@ import { withUtmParams } from "@/lib/attribution";
 // esté el ratón (tarificador/"te llamamos" y sus preguntas frecuentes),
 // todos con UTM propio del mega menú para poder medir su aportación aparte
 // del resto de la navegación.
+//
+// El panel se renderiza en un portal a document.body: el <header> lleva
+// "lg:overflow-hidden" para recortar sus propias esquinas redondeadas
+// (efecto "isla" flotante), y eso recortaba también el panel si vivía dentro
+// del header como cualquier otro hijo posicionado en absoluto. Al vivir
+// fuera del DOM del header, ya no lo afecta ese overflow.
+const CLOSE_DELAY_MS = 150;
+
 export function MegaMenu() {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [activeSlug, setActiveSlug] = useState<ProductSlug>(PRODUCT_PAGES[0].slug);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const active = PRODUCT_PAGES.find((p) => p.slug === activeSlug) ?? PRODUCT_PAGES[0];
 
   function utm(href: string): string {
     return withUtmParams(href, { source: "web", medium: "megamenu", campaign: `megamenu-${active.slug}` });
   }
 
+  function cancelClose() {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+  }
+
+  // Al vivir en un portal, el panel ya no es descendiente del div disparador
+  // en el DOM: mover el ratón del botón "Seguros" hacia abajo, al panel,
+  // dispararía "mouseleave" del disparador antes de llegar al panel. Un
+  // pequeño margen (cancelable si el ratón entra a tiempo en cualquiera de
+  // los dos) evita que se cierre solo al cruzar ese hueco.
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
+  }
+
+  function openMenu() {
+    cancelClose();
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setPos({ top: rect.bottom + 12, left: rect.left + rect.width / 2 });
+    setOpen(true);
+  }
+
   return (
-    <div
-      className="relative hidden lg:block"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <div ref={triggerRef} className="relative hidden lg:block" onMouseEnter={openMenu} onMouseLeave={scheduleClose}>
       <button
         type="button"
         aria-haspopup="true"
@@ -35,8 +65,14 @@ export function MegaMenu() {
         Seguros
       </button>
 
-      {open && (
-        <div className="absolute left-1/2 top-full z-50 mt-3 w-[640px] -translate-x-1/2 overflow-hidden rounded-[20px] border border-hair bg-white shadow-card">
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <div
+          role="menu"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
+          className="z-50 w-[640px] overflow-hidden rounded-[20px] border border-hair bg-white shadow-card"
+        >
           <div className="flex">
             <ul className="w-56 shrink-0 border-r border-hair p-2">
               {PRODUCT_PAGES.map((p) => (
@@ -81,7 +117,8 @@ export function MegaMenu() {
               </a>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
