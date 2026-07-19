@@ -12,6 +12,9 @@ const CTA_HREF = "/tarificador-auto?utm_source=web&utm_medium=widget&utm_campaig
 // productos y la barra de CTA fija). Aparece con un pequeño retraso, se
 // puede cerrar, y su CTA lleva utm propio para poder medir en el dashboard
 // de UTM cuánto convierte este widget frente al resto de puntos de entrada.
+// Comparte la misma variable CSS --assistant-bottom que usa el botón del
+// asistente (ver lib/useStickyDesktopBar.ts): así sube junto con ellos y no
+// queda tapado por la barra roja sticky de escritorio al desplegarse.
 export function AutoWidget() {
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -27,7 +30,7 @@ export function AutoWidget() {
     <div
       role="complementary"
       aria-label="Seguro de coche"
-      className="fixed bottom-6 right-6 z-40 hidden w-[280px] overflow-hidden rounded-[20px] bg-gradient-to-br from-brand-red to-brand-red-deep p-5 shadow-card motion-safe:animate-fade-up lg:block"
+      className="fixed bottom-6 right-6 z-40 hidden w-[280px] overflow-hidden rounded-[20px] bg-gradient-to-br from-brand-red to-brand-red-deep p-5 shadow-card motion-safe:animate-fade-up lg:block lg:bottom-[var(--assistant-bottom,1.5rem)]"
     >
       <button
         type="button"
