@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { BRAND_NAME, WHATSAPP_URL_GENERIC } from "@/lib/brand";
+import { WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { useSiteTheme } from "@/lib/useTheme";
@@ -11,6 +11,7 @@ import { Close, WhatsApp, ArrowRight } from "./icons";
 
 const LINKS = [
   { href: "/", label: "Inicio" },
+  { href: "/promociones", label: "Promociones" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/actualidad", label: "Actualidad" },
   { href: "/area-cliente", label: "Mi área de cliente" },
@@ -45,26 +46,15 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
       role="dialog"
       aria-modal="true"
       aria-label="Menú de navegación"
-      className="safe-top safe-bottom fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-y-auto bg-navy motion-safe:animate-fade-up lg:hidden"
+      className="safe-top safe-bottom fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-y-auto bg-white motion-safe:animate-slide-in-left lg:hidden"
     >
-      <div className="flex items-center justify-between px-5 py-4">
-        {theme.logoUrl ? (
-          <Wordmark logoUrl={theme.logoUrl} />
-        ) : (
-          // Sin logo configurado, el wordmark de texto de <Wordmark> es
-          // navy (pensado para el header, con fondo blanco) — aquí, sobre
-          // fondo navy, sería invisible, así que este fallback va en blanco.
-          <span className="inline-flex items-baseline gap-1.5 font-display text-[17px] font-extrabold tracking-tight text-white" translate="no">
-            <span aria-hidden="true" className="mr-0.5 inline-block h-3 w-3 translate-y-[1px] rounded-[3px] bg-brand-red" />
-            {BRAND_NAME.split(" ")[0]}
-            <span className="text-brand-red">{BRAND_NAME.split(" ").slice(1).join(" ")}</span>
-          </span>
-        )}
+      <div className="flex items-center justify-between border-b border-hair px-5 py-4">
+        <Wordmark logoUrl={theme.logoUrl} />
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar menú"
-          className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          className="grid h-11 w-11 place-items-center rounded-full bg-mist text-navy transition-colors hover:bg-hair"
         >
           <Close width={20} height={20} />
         </button>
@@ -75,22 +65,22 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
           <a
             key={l.href}
             href={l.href}
-            className="flex items-center justify-between border-b border-white/10 py-4 text-[19px] font-bold text-white"
+            className="flex items-center justify-between border-b border-hair py-4 text-[19px] font-bold text-ink"
           >
             {l.label}
-            <ArrowRight className="text-white/50" />
+            <ArrowRight className="text-slate2" />
           </a>
         ))}
 
-        <p className="mb-1 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/50">Seguros</p>
+        <p className="mb-1 mt-5 text-[12px] font-bold uppercase tracking-wide text-slate2">Seguros</p>
         {PRODUCT_PAGES.map((p) => (
           <a
             key={p.slug}
             href={p.path}
-            className="flex items-center justify-between border-b border-white/10 py-3.5 text-[16px] font-semibold text-white/90"
+            className="flex items-center justify-between border-b border-hair py-3.5 text-[16px] font-semibold text-ink"
           >
             {p.badge}
-            <ArrowRight width={16} height={16} className="text-white/40" />
+            <ArrowRight width={16} height={16} className="text-slate2" />
           </a>
         ))}
       </nav>
@@ -104,7 +94,7 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
         </a>
         <a
           href="/quiero-que-me-llamen"
-          className="flex items-center justify-center rounded-card border border-white/30 px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-white/10"
+          className="flex items-center justify-center rounded-card border border-hair px-5 py-4 text-[16px] font-semibold text-navy transition-colors hover:bg-mist"
         >
           Te llamamos gratis
         </a>
@@ -113,7 +103,7 @@ export function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () =>
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => pushDataLayerEvent("whatsapp_click", { placement: "mobile_menu" })}
-          className="flex items-center justify-center gap-2 rounded-card bg-white/10 px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-white/20"
+          className="flex items-center justify-center gap-2 rounded-card bg-mist px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-hair"
         >
           <WhatsApp className="text-[#25D366]" />
           Escríbenos por WhatsApp

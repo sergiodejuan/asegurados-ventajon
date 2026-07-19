@@ -46,10 +46,15 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "slide-in-left": {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(0)" },
+        },
         spin: { to: { transform: "rotate(360deg)" } },
       },
       animation: {
         "fade-up": "fade-up 260ms cubic-bezier(0.22,1,0.36,1)",
+        "slide-in-left": "slide-in-left 300ms cubic-bezier(0.22,1,0.36,1)",
       },
     },
   },

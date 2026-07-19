@@ -89,8 +89,12 @@ export function CampaignBanner() {
         <p className="text-[11px] font-bold uppercase tracking-wide text-white/60">
           {slide.kind === "promocion" ? "Promoción" : "Campaña"}
         </p>
-        <span className={`mt-1.5 inline-flex items-center rounded-pill px-3.5 py-1.5 text-[14px] font-extrabold uppercase tracking-wide text-white ${
-          slide.kind === "promocion" ? "bg-navy" : "bg-brand-red"
+        {/* La insignia de promoción va en blanco (no navy): el fondo de
+            respaldo sin foto es un degradado navy, y un badge también navy
+            quedaba prácticamente invisible encima — el blanco contrasta
+            siempre, tenga foto o no la diapositiva. */}
+        <span className={`mt-1.5 inline-flex items-center rounded-pill px-3.5 py-1.5 text-[14px] font-extrabold uppercase tracking-wide ${
+          slide.kind === "promocion" ? "bg-white text-navy" : "bg-brand-red text-white"
         }`}>
           {slide.badge}
         </span>
