@@ -755,16 +755,25 @@ export async function deletePromotion(id: string): Promise<boolean> {
 
 /* ----------------------------- Testimonios ------------------------------ */
 // "/testimonios" y "/testimonios/[slug]", editables desde /admin/testimonios.
-// Mismo patrón que promociones, pero sin semilla de ejemplo (ver lib/testimonios.ts).
+// Mismo patrón que promociones (semilla aditiva), salvo que las semillas de
+// testimonios son ilustrativas y siempre en status "borrador" — ver el aviso
+// en lib/testimonios.ts.
 
 const TESTIMONIOS_KEY = "testimonios:all";
 
 async function readTestimonios(): Promise<Testimonio[]> {
   const stored = await jget<Testimonio[]>(TESTIMONIOS_KEY);
-  if (!stored) {
+  if (!stored || !stored.length) {
     const seeded = [...DEFAULT_TESTIMONIOS];
     await jset(TESTIMONIOS_KEY, seeded);
     return seeded;
+  }
+  const knownIds = new Set(stored.map((t) => t.id));
+  const missing = DEFAULT_TESTIMONIOS.filter((t) => !knownIds.has(t.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(TESTIMONIOS_KEY, next);
+    return next;
   }
   return stored;
 }
