@@ -9,15 +9,12 @@ import { IconByName } from "./icons";
 // Diapositiva ya normalizada, venga de una campaña "a mano" (pestaña
 // "Banners de campaña" en /admin/promociones) o de una promoción marcada
 // "mostrar en la Home" (/admin/promociones): se mezclan en una sola lista de
-// tarjetas, distinguiendo cada una con una pequeña etiqueta ("Campaña" /
-// "Promoción") y un color de insignia distinto.
+// tarjetas. La tarjeta solo muestra el título y el CTA, al estilo de la
+// referencia (Línea Directa) — nada de etiquetas ni textos secundarios.
 type BannerSlide = {
   id: string;
-  kind: "campana" | "promocion";
   imageUrl: string;
-  badge: string;
   headline: string;
-  caption: string;
   href: string;
 };
 
@@ -42,15 +39,11 @@ export function CampaignBanner() {
   const slides = useMemo<BannerSlide[]>(() => {
     const campanas: BannerSlide[] = (config?.slides ?? [])
       .filter((s) => s.activo)
-      .map((s) => ({
-        id: `campana-${s.id}`, kind: "campana", imageUrl: s.imageDataUrl, badge: s.price,
-        headline: s.headline, caption: s.sub, href: s.ctaHref,
-      }));
+      .map((s) => ({ id: `campana-${s.id}`, imageUrl: s.imageDataUrl, headline: s.headline, href: s.ctaHref }));
     // El CTA, el título y la foto llevan todos al mismo sitio: la propia
     // página de la promoción (o su enlace propio si ya tiene landing aparte).
     const promociones: BannerSlide[] = homePromotions.map((p) => ({
-      id: `promo-${p.id}`, kind: "promocion", imageUrl: p.imagenUrl, badge: p.categoria || "Promoción",
-      headline: p.tituloTarjeta, caption: p.validoHasta,
+      id: `promo-${p.id}`, imageUrl: p.imagenUrl, headline: p.tituloTarjeta,
       href: p.linkExterno ? withPromotionUtm(p.linkExterno, p.slug) : `/promociones/${p.slug}`,
     }));
     return [...campanas, ...promociones];
@@ -67,7 +60,13 @@ export function CampaignBanner() {
         </a>
       </div>
 
-      <ul aria-label="Promociones" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-3 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
+      {/* Con scroll-snap obligatorio, un simple padding-left en el <ul> no
+          basta: el navegador "consume" ese hueco como posición de reposo
+          del scroll (scrollLeft empieza en 20 en vez de 0), así que la
+          primera tarjeta queda pegada al borde. scroll-pl-5 le dice al
+          snap que el punto de anclaje ya incluye ese padding, y entonces
+          sí se respeta como hueco visible desde el principio. */}
+      <ul aria-label="Promociones" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 scroll-pl-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-3 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
         {slides.map((s) => (
           <li key={s.id} className="w-[320px] shrink-0 snap-start overflow-hidden rounded-[20px] shadow-soft md:w-auto">
             <a href={s.href} className="group relative block h-[420px] w-full overflow-hidden bg-navy-deep md:h-64">
@@ -83,19 +82,7 @@ export function CampaignBanner() {
                   PromotionCard.tsx. */}
               <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink from-0% via-ink/85 via-45% to-transparent to-95%" />
               <div className="absolute inset-x-0 bottom-0 p-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-white/60">
-                  {s.kind === "promocion" ? "Promoción" : "Campaña"}
-                </p>
-                {/* La insignia de promoción va en blanco (no navy): el fondo
-                    de respaldo sin foto es un degradado navy, y un badge
-                    también navy quedaba casi invisible encima. */}
-                <span className={`mt-1.5 inline-flex items-center rounded-pill px-3 py-1 text-[12px] font-extrabold uppercase tracking-wide ${
-                  s.kind === "promocion" ? "bg-white text-navy" : "bg-brand-red text-white"
-                }`}>
-                  {s.badge}
-                </span>
-                <p className="mt-2 line-clamp-2 max-w-xs text-[18px] font-extrabold leading-snug text-white">{s.headline}</p>
-                {s.caption && <p className="mt-1.5 line-clamp-1 text-[12px] text-white/80">{s.caption}</p>}
+                <p className="line-clamp-2 max-w-xs text-[18px] font-extrabold leading-snug text-white">{s.headline}</p>
                 <span className="mt-4 inline-flex items-center justify-center rounded-pill bg-white px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors group-hover:bg-white/90">
                   Más información
                 </span>
