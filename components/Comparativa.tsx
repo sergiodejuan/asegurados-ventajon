@@ -10,7 +10,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import type { Product } from "@/lib/catalog";
 import {
-  loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, quoteNumber, ageFromDob,
+  loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
 
@@ -21,6 +21,7 @@ function euros(n: number) {
 function tarificadorHref(producto: string) {
   if (producto === "vida") return "/tarificador-vida";
   if (producto === "auto") return "/tarificador-auto";
+  if (producto === "decesos") return "/tarificador-decesos";
   return "/tarificador";
 }
 
@@ -34,7 +35,7 @@ const COBERTURA_LABELS: Record<string, string> = {
 export function Comparativa() {
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
-  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : "salud";
+  const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -152,6 +153,12 @@ export function Comparativa() {
                     <dd className="text-right font-semibold text-ink">{quote.fumador ? "Sí" : "No"}</dd>
                   </>
                 )}
+                {producto === "decesos" && (
+                  <>
+                    <dt className="text-slate2">Personas a asegurar</dt>
+                    <dd className="text-right font-semibold tnums text-ink">{quote.numAsegurados ?? 1}</dd>
+                  </>
+                )}
                 {producto === "auto" && (
                   <>
                     <dt className="text-slate2">Vehículo</dt>
@@ -202,6 +209,16 @@ export function Comparativa() {
                     <input type="checkbox" checked={fumador} onChange={(e) => setFumador(e.target.checked)} className="h-5 w-5 accent-navy" />
                   </label>
                 )}
+                {producto === "decesos" && (
+                  <label className="block">
+                    <span className="mb-1 block text-[13px] font-semibold text-ink">Personas a asegurar</span>
+                    <input
+                      type="number" min={1} max={9} value={n}
+                      onChange={(e) => setN(Number(e.target.value) || 1)}
+                      className="w-full rounded-card border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink"
+                    />
+                  </label>
+                )}
                 {producto === "auto" && (
                   <div>
                     <span className="mb-1.5 block text-[13px] font-semibold text-ink">Cobertura deseada</span>
@@ -240,6 +257,8 @@ export function Comparativa() {
             ? products.map((c) => {
                 const price = producto === "auto"
                   ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+                  : producto === "decesos"
+                  ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
                   : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
