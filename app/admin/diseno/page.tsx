@@ -8,6 +8,7 @@ import {
   type SiteTheme, type SiteColors,
 } from "@/lib/theme";
 import { PARTNERS } from "@/lib/brand";
+import { PRODUCT_PAGES } from "@/lib/productPages";
 
 export default function AdminDisenoPage() {
   return (
@@ -48,6 +49,30 @@ function DisenoAdmin() {
 
   function setPartnerLogo(name: string, value: string) {
     setTheme((t) => ({ ...t, partnerLogos: { ...t.partnerLogos, [name]: value } }));
+  }
+
+  function setLoaderField<K extends keyof SiteTheme["pageTransitionLoader"]>(key: K, value: SiteTheme["pageTransitionLoader"][K]) {
+    setTheme((t) => ({ ...t, pageTransitionLoader: { ...t.pageTransitionLoader, [key]: value } }));
+  }
+
+  function setLoaderSubtitle(path: string, value: string) {
+    setTheme((t) => ({ ...t, pageTransitionLoader: { ...t.pageTransitionLoader, subtitles: { ...t.pageTransitionLoader.subtitles, [path]: value } } }));
+  }
+
+  function setLoaderTip(index: number, value: string) {
+    setTheme((t) => {
+      const tips = [...t.pageTransitionLoader.tips];
+      tips[index] = value;
+      return { ...t, pageTransitionLoader: { ...t.pageTransitionLoader, tips } };
+    });
+  }
+
+  function addLoaderTip() {
+    setTheme((t) => ({ ...t, pageTransitionLoader: { ...t.pageTransitionLoader, tips: [...t.pageTransitionLoader.tips, ""] } }));
+  }
+
+  function removeLoaderTip(index: number) {
+    setTheme((t) => ({ ...t, pageTransitionLoader: { ...t.pageTransitionLoader, tips: t.pageTransitionLoader.tips.filter((_, i) => i !== index) } }));
   }
 
   async function save() {
@@ -195,6 +220,80 @@ function DisenoAdmin() {
                   preview="h-9"
                 />
               ))}
+            </div>
+          </section>
+
+          {/* Loader entre páginas */}
+          <section className="rounded-[20px] border border-hair bg-white p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-bold text-navy">Loader entre páginas</h2>
+              <label className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  checked={theme.pageTransitionLoader.enabled}
+                  onChange={(e) => setLoaderField("enabled", e.target.checked)}
+                />
+                Activado
+              </label>
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+              Pantalla de marca a página completa que aparece al navegar entre páginas generales (home, producto, promociones, actualidad…). No se muestra en tarificadores, comparativa, &ldquo;quiero que me llamen&rdquo; ni área de cliente, que ya tienen su propia carga.
+            </p>
+
+            <ImageField
+              label="Imagen del loader"
+              hint='Si lo dejas vacío, se muestra el texto "mereces pagar menos" con la tipografía de marca.'
+              value={theme.pageTransitionLoader.imageUrl}
+              onChange={(v) => setLoaderField("imageUrl", v)}
+              maxWidth={600} mime="image/png"
+              preview="h-16"
+            />
+
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Subtítulo por defecto</span>
+              <input
+                type="text"
+                value={theme.pageTransitionLoader.defaultSubtitle}
+                onChange={(e) => setLoaderField("defaultSubtitle", e.target.value)}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[14px]"
+              />
+            </label>
+
+            <div className="mt-4">
+              <p className="text-[12px] font-semibold text-ink">Subtítulo por página</p>
+              <div className="mt-2 flex flex-col gap-2">
+                {PRODUCT_PAGES.map((p) => (
+                  <label key={p.path} className="flex items-center gap-3">
+                    <span className="w-36 shrink-0 truncate text-[12px] text-slate2">{p.badge}</span>
+                    <input
+                      type="text"
+                      value={theme.pageTransitionLoader.subtitles[p.path] ?? ""}
+                      onChange={(e) => setLoaderSubtitle(p.path, e.target.value)}
+                      className="min-w-0 flex-1 rounded-card border border-hair bg-white px-3 py-2 text-[13px]"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12px] font-semibold text-ink">Sección &ldquo;¿Sabías que…?&rdquo;</p>
+                <button type="button" onClick={addLoaderTip} className="text-[12px] font-semibold text-navy underline">Añadir</button>
+              </div>
+              <div className="mt-2 flex flex-col gap-2">
+                {theme.pageTransitionLoader.tips.map((tip, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={tip}
+                      onChange={(e) => setLoaderTip(i, e.target.value)}
+                      className="min-w-0 flex-1 rounded-card border border-hair bg-white px-3 py-2 text-[13px]"
+                    />
+                    <button type="button" onClick={() => removeLoaderTip(i)} className="shrink-0 text-[12px] font-semibold text-brand-red underline">Quitar</button>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         </div>

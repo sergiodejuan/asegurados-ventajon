@@ -50,11 +50,16 @@ const config: Config = {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
         },
+        "loader-pulse": {
+          "0%, 100%": { transform: "scale(1)", opacity: "1" },
+          "50%": { transform: "scale(1.05)", opacity: "0.85" },
+        },
         spin: { to: { transform: "rotate(360deg)" } },
       },
       animation: {
         "fade-up": "fade-up 260ms cubic-bezier(0.22,1,0.36,1)",
         "slide-in-left": "slide-in-left 300ms cubic-bezier(0.22,1,0.36,1)",
+        "loader-pulse": "loader-pulse 1.6s ease-in-out infinite",
       },
     },
   },

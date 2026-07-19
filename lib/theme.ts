@@ -5,7 +5,8 @@
 // (bg-navy, text-brand-red…) siguen funcionando igual y se vuelven editables
 // sin tocar componentes.
 
-import { BRAND_NAME } from "./brand";
+import { BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS } from "./brand";
+import { PRODUCT_PAGES } from "./productPages";
 
 export type SiteColors = {
   navy: string;
@@ -161,6 +162,34 @@ export const DEFAULT_META_PIXEL: MetaPixelConfig = {
   pixelId: "",
 };
 
+// Loader de marca entre páginas GENERALES (home, landings, blog, producto,
+// promociones…). Los tarificadores, la comparativa, "quiero que me llamen" y
+// el área de cliente ("páginas azules") tienen su propia experiencia de carga
+// y nunca deben mostrar este — la exclusión vive en el propio componente
+// (mismo patrón que GeneralExitIntentModal.EXCLUDED_PREFIXES).
+export type PageTransitionLoaderConfig = {
+  enabled: boolean;
+  imageUrl: string; // vacío = logotipo de texto por defecto ("mereces pagar menos")
+  defaultSubtitle: string;
+  subtitles: Record<string, string>; // pathname -> subtítulo específico de esa página
+  tips: string[]; // rotan en la sección "¿Sabías que…?"
+};
+
+export const DEFAULT_PAGE_TRANSITION_LOADER: PageTransitionLoaderConfig = {
+  enabled: true,
+  imageUrl: "",
+  defaultSubtitle: `con ${BRAND_NAME}`,
+  subtitles: Object.fromEntries(
+    PRODUCT_PAGES.map((p) => [p.path, `por tu ${p.badge.toLowerCase()}`]),
+  ),
+  tips: [
+    `Comparamos entre ${PARTNERS.length} aseguradoras líderes: ${PARTNERS.join(", ")}.`,
+    `Formamos parte del ecosistema Ventajon, con ${ECOSYSTEM_MEMBERS}.`,
+    "Comparar con nosotros no tiene ningún coste ni compromiso.",
+    "Somos correduría de seguros: estamos de tu lado, no del de la compañía.",
+  ],
+};
+
 export type SiteTheme = {
   colors: SiteColors;
   displayFont: string;
@@ -175,6 +204,7 @@ export type SiteTheme = {
   gtmId: string; // ID de contenedor de Google Tag Manager (GTM-XXXXXXX); vacío = no se carga
   ga4: Ga4Config;
   metaPixel: MetaPixelConfig;
+  pageTransitionLoader: PageTransitionLoaderConfig;
   updatedAt: string;
 };
 
@@ -192,5 +222,6 @@ export const DEFAULT_THEME: SiteTheme = {
   gtmId: "",
   ga4: DEFAULT_GA4,
   metaPixel: DEFAULT_META_PIXEL,
+  pageTransitionLoader: DEFAULT_PAGE_TRANSITION_LOADER,
   updatedAt: new Date(0).toISOString(),
 };

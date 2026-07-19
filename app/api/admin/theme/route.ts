@@ -77,6 +77,26 @@ export async function PATCH(request: Request) {
     if (body.metaPixel.pixelId.length > 30) return NextResponse.json({ ok: false, error: "El ID del píxel de Meta no es válido." }, { status: 413 });
     if (body.metaPixel.pixelId && !/^\d+$/.test(body.metaPixel.pixelId)) return NextResponse.json({ ok: false, error: "El ID del píxel de Meta debe ser solo números." }, { status: 400 });
   }
+  if (typeof body.pageTransitionLoader?.imageUrl === "string") {
+    if (body.pageTransitionLoader.imageUrl.length > MAX_HERO_LENGTH) return NextResponse.json({ ok: false, error: "La imagen del loader entre páginas es demasiado grande." }, { status: 413 });
+    if (!isValidImageValue(body.pageTransitionLoader.imageUrl)) return NextResponse.json({ ok: false, error: "La imagen del loader entre páginas no es una imagen válida." }, { status: 400 });
+  }
+  if (typeof body.pageTransitionLoader?.defaultSubtitle === "string" && body.pageTransitionLoader.defaultSubtitle.length > 200) {
+    return NextResponse.json({ ok: false, error: "El subtítulo por defecto del loader es demasiado largo." }, { status: 413 });
+  }
+  if (body.pageTransitionLoader?.subtitles) {
+    for (const [key, val] of Object.entries(body.pageTransitionLoader.subtitles)) {
+      if (typeof val !== "string") continue;
+      if (val.length > 200) return NextResponse.json({ ok: false, error: `El subtítulo de "${key}" es demasiado largo.` }, { status: 413 });
+    }
+  }
+  if (Array.isArray(body.pageTransitionLoader?.tips)) {
+    if (body.pageTransitionLoader.tips.length > 20) return NextResponse.json({ ok: false, error: "Demasiados datos en la sección \"¿Sabías que…?\"." }, { status: 413 });
+    for (const tip of body.pageTransitionLoader.tips) {
+      if (typeof tip !== "string") return NextResponse.json({ ok: false, error: "La sección \"¿Sabías que…?\" no es válida." }, { status: 400 });
+      if (tip.length > 300) return NextResponse.json({ ok: false, error: "Un dato de \"¿Sabías que…?\" es demasiado largo." }, { status: 413 });
+    }
+  }
 
   const theme = await saveTheme(body);
 

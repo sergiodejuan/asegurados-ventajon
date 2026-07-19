@@ -9,6 +9,7 @@ import { GoogleTagManager } from "@/components/GoogleTagManager";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { MetaPixel } from "@/components/MetaPixel";
 import { Analytics } from "@/components/Analytics";
+import { PageTransitionLoader } from "@/components/PageTransitionLoader";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import { GeneralExitIntentModal } from "@/components/GeneralExitIntentModal";
@@ -105,6 +106,7 @@ export default async function RootLayout({
           </a>
           {children}
           <Analytics />
+          <PageTransitionLoader />
           <AssistantWidget />
           <AccessibilityWidget />
           <GeneralExitIntentModal />

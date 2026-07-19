@@ -802,6 +802,12 @@ export async function getTheme(): Promise<SiteTheme> {
     accessibilityWidget: { ...DEFAULT_THEME.accessibilityWidget, ...(stored.accessibilityWidget ?? {}) },
     ga4: { ...DEFAULT_THEME.ga4, ...(stored.ga4 ?? {}) },
     metaPixel: { ...DEFAULT_THEME.metaPixel, ...(stored.metaPixel ?? {}) },
+    pageTransitionLoader: {
+      ...DEFAULT_THEME.pageTransitionLoader,
+      ...(stored.pageTransitionLoader ?? {}),
+      subtitles: { ...DEFAULT_THEME.pageTransitionLoader.subtitles, ...(stored.pageTransitionLoader?.subtitles ?? {}) },
+      tips: stored.pageTransitionLoader?.tips ?? DEFAULT_THEME.pageTransitionLoader.tips,
+    },
   };
 }
 
