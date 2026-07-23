@@ -52,6 +52,20 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
   },
   { kind: "link", href: "/admin/productos", label: "Productos", key: "productos", modulo: "productos" },
   {
+    kind: "group", label: "Diseño", key: "diseno-grupo",
+    children: [
+      { href: "/admin/diseno", label: "Resumen", key: "diseno", modulo: "configuracion" },
+      { href: "/admin/diseno/colores", label: "Colores", key: "diseno-colores", modulo: "configuracion" },
+      { href: "/admin/diseno/tipografia", label: "Tipografías", key: "diseno-tipografia", modulo: "configuracion" },
+      { href: "/admin/diseno/logos", label: "Logos y favicon", key: "diseno-logos", modulo: "configuracion" },
+      { href: "/admin/diseno/portadas", label: "Fotos de portada", key: "diseno-portadas", modulo: "configuracion" },
+      { href: "/admin/diseno/aseguradoras", label: "Aseguradoras aliadas", key: "diseno-aseguradoras", modulo: "configuracion" },
+      { href: "/admin/diseno/loader", label: "Loader entre páginas", key: "diseno-loader", modulo: "configuracion" },
+      { href: "/admin/diseno/home-hero", label: "Hero de la Home", key: "diseno-home-hero", modulo: "configuracion" },
+      { href: "/admin/diseno/widget-auto", label: "Widget de auto", key: "diseno-widget-auto", modulo: "configuracion" },
+    ],
+  },
+  {
     kind: "group", label: "Analítica", key: "analitica-grupo",
     children: [
       { href: "/admin/informes", label: "Informes", key: "informes", modulo: "informes" },
@@ -61,9 +75,8 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
   {
     kind: "group", label: "Configuración", key: "configuracion-grupo",
     children: [
-      { href: "/admin/diseno", label: "Diseño", key: "diseno", modulo: "configuracion" },
       { href: "/admin/configuracion/cookies", label: "Cookies", key: "cookies", modulo: "configuracion" },
-      { href: "/admin/configuracion/analitica", label: "Analítica", key: "analitica", modulo: "configuracion" },
+      { href: "/admin/configuracion/analitica", label: "Seguimiento (GTM/GA4)", key: "analitica", modulo: "configuracion" },
       { href: "/admin/configuracion/accesibilidad", label: "Accesibilidad", key: "accesibilidad", modulo: "configuracion" },
       { href: "/admin/rgpd", label: "RGPD", key: "rgpd", modulo: "rgpd" },
     ],
@@ -88,7 +101,9 @@ function groupKeyForActive(active: string): string | null {
 export type AdminActiveKey =
   | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
   | "exitintents" | "promociones" | "testimonios"
-  | "diseno" | "cookies" | "analitica" | "accesibilidad" | "rgpd" | "agentes" | "permisos" | "registro";
+  | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
+  | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
+  | "cookies" | "analitica" | "accesibilidad" | "rgpd" | "agentes" | "permisos" | "registro";
 
 function visibleFor(identity: Identity | null) {
   const canSee = (modulo: AdminModule) => !identity || identity.rol === "admin" || identity.permisos.includes(modulo);
