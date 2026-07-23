@@ -9,6 +9,7 @@ import { PRODUCT_PAGES } from "@/lib/productPages";
 import { WhatsApp, Menu } from "./icons";
 import { MobileNavMenu } from "./MobileNavMenu";
 import { MegaMenu } from "./MegaMenu";
+import { ServicesMenu } from "./ServicesMenu";
 import { InsuranceQuoteCta } from "./InsuranceQuoteCta";
 
 export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
@@ -28,12 +29,9 @@ export function Wordmark({ logoUrl }: { logoUrl?: string } = {}) {
   );
 }
 
-const NAV_LINKS = [
-  { href: "/promociones", label: "Promociones" },
-  { href: "/testimonios", label: "Testimonios" },
-  { href: "/quienes-somos", label: "Quiénes somos" },
-  { href: "/actualidad", label: "Actualidad" },
-];
+// Solo 2 elementos visibles en el menú de escritorio (MegaMenu = "Nuestros
+// seguros", ServicesMenu = "Servicios"), mismo patrón que la referencia de
+// Línea Directa: ambos son desplegables laterales, no enlaces sueltos.
 
 export type Crumb = { label: string; href?: string };
 
@@ -140,11 +138,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
         </a>
         <nav aria-label="Principal" className="hidden items-center gap-8 lg:flex">
           <MegaMenu />
-          {NAV_LINKS.map((l) => (
-            <a key={l.href} href={l.href} className="text-[14px] font-semibold text-slate2 transition-colors hover:text-navy">
-              {l.label}
-            </a>
-          ))}
+          <ServicesMenu />
         </nav>
         <div className="flex items-center gap-3">
           <a
