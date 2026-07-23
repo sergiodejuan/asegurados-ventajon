@@ -912,6 +912,8 @@ export async function getTheme(): Promise<SiteTheme> {
       subtitles: { ...DEFAULT_THEME.pageTransitionLoader.subtitles, ...(stored.pageTransitionLoader?.subtitles ?? {}) },
       tips: stored.pageTransitionLoader?.tips ?? DEFAULT_THEME.pageTransitionLoader.tips,
     },
+    autoWidget: { ...DEFAULT_THEME.autoWidget, ...(stored.autoWidget ?? {}) },
+    homeHero: { ...DEFAULT_THEME.homeHero, ...(stored.homeHero ?? {}) },
   };
 }
 
@@ -927,6 +929,8 @@ export async function saveTheme(patch: Partial<SiteTheme>): Promise<SiteTheme> {
     accessibilityWidget: { ...current.accessibilityWidget, ...(patch.accessibilityWidget ?? {}) },
     ga4: { ...current.ga4, ...(patch.ga4 ?? {}) },
     metaPixel: { ...current.metaPixel, ...(patch.metaPixel ?? {}) },
+    autoWidget: { ...current.autoWidget, ...(patch.autoWidget ?? {}) },
+    homeHero: { ...current.homeHero, ...(patch.homeHero ?? {}) },
     updatedAt: new Date().toISOString(),
   };
   await jset(THEME_KEY, next);

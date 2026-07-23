@@ -34,24 +34,29 @@ const FAQ_GENERAL = [
 export default async function Home() {
   const theme = await getTheme();
   const heroImage = theme.heroImages.home;
+  const hero = theme.homeHero;
+  const headlineLines = hero.headline.split("\n");
   return (
     <>
       <Header />
 
       <main id="contenido">
-        {/* HERO */}
+        {/* HERO: textos y CTA editables desde /admin/diseno (theme.homeHero) */}
         <section className="mx-auto max-w-app px-5 pt-8 md:max-w-5xl md:pt-16 lg:max-w-6xl">
           <div className="md:grid md:grid-cols-2 md:items-center md:gap-16">
             <div className="md:col-start-1 md:row-start-1">
-              <span className="inline-flex items-center rounded-pill bg-brand-red/10 px-3 py-1 text-[12px] font-bold uppercase tracking-wide text-brand-red">
-                Correduría de seguros
-              </span>
+              {hero.eyebrow && (
+                <span className="inline-flex items-center rounded-pill bg-brand-red/10 px-3 py-1 text-[12px] font-bold uppercase tracking-wide text-brand-red">
+                  {hero.eyebrow}
+                </span>
+              )}
               <h1 className="mt-4 text-[34px] font-extrabold leading-[1.05] tracking-tight text-navy md:text-[48px] lg:text-[56px]">
-                Asegurarte bien<br />es de listos
+                {headlineLines.map((line, i) => (
+                  <span key={i}>{line}{i < headlineLines.length - 1 && <br />}</span>
+                ))}
               </h1>
               <p className="mt-3 text-[16px] leading-relaxed text-slate2 md:text-[18px] md:max-w-md">
-                Comparamos tu seguro de salud, vida, decesos, hogar y auto entre las mejores compañías
-                para que pagues lo justo. Sin trucos, sin letra pequeña.
+                {hero.subheadline}
               </p>
               <SocialProofBadge />
             </div>
@@ -73,12 +78,19 @@ export default async function Home() {
             </div>
 
             <div id="home-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
-              <InsuranceQuoteCta className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
-                Calcula tu precio
-              </InsuranceQuoteCta>
-              <a href="/quiero-que-me-llamen"
+              {hero.ctaPrimaryHref ? (
+                <a href={hero.ctaPrimaryHref}
+                  className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
+                  {hero.ctaPrimaryLabel}
+                </a>
+              ) : (
+                <InsuranceQuoteCta className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
+                  {hero.ctaPrimaryLabel}
+                </InsuranceQuoteCta>
+              )}
+              <a href={hero.ctaSecondaryHref}
                 className="flex items-center justify-center rounded-card bg-navy px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-navy-deep sm:flex-1">
-                Te llamamos gratis
+                {hero.ctaSecondaryLabel}
               </a>
             </div>
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">

@@ -58,11 +58,13 @@ type TicketPresupuesto = {
   codigoPostal?: string;
 };
 
-// A partir de qué scroll (px) se revela la burbuja: evita que aparezca de
-// golpe nada más cargar la página, cuando el visitante ni siquiera ha
-// empezado a leer — una vez revelada (tras cruzar el umbral una vez), se
-// queda visible aunque se vuelva a subir arriba.
-const SCROLL_REVEAL_PX = 240;
+// El asistente se revela con dos disparadores independientes, el que llegue
+// antes: a los 30s de haber entrado (para quien no llega a hacer scroll,
+// p.ej. porque ya encontró lo que buscaba arriba) o al superar el 40% de
+// scroll de la página (para quien navega rápido) — una vez revelado (por
+// cualquiera de los dos), se queda visible aunque se vuelva a subir arriba.
+const REVEAL_DELAY_MS = 30_000;
+const REVEAL_SCROLL_RATIO = 0.4;
 const TEASER_DELAY_MS = 1200;
 const TEASER_AUTOHIDE_MS = 10000;
 const TEASER_SEEN_KEY = "ventajon:assistantTeaserSeen";
@@ -193,10 +195,19 @@ export function AssistantWidget() {
   const [ticketComment, setTicketComment] = useState("");
 
   useEffect(() => {
-    function onScroll() { if (window.scrollY > SCROLL_REVEAL_PX) setScrolled(true); }
+    function onScroll() {
+      const doc = document.documentElement;
+      const scrollable = doc.scrollHeight - doc.clientHeight;
+      const ratio = scrollable > 0 ? window.scrollY / scrollable : 0;
+      if (ratio >= REVEAL_SCROLL_RATIO) setScrolled(true);
+    }
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const revealTimer = setTimeout(() => setScrolled(true), REVEAL_DELAY_MS);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(revealTimer);
+    };
   }, []);
 
   // Mensaje proactivo (bocadillo junto al icono) antes de abrir el widget,

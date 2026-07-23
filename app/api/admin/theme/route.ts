@@ -97,6 +97,26 @@ export async function PATCH(request: Request) {
       if (tip.length > 300) return NextResponse.json({ ok: false, error: "Un dato de \"¿Sabías que…?\" es demasiado largo." }, { status: 413 });
     }
   }
+  if (body.autoWidget) {
+    const { delaySeconds, title, ctaLabel, ctaHref, icon } = body.autoWidget;
+    if (delaySeconds !== undefined && (typeof delaySeconds !== "number" || !Number.isFinite(delaySeconds) || delaySeconds < 0 || delaySeconds > 120)) {
+      return NextResponse.json({ ok: false, error: "El retraso del widget de auto debe ser un número entre 0 y 120 segundos." }, { status: 400 });
+    }
+    if (typeof title === "string" && title.length > 140) return NextResponse.json({ ok: false, error: "El texto del widget de auto es demasiado largo." }, { status: 413 });
+    if (typeof ctaLabel === "string" && ctaLabel.length > 40) return NextResponse.json({ ok: false, error: "El texto del botón del widget de auto es demasiado largo." }, { status: 413 });
+    if (typeof ctaHref === "string" && ctaHref.length > 300) return NextResponse.json({ ok: false, error: "El enlace del widget de auto es demasiado largo." }, { status: 413 });
+    if (typeof icon === "string" && icon.length > 40) return NextResponse.json({ ok: false, error: "El icono del widget de auto no es válido." }, { status: 400 });
+  }
+  if (body.homeHero) {
+    const { eyebrow, headline, subheadline, ctaPrimaryLabel, ctaPrimaryHref, ctaSecondaryLabel, ctaSecondaryHref } = body.homeHero;
+    if (typeof eyebrow === "string" && eyebrow.length > 60) return NextResponse.json({ ok: false, error: "La etiqueta del hero es demasiado larga." }, { status: 413 });
+    if (typeof headline === "string" && headline.length > 140) return NextResponse.json({ ok: false, error: "El titular del hero es demasiado largo." }, { status: 413 });
+    if (typeof subheadline === "string" && subheadline.length > 400) return NextResponse.json({ ok: false, error: "El subtítulo del hero es demasiado largo." }, { status: 413 });
+    if (typeof ctaPrimaryLabel === "string" && ctaPrimaryLabel.length > 40) return NextResponse.json({ ok: false, error: "El texto del botón principal es demasiado largo." }, { status: 413 });
+    if (typeof ctaPrimaryHref === "string" && ctaPrimaryHref.length > 300) return NextResponse.json({ ok: false, error: "El enlace del botón principal es demasiado largo." }, { status: 413 });
+    if (typeof ctaSecondaryLabel === "string" && ctaSecondaryLabel.length > 40) return NextResponse.json({ ok: false, error: "El texto del botón secundario es demasiado largo." }, { status: 413 });
+    if (typeof ctaSecondaryHref === "string" && ctaSecondaryHref.length > 300) return NextResponse.json({ ok: false, error: "El enlace del botón secundario es demasiado largo." }, { status: 413 });
+  }
 
   const theme = await saveTheme(body);
 

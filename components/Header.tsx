@@ -82,6 +82,30 @@ function useScrollProgress(enabled: boolean) {
   return progress;
 }
 
+// Menú isla de escritorio: se oculta deslizándose hacia arriba al bajar
+// (para no robarle espacio a la lectura) y reaparece al subir, incluso sin
+// llegar arriba del todo — patrón habitual en sitios de contenido largo.
+// Solo aplica en escritorio (ver clases lg: donde se usa); en móvil el menú
+// siempre se queda fijo, como hasta ahora.
+const HEADER_HIDE_THRESHOLD_PX = 96;
+function useHideHeaderOnScrollDown() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      const delta = y - lastY;
+      if (y < HEADER_HIDE_THRESHOLD_PX) setHidden(false);
+      else if (delta > 4) setHidden(true);
+      else if (delta < -4) setHidden(false);
+      lastY = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return hidden;
+}
+
 // showProgress: activa la línea de progreso de lectura en el menú isla
 // (pensada para páginas de contenido largo tipo artículo/blog).
 // crumbs: para rutas dinámicas (p.ej. /actualidad/[slug]) que no pueden
@@ -91,6 +115,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
   const isHome = pathname === "/";
   const crumbs = !isHome ? (crumbsOverride ?? BREADCRUMB_MAP[pathname] ?? fallbackBreadcrumb(pathname)) : null;
   const progress = useScrollProgress(showProgress && !isHome);
+  const headerHidden = useHideHeaderOnScrollDown();
   const theme = useSiteTheme();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -103,7 +128,7 @@ export function Header({ showProgress = false, crumbs: crumbsOverride }: { showP
 
   return (
     <>
-    <header className="safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md xl:mx-12">
+    <header className={`safe-top sticky top-0 z-40 border-b border-hair bg-white/90 backdrop-blur lg:top-4 lg:mx-6 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-hair lg:bg-white/95 lg:shadow-card lg:backdrop-blur-md lg:transition-transform lg:duration-300 lg:ease-in-out xl:mx-12 ${headerHidden ? "lg:-translate-y-[calc(100%+2rem)]" : "lg:translate-y-0"}`}>
       {showProgress && !isHome && (
         <div aria-hidden="true" className="hidden h-[3px] w-full bg-hair lg:block">
           <div className="h-full bg-brand-red transition-[width] duration-150 ease-out" style={{ width: `${progress}%` }} />

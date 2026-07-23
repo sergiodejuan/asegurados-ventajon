@@ -191,6 +191,53 @@ export const DEFAULT_PAGE_TRANSITION_LOADER: PageTransitionLoaderConfig = {
   ],
 };
 
+// Widget flotante "Tu seguro de coche ideal" de la home (ver
+// components/AutoWidget.tsx) — activable/desactivable y con retraso, textos,
+// icono y CTA editables desde /admin/diseno.
+export type AutoWidgetConfig = {
+  enabled: boolean;
+  delaySeconds: number;
+  icon: string; // nombre de icono de components/icons.tsx (IconByName)
+  title: string;
+  ctaLabel: string;
+  ctaHref: string;
+};
+
+export const DEFAULT_AUTO_WIDGET: AutoWidgetConfig = {
+  enabled: true,
+  delaySeconds: 4,
+  icon: "car",
+  title: "Tu seguro de coche ideal te está esperando",
+  ctaLabel: "¡Vamos allá!",
+  ctaHref: "/tarificador-auto",
+};
+
+// Textos y CTA del hero de la home, editables desde /admin/diseno.
+export type HomeHeroConfig = {
+  eyebrow: string;
+  headline: string; // admite "\n" para forzar un salto de línea, como el H1 actual
+  subheadline: string;
+  ctaPrimaryLabel: string;
+  // "" = mantiene el comportamiento dinámico actual (abre el selector de
+  // seguros a pantalla completa, ver components/InsuranceQuoteCta.tsx); si
+  // se rellena, el botón se convierte en un enlace normal a esa URL.
+  ctaPrimaryHref: string;
+  ctaSecondaryLabel: string;
+  ctaSecondaryHref: string;
+};
+
+export const DEFAULT_HOME_HERO: HomeHeroConfig = {
+  eyebrow: "Correduría de seguros",
+  headline: "Asegurarte bien\nes de listos",
+  subheadline:
+    "Comparamos tu seguro de salud, vida, decesos, hogar y auto entre las mejores compañías " +
+    "para que pagues lo justo. Sin trucos, sin letra pequeña.",
+  ctaPrimaryLabel: "Calcula tu precio",
+  ctaPrimaryHref: "",
+  ctaSecondaryLabel: "Te llamamos gratis",
+  ctaSecondaryHref: "/quiero-que-me-llamen",
+};
+
 export type SiteTheme = {
   colors: SiteColors;
   displayFont: string;
@@ -206,6 +253,8 @@ export type SiteTheme = {
   ga4: Ga4Config;
   metaPixel: MetaPixelConfig;
   pageTransitionLoader: PageTransitionLoaderConfig;
+  autoWidget: AutoWidgetConfig;
+  homeHero: HomeHeroConfig;
   updatedAt: string;
 };
 
@@ -224,5 +273,7 @@ export const DEFAULT_THEME: SiteTheme = {
   ga4: DEFAULT_GA4,
   metaPixel: DEFAULT_META_PIXEL,
   pageTransitionLoader: DEFAULT_PAGE_TRANSITION_LOADER,
+  autoWidget: DEFAULT_AUTO_WIDGET,
+  homeHero: DEFAULT_HOME_HERO,
   updatedAt: new Date(0).toISOString(),
 };

@@ -10,6 +10,17 @@ import {
 import { PARTNERS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 
+const WIDGET_ICON_OPTIONS = [
+  { value: "car", label: "Coche" },
+  { value: "shield", label: "Escudo" },
+  { value: "compare", label: "Comparar" },
+  { value: "doc", label: "Documento" },
+  { value: "pin", label: "Ubicación" },
+  { value: "life", label: "Vida" },
+  { value: "flower", label: "Flor" },
+  { value: "home", label: "Casa" },
+];
+
 export default function AdminDisenoPage() {
   return (
     <AdminShell active="diseno">
@@ -73,6 +84,14 @@ function DisenoAdmin() {
 
   function removeLoaderTip(index: number) {
     setTheme((t) => ({ ...t, pageTransitionLoader: { ...t.pageTransitionLoader, tips: t.pageTransitionLoader.tips.filter((_, i) => i !== index) } }));
+  }
+
+  function setAutoWidgetField<K extends keyof SiteTheme["autoWidget"]>(key: K, value: SiteTheme["autoWidget"][K]) {
+    setTheme((t) => ({ ...t, autoWidget: { ...t.autoWidget, [key]: value } }));
+  }
+
+  function setHomeHeroField<K extends keyof SiteTheme["homeHero"]>(key: K, value: SiteTheme["homeHero"][K]) {
+    setTheme((t) => ({ ...t, homeHero: { ...t.homeHero, [key]: value } }));
   }
 
   async function save() {
@@ -294,6 +313,109 @@ function DisenoAdmin() {
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          {/* Hero de la portada (Home) */}
+          <section className="rounded-[20px] border border-hair bg-white p-5">
+            <h2 className="text-[15px] font-bold text-navy">Hero de la portada (Home)</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+              Etiqueta, titular, subtítulo y botones de la cabecera de la home.
+            </p>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Etiqueta pequeña (encima del titular)</span>
+              <input type="text" value={theme.homeHero.eyebrow} onChange={(e) => setHomeHeroField("eyebrow", e.target.value)}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[14px]" />
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Titular (H1)</span>
+              <textarea value={theme.homeHero.headline} onChange={(e) => setHomeHeroField("headline", e.target.value)} rows={2}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[16px] font-bold leading-snug" />
+              <p className="mt-1 text-[11px] leading-relaxed text-slate2">Pon un salto de línea donde quieras forzar el corte de línea.</p>
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Subtítulo</span>
+              <textarea value={theme.homeHero.subheadline} onChange={(e) => setHomeHeroField("subheadline", e.target.value)} rows={3}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[14px] leading-relaxed" />
+            </label>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón principal · texto</span>
+                <input type="text" value={theme.homeHero.ctaPrimaryLabel} onChange={(e) => setHomeHeroField("ctaPrimaryLabel", e.target.value)}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón principal · enlace</span>
+                <input type="text" value={theme.homeHero.ctaPrimaryHref} onChange={(e) => setHomeHeroField("ctaPrimaryHref", e.target.value)}
+                  placeholder="Vacío = abre el selector de seguros"
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate2">
+              Si dejas el enlace del botón principal vacío, mantiene su comportamiento actual (abre la ventana con
+              todas las opciones de seguro). Si escribes una URL, se convierte en un enlace normal a esa página.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón secundario · texto</span>
+                <input type="text" value={theme.homeHero.ctaSecondaryLabel} onChange={(e) => setHomeHeroField("ctaSecondaryLabel", e.target.value)}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón secundario · enlace</span>
+                <input type="text" value={theme.homeHero.ctaSecondaryHref} onChange={(e) => setHomeHeroField("ctaSecondaryHref", e.target.value)}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
+            </div>
+          </section>
+
+          {/* Widget de seguro de auto (home) */}
+          <section className="rounded-[20px] border border-hair bg-white p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-bold text-navy">Widget de seguro de auto (home)</h2>
+              <label className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  checked={theme.autoWidget.enabled}
+                  onChange={(e) => setAutoWidgetField("enabled", e.target.checked)}
+                />
+                Activado
+              </label>
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+              Tarjeta flotante de captación en la esquina inferior derecha de la home (solo escritorio).
+            </p>
+            <label className="mt-3 block max-w-[160px]">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Aparece a los (segundos)</span>
+              <input
+                type="number" min={0} max={120} value={theme.autoWidget.delaySeconds}
+                onChange={(e) => setAutoWidgetField("delaySeconds", Math.max(0, Math.min(120, Number(e.target.value) || 0)))}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums"
+              />
+            </label>
+            <label className="mt-3 block max-w-xs">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Icono</span>
+              <select value={theme.autoWidget.icon} onChange={(e) => setAutoWidgetField("icon", e.target.value)}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[14px]">
+                {WIDGET_ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Texto</span>
+              <textarea value={theme.autoWidget.title} onChange={(e) => setAutoWidgetField("title", e.target.value)} rows={2}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2.5 text-[14px] leading-relaxed" />
+            </label>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón · texto</span>
+                <input type="text" value={theme.autoWidget.ctaLabel} onChange={(e) => setAutoWidgetField("ctaLabel", e.target.value)}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Botón · enlace</span>
+                <input type="text" value={theme.autoWidget.ctaHref} onChange={(e) => setAutoWidgetField("ctaHref", e.target.value)}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px]" />
+              </label>
             </div>
           </section>
         </div>
