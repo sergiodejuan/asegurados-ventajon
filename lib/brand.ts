@@ -64,10 +64,10 @@ export const RATING_VALUE = "4,7/5";
 // Datos de confianza reales (sin inventar cifras): reutilizados en la home y
 // en los bloques de prueba social del tarificador.
 export const TRUST_STATS = [
-  { value: ECOSYSTEM_MEMBERS, label: "en el ecosistema Ventajon" },
-  { value: String(PARTNERS.length), label: "aseguradoras líderes comparadas" },
-  { value: "0 €", label: "coste de comparar, siempre" },
-  { value: "100 %", label: "online, sin desplazamientos" },
+  { value: "+350.000", label: "personas ya comparan con nosotros" },
+  { value: String(PARTNERS.length), label: "aseguradoras líderes en una sola comparativa" },
+  { value: "0 €", label: "de coste por comparar, siempre" },
+  { value: "100 %", label: "online, sin colas ni oficinas" },
 ];
 
 // El catálogo de compañías/precios de la comparativa vive en lib/catalog.ts
@@ -96,10 +96,10 @@ export const PROMO = {
 /* ------------------------- Contenido de la landing ------------------------- */
 
 export const VENTAJAS = [
-  { icon: "shield", t: "De tu lado", d: "Somos tu asesor, no el vendedor de la compañía." },
-  { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras del país." },
-  { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos lo que cubre y lo que no, en claro." },
-  { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
+  { icon: "shield", t: "De tu lado", d: "Somos correduría: cobramos igual elijas la compañía que elijas, así que comparamos sin sesgo." },
+  { icon: "compare", t: "Mejor precio por volumen", d: "Comparamos miles de pólizas al mes, y eso nos da condiciones que tú solo no conseguirías." },
+  { icon: "doc", t: "Sin letra pequeña", d: "Te decimos qué cubre y qué no antes de firmar, no después." },
+  { icon: "pin", t: "Cercanía real", d: "Atendemos toda España por teléfono y WhatsApp, con equipo propio en Canarias y Baleares." },
 ];
 
 export const COBERTURAS = {

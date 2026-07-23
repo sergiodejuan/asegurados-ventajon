@@ -16,19 +16,19 @@ import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
 
 const PRODUCT_BLURBS: Record<string, string> = {
-  salud: "Con o sin copago. Calcula tu precio al instante.",
-  vida: "Protege a los tuyos y tu hipoteca.",
-  decesos: "Tranquilidad para tu familia, sin tabúes.",
-  hogar: "Tu vivienda cubierta al mejor precio.",
-  auto: "A terceros o a todo riesgo, comparado por un experto.",
+  salud: "Con copago o sin él, calcula tu precio al instante y elige tu cuadro médico.",
+  vida: "Protege a tu familia y tu hipoteca desde una cuota ajustada a tu edad real.",
+  decesos: "Resuelto para tu familia, sin tabúes y sin sorpresas de última hora.",
+  hogar: "Continente, contenido y responsabilidad civil al precio justo.",
+  auto: "A terceros o a todo riesgo, comparado por un experto, no por un algoritmo.",
 };
 
 const FAQ_GENERAL = [
-  { q: "¿Sois una aseguradora?", a: "No. Somos correduría de seguros: comparamos entre varias compañías para encontrar la que mejor se ajusta a ti, no vendemos un único producto." },
-  { q: "¿Cuánto cuesta compararse con vosotros?", a: "Nada. La comparativa y el asesoramiento son 100% gratuitos y sin compromiso de contratación." },
-  { q: "¿Qué seguros comparáis?", a: "Salud, vida, decesos, hogar y auto, entre las principales aseguradoras del país: Mapfre, Adeslas, Asisa, Zurich y Generali." },
-  { q: "¿Cómo me contactáis?", a: "Como prefieras: por teléfono, WhatsApp o completando el formulario online. Tú eliges cuándo y cómo." },
-  { q: "¿En qué zonas trabajáis?", a: "Trabajamos en toda España, con atención especialmente cercana en Canarias y Baleares." },
+  { q: "¿Sois una aseguradora?", a: "No, somos correduría de seguros: comparamos entre varias aseguradoras para encontrar tu mejor opción, no vendemos un producto propio." },
+  { q: "¿Cuánto cuesta compararse con vosotros?", a: "Nada. Comparar es gratis y sin compromiso, cobremos o no una póliza al final." },
+  { q: "¿Qué seguros comparáis?", a: "Salud, vida, decesos, hogar y auto, con las principales aseguradoras de España." },
+  { q: "¿Cómo me contactáis?", a: "Por teléfono o WhatsApp, en el horario que nos indiques; nunca sin que lo pidas." },
+  { q: "¿En qué zonas trabajáis?", a: "En toda España, con atención especial a Canarias y Baleares." },
 ];
 
 export default async function Home() {
@@ -94,7 +94,7 @@ export default async function Home() {
               </a>
             </div>
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
-              Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
+              Sin coste · Sin compromiso · Respuesta en menos de 24h
             </p>
           </div>
         </section>
@@ -205,7 +205,7 @@ export default async function Home() {
             <div>
               <h2 className="text-[22px] font-extrabold leading-tight md:text-[28px]">¿Empezamos?</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-white/80 md:text-[16px]">
-                Calcula tu precio en 1 minuto o deja que te llamemos. Sin compromiso.
+                Calcula tu precio en menos de 2 minutos, o pide que te llamemos. Sin compromiso.
               </p>
             </div>
             <div className="mt-5 flex flex-col gap-3 md:mt-0 md:flex-row md:shrink-0">

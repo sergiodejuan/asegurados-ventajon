@@ -38,14 +38,14 @@ export const revalidate = 30;
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getTheme();
   return {
-    title: `Seguro de salud — ${BRAND_NAME}`,
+    title: `${BRAND_NAME} | Compara seguros y paga menos`,
     description:
-      "Comparamos tu seguro de salud entre las mejores compañías para que pagues lo justo. Sin trucos, sin letra pequeña.",
+      "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña. Calcula tu precio.",
     robots: { index: true, follow: true },
     openGraph: {
-      title: `Seguro de salud — ${BRAND_NAME}`,
+      title: `${BRAND_NAME} | Compara seguros y paga menos`,
       description:
-        "Comparamos tu seguro de salud entre las mejores compañías para que pagues lo justo.",
+        "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña.",
       locale: "es_ES",
       type: "website",
     },
