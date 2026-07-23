@@ -93,7 +93,7 @@ export function CallRequestForm({
         }),
       });
       if (res.ok) {
-        saveCallResult({ nombre: quote.nombre, diaLlamada, turnoLlamada });
+        saveCallResult({ nombre: quote.nombre, diaLlamada, turnoLlamada, producto });
         saveClientProfile({ nombre: quote.nombre, telefono: quote.telefono, diaLlamada, turnoLlamada });
         pushDataLayerEvent("generate_lead", { producto, form: "quiero_que_me_llamen" });
         router.push("/gracias");
@@ -148,7 +148,7 @@ export function CallRequestForm({
         body: JSON.stringify(parsed.data),
       });
       if (res.ok) {
-        saveCallResult({ nombre, diaLlamada, turnoLlamada });
+        saveCallResult({ nombre, diaLlamada, turnoLlamada, producto });
         saveClientProfile({ nombre, telefono, diaLlamada, turnoLlamada });
         pushDataLayerEvent("generate_lead", { producto, form: "quiero_que_me_llamen" });
         router.push("/gracias");

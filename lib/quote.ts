@@ -133,8 +133,10 @@ export function whatsAppUrl(text: string) {
 }
 
 // Resultado de una solicitud de llamada, para personalizar la página de
-// agradecimiento (nombre + preferencia horaria) sin tener que volver a pedirlo.
-export type CallResult = { nombre?: string; diaLlamada?: string; turnoLlamada?: string };
+// agradecimiento (nombre + preferencia horaria + producto solicitado, este
+// último para poder sugerir un segundo producto sin volver a preguntarlo)
+// sin tener que volver a pedirlo.
+export type CallResult = { nombre?: string; diaLlamada?: string; turnoLlamada?: string; producto?: string };
 const CALL_RESULT_KEY = "ventajon:callResult";
 
 export function saveCallResult(v: CallResult) {

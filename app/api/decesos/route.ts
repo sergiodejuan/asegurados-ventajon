@@ -10,7 +10,8 @@ import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
-import { callTriggerRateLimitFail } from "@/lib/rateLimit";
+import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
 
 export const runtime = "nodejs";
@@ -27,6 +28,9 @@ export async function POST(request: Request) {
   }
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
+
+  const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
+  if (!humano) return NextResponse.json({ ok: false, error: "No hemos podido verificar la solicitud. Recarga la página e inténtalo de nuevo." }, { status: 403 });
 
   const limited = await callTriggerRateLimitFail(request, "tarificador-decesos", d.telefono);
   if (limited) return limited;

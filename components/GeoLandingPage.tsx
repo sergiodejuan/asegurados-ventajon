@@ -178,8 +178,8 @@ export async function GeoLandingPage({ geo }: { geo: GeoLandingPageData }) {
         {/* SEO */}
         <section aria-labelledby="seo-heading" className="mx-auto mt-14 max-w-app px-5 pb-4 md:mt-24 md:max-w-2xl">
           <h2 id="seo-heading" className="text-[22px] font-extrabold text-navy md:text-[26px]">Todo sobre el seguro de salud en {geo.islandName}</h2>
-          <p className="mt-3 text-[14px] leading-relaxed text-slate2">{base.seo.intro}</p>
-          {base.seo.sections.map((s) => (
+          <p className="mt-3 text-[14px] leading-relaxed text-slate2">{geo.seoIntro}</p>
+          {geo.seoSections.map((s) => (
             <div key={s.h2} className="mt-6">
               <h3 className="text-[16px] font-bold text-navy">{s.h2}</h3>
               <p className="mt-2 text-[14px] leading-relaxed text-slate2">{s.p}</p>

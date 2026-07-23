@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME, SITE_URL } from "@/lib/brand";
 import { getTheme } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/ThemeContext";
@@ -38,6 +38,10 @@ export const revalidate = 30;
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getTheme();
   return {
+    // Sin esto, los canonical y openGraph.url relativos (ver las páginas de
+    // producto y home) no se resuelven a URL absoluta — necesario para que
+    // buscadores y redes sociales los interpreten bien.
+    metadataBase: new URL(SITE_URL),
     title: `${BRAND_NAME} | Compara seguros y paga menos`,
     description:
       "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña. Calcula tu precio.",

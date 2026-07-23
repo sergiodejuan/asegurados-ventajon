@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CoverageTabs } from "@/components/CoverageTabs";
@@ -11,9 +12,21 @@ import { InsuranceQuoteCta } from "@/components/InsuranceQuoteCta";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
-import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
+import { BRAND_NAME, SITE_URL, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
+
+const HOME_TITLE = `${BRAND_NAME} | Compara seguros y paga menos`;
+const HOME_DESCRIPTION =
+  "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña. Calcula tu precio.";
+
+export const metadata: Metadata = {
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: { title: HOME_TITLE, description: HOME_DESCRIPTION, url: SITE_URL, locale: "es_ES", type: "website" },
+};
 
 const PRODUCT_BLURBS: Record<string, string> = {
   salud: "Con copago o sin él, calcula tu precio al instante y elige tu cuadro médico.",
@@ -36,8 +49,36 @@ export default async function Home() {
   const heroImage = theme.heroImages.home;
   const hero = theme.homeHero;
   const headlineLines = hero.headline.split("\n");
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "InsuranceAgency",
+        name: BRAND_NAME,
+        url: SITE_URL,
+        description: HOME_DESCRIPTION,
+        areaServed: [
+          { "@type": "AdministrativeArea", name: "Islas Canarias" },
+          { "@type": "AdministrativeArea", name: "Islas Baleares" },
+          { "@type": "Country", name: "España" },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: FAQ_GENERAL.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+    ],
+  };
+
   return (
     <>
+      {/* eslint-disable-next-line react/no-danger */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Header />
 
       <main id="contenido">

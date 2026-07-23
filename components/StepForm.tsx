@@ -14,6 +14,7 @@ import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { ConsentNudgeModal } from "./ConsentNudgeModal";
 import { ExitIntentModal } from "./ExitIntentModal";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -40,6 +41,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const [showConsentNudge, setShowConsentNudge] = useState(false);
   const [showExitIntent, setShowExitIntent] = useState(false);
   const [exitIntentArmed, setExitIntentArmed] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const doneRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
 
@@ -181,6 +183,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       company: "",
       consent: consentTimes,
       utm: getAttribution(),
+      turnstileToken,
       ...(origen ? { origen } : {}),
     };
 
@@ -331,6 +334,18 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
             </form>
           </Shell>
         );
+      case "choice2":
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (data[step.groupA.field] && data[step.groupB.field]) next(); }}>
+              <ChoiceGroup label={step.groupA.label} field={step.groupA.field} options={step.groupA.options} value={data[step.groupA.field]} onSelect={(v) => set({ [step.groupA.field]: v })} />
+              <div className="mt-5">
+                <ChoiceGroup label={step.groupB.label} field={step.groupB.field} options={step.groupB.options} value={data[step.groupB.field]} onSelect={(v) => set({ [step.groupB.field]: v })} />
+              </div>
+              <PrimaryButton disabled={!data[step.groupA.field] || !data[step.groupB.field]}>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
       case "dobsex":
         return (
           <Shell title={step.title} helper={step.helper}>
@@ -425,6 +440,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
                   Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).
                 </Consent>
               </div>
+              <TurnstileWidget onToken={setTurnstileToken} />
               {submitError && <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>}
               <PrimaryButton loading={submitting}>{submitting ? "Enviando…" : "Ver precios"}</PrimaryButton>
               <p className="mt-3 text-center text-[12px] leading-relaxed text-slate2">Verás una comparativa orientativa al momento. Un asesor te confirma el precio final cuando elijas tu opción.</p>
@@ -575,6 +591,29 @@ function OptionCard({ onClick, children, selected }: { onClick: () => void; chil
       <span>{children}</span>
       <ArrowRight className={selected ? "text-white" : "text-brand-red"} />
     </button>
+  );
+}
+// Un grupo de opciones de una sola respuesta, compacto para poder mostrar
+// dos grupos en la misma pantalla (ver el paso "choice2"). Misma lógica de
+// selección que OptionCard, con menos altura por opción.
+function ChoiceGroup({ label, field, options, value, onSelect }: {
+  label: string; field: string; options: { value: string; label: string }[]; value: unknown; onSelect: (v: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-[14px] font-semibold text-ink">{label}</legend>
+      <div className="flex flex-col gap-2">
+        {options.map((o) => (
+          <button
+            key={`${field}-${o.value}`} type="button" aria-pressed={value === o.value}
+            onClick={() => onSelect(o.value)}
+            className={`rounded-card border px-4 py-3 text-left text-[14px] font-medium transition-colors ${value === o.value ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 function YesNo({ onSelect, value }: { onSelect: (v: boolean) => void; value?: boolean }) {

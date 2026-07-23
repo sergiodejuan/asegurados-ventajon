@@ -246,3 +246,43 @@ export function getProductPage(slug: string): ProductPage | undefined {
 export function quoteHref(p: ProductPage): string {
   return p.cta.href.startsWith("/tarificador") ? p.cta.href : p.path;
 }
+
+// JSON-LD de las 5 páginas de producto: InsuranceAgency + Service (sin
+// Offer/precio — por decisión de marca no se muestran precios cerrados,
+// ver lib/brand.ts PROMO) + FAQPage con el FAQ ya visible en la página +
+// BreadcrumbList. Mismo espíritu que buildJsonLd en lib/seoLandingPages.ts,
+// adaptado a que aquí no hay un precio resuelto que anunciar.
+export function buildProductJsonLd(page: ProductPage, brandName: string, siteUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "InsuranceAgency",
+        name: brandName,
+        url: `${siteUrl}${page.path}`,
+        description: page.metaDescription,
+      },
+      {
+        "@type": "Service",
+        name: page.badge,
+        description: page.subheadline,
+        provider: { "@type": "InsuranceAgency", name: brandName },
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: page.faq.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
+          { "@type": "ListItem", position: 2, name: page.badge, item: `${siteUrl}${page.path}` },
+        ],
+      },
+    ],
+  };
+}

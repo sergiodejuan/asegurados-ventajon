@@ -100,6 +100,7 @@ export const leadSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type LeadInput = z.input<typeof leadSchema>;
 
@@ -123,6 +124,7 @@ export const vidaSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type VidaInput = z.input<typeof vidaSchema>;
 
@@ -151,6 +153,7 @@ export const decesosSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type DecesosInput = z.input<typeof decesosSchema>;
 
@@ -180,6 +183,7 @@ export const autoSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type AutoInput = z.input<typeof autoSchema>;
 

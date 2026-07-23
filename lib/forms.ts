@@ -10,6 +10,16 @@ export type Step =
   | { type: "seguroActual"; key: string; title: string; helper?: string; servicios: string[]; phase: number; showIf?: (d: FormData) => boolean }
   | { type: "matricula"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
   | { type: "vehiculo"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
+  // Dos preguntas de una sola opción en la misma pantalla — para fusionar
+  // pasos afines (p.ej. carnet + cobertura en auto) sin perder ninguno de
+  // los dos datos, solo la página/avance de progreso que ocupaban por
+  // separado. Ver nota en AUTO_CONFIG.
+  | {
+      type: "choice2"; key: string; title: string; helper?: string; phase: number;
+      groupA: { field: string; label: string; options: Option[] };
+      groupB: { field: string; label: string; options: Option[] };
+      showIf?: (d: FormData) => boolean;
+    }
   | { type: "contact"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean };
 
 export type FormData = Record<string, unknown>;
@@ -145,26 +155,31 @@ export const AUTO_CONFIG: FormConfig = {
     },
     { type: "choice", key: "zona", field: "codigoPostal", phase: 1, title: "¿Dónde se guarda habitualmente?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "dobsex", key: "titular", phase: 1, title: "Datos del conductor principal", helper: "La edad influye en el precio del seguro de auto." },
+    // Antes eran 2 pasos ("carnet" y "cobertura") — se fusionan en una sola
+    // pantalla porque el tarificador de auto tenía notablemente más pasos
+    // que el resto (hasta 10 frente a 6-8), sin dejar de pedir ninguno de
+    // los dos datos.
     {
-      type: "choice", key: "carnet", field: "antiguedadCarnet", phase: 1,
-      title: "¿Cuánto tiempo llevas con el carnet?",
-      helper: "Es uno de los factores que más influyen en el precio.",
-      options: [
-        { value: "menos_2", label: "Menos de 2 años" },
-        { value: "2_5", label: "Entre 2 y 5 años" },
-        { value: "mas_5", label: "Más de 5 años" },
-      ],
-    },
-    {
-      type: "choice", key: "cobertura", field: "coberturaDeseada", phase: 1,
-      title: "¿Qué cobertura te interesa?",
-      helper: "Si no lo tienes claro, tu asesor te ayuda a elegir.",
-      options: [
-        { value: "terceros", label: "Terceros" },
-        { value: "terceros_ampliado", label: "Terceros ampliado" },
-        { value: "todo_riesgo", label: "Todo riesgo" },
-        { value: "no_lo_tengo_claro", label: "No lo tengo claro" },
-      ],
+      type: "choice2", key: "carnetYcobertura", phase: 1,
+      title: "Tu carnet y la cobertura que buscas",
+      helper: "Dos datos que influyen mucho en el precio de tu seguro de auto.",
+      groupA: {
+        field: "antiguedadCarnet", label: "¿Cuánto tiempo llevas con el carnet?",
+        options: [
+          { value: "menos_2", label: "Menos de 2 años" },
+          { value: "2_5", label: "Entre 2 y 5 años" },
+          { value: "mas_5", label: "Más de 5 años" },
+        ],
+      },
+      groupB: {
+        field: "coberturaDeseada", label: "¿Qué cobertura te interesa?",
+        options: [
+          { value: "terceros", label: "Terceros" },
+          { value: "terceros_ampliado", label: "Terceros ampliado" },
+          { value: "todo_riesgo", label: "Todo riesgo" },
+          { value: "no_lo_tengo_claro", label: "No lo tengo claro" },
+        ],
+      },
     },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes seguro de auto?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de auto actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_AUTO, showIf: (d) => d.yaTieneSeguro === true },
