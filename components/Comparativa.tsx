@@ -6,7 +6,7 @@ import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import type { Product } from "@/lib/catalog";
 import {
@@ -17,6 +17,15 @@ import {
 function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+// "Mapfre, Adeslas, Asisa, Zurich y Generali" — nombrar las aseguradoras
+// reales pesa más como prueba de que se ha comparado de verdad que un
+// genérico "las principales compañías".
+function naturalList(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+const PARTNERS_LIST = naturalList(PARTNERS);
 
 function tarificadorHref(producto: string) {
   if (producto === "vida") return "/tarificador-vida";
@@ -111,13 +120,13 @@ export function Comparativa() {
           <Check width={30} height={30} />
         </div>
         <h1 className="mt-6 text-[28px] font-extrabold leading-tight text-navy">
-          {firstName ? `${firstName}, ya tenemos tu comparativa` : "Ya tenemos tu comparativa"}
+          {firstName ? `${firstName}, esto es lo que puedes pagar` : "Esto es lo que puedes pagar"}
         </h1>
         {quote && (
           <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>
         )}
         <p className="mt-3 text-[16px] leading-relaxed text-slate2">
-          Así de orientativo se mueve el precio entre las compañías con las que trabajamos.
+          Hemos comparado tu perfil entre {PARTNERS_LIST} para darte el precio más ajustado.
           {" "}Un asesor de {BRAND_NAME} te llama para confirmar tu propuesta final, sin compromiso.
         </p>
 
@@ -247,8 +256,7 @@ export function Comparativa() {
         <div className="mt-5 rounded-card border border-hair bg-mist p-4">
           <p className="text-[13px] font-bold text-navy">Precios orientativos</p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Son precios de ejemplo, no una cotización en firme: el precio final depende de tu perfil
-            y te lo confirma tu asesor sin compromiso.
+            El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso.
           </p>
         </div>
 
@@ -329,7 +337,7 @@ function CompanyActions({ producto, compania, precio }: { producto: string; comp
         href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
         className="flex-1 rounded-card bg-brand-red px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
       >
-        Que me llamen
+        Que te llamen gratis
       </a>
     </div>
   );
