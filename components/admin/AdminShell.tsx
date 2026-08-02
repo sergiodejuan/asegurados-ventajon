@@ -66,6 +66,15 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     ],
   },
   {
+    kind: "group", label: "Integraciones", key: "integraciones-grupo",
+    children: [
+      { href: "/admin/integraciones", label: "Resumen", key: "integraciones", modulo: "integraciones" },
+      { href: "/admin/integraciones/codescopic", label: "Codescopic", key: "integraciones-codescopic", modulo: "integraciones" },
+      { href: "/admin/integraciones/api", label: "API propia", key: "integraciones-api", modulo: "integraciones" },
+      { href: "/admin/integraciones/webhooks", label: "Webhooks", key: "integraciones-webhooks", modulo: "integraciones" },
+    ],
+  },
+  {
     kind: "group", label: "Analítica", key: "analitica-grupo",
     children: [
       { href: "/admin/informes", label: "Informes", key: "informes", modulo: "informes" },
@@ -103,6 +112,7 @@ export type AdminActiveKey =
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
+  | "integraciones" | "integraciones-codescopic" | "integraciones-api" | "integraciones-webhooks"
   | "cookies" | "analitica" | "accesibilidad" | "rgpd" | "agentes" | "permisos" | "registro";
 
 function visibleFor(identity: Identity | null) {

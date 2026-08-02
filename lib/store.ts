@@ -100,6 +100,24 @@ async function zrangeRev(key: string): Promise<string[]> {
   return (mem.z.get(key) ?? []).slice().sort((a, b) => b.s - a.s).map((e) => e.m);
 }
 
+// Prueba de conexión real para el panel /admin/integraciones (API propia de
+// la web): un round-trip de escritura+lectura sobre el almacén que usan de
+// verdad todos los endpoints públicos, no solo comprobar que las variables
+// de entorno existen — así detecta también un Redis mal configurado o caído.
+export async function pingStore(): Promise<{ ok: boolean; backend: "kv" | "memory"; latencyMs: number; error?: string }> {
+  const start = Date.now();
+  try {
+    const key = "integraciones:ping";
+    const value = Date.now();
+    await jset(key, value);
+    const read = await jget<number>(key);
+    if (read !== value) throw new Error("La lectura no coincide con lo escrito.");
+    return { ok: true, backend: hasKV ? "kv" : "memory", latencyMs: Date.now() - start };
+  } catch (err) {
+    return { ok: false, backend: hasKV ? "kv" : "memory", latencyMs: Date.now() - start, error: err instanceof Error ? err.message : "Error de conexión con el almacén." };
+  }
+}
+
 /* -------------------------------- Upsert ---------------------------------- */
 
 function fillEmpty(lead: Lead, draft: LeadDraft) {
