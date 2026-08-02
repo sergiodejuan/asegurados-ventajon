@@ -385,7 +385,7 @@ export function npsCategory(score: number): NpsCategory {
 export const ADMIN_MODULES = [
   "leads", "presupuestos", "llamadas", "tareas", "blog", "campana",
   "productos", "informes", "rgpd", "configuracion", "agentes", "exitintents", "promociones", "testimonios",
-  "integraciones",
+  "integraciones", "desarrollador",
 ] as const;
 export type AdminModule = (typeof ADMIN_MODULES)[number];
 
@@ -395,6 +395,11 @@ export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
   rgpd: "RGPD", configuracion: "Configuración y diseño", agentes: "Agentes y permisos",
   exitintents: "Exit-intent (web general)", promociones: "Promociones", testimonios: "Testimonios",
   integraciones: "Integraciones",
+  // Da acceso a /portal-desarrollo (documentación de onboarding técnico),
+  // independiente de "integraciones" (que además expone pruebas de conexión
+  // y estado operativo) — pensado para poder dárselo a un desarrollador
+  // externo sin abrir el resto del panel.
+  desarrollador: "Documentación técnica (desarrollador)",
 };
 
 export const AGENT_ROLES = ["admin", "agente"] as const;

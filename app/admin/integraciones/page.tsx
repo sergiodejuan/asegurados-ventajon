@@ -1,7 +1,8 @@
 "use client";
 
-import { AdminShell } from "@/components/admin/AdminShell";
-import { ArrowRight } from "@/components/icons";
+import { useState } from "react";
+import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { ArrowRight, Spinner } from "@/components/icons";
 import { useIntegrationStatus } from "@/components/admin/useIntegrationStatus";
 import type { ConnectionStatus } from "@/components/admin/ConnectionBanner";
 
@@ -31,6 +32,31 @@ export default function AdminIntegracionesPage() {
 
 function IntegracionesIndex() {
   const { status, loading, error } = useIntegrationStatus();
+  const { token } = useAdminToken();
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  async function downloadPdf() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/admin/integraciones/pdf", { headers: { "x-admin-token": token } });
+      if (!res.ok) { setDownloadError("No se pudo generar el PDF."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `integraciones-api-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Error de conexión al generar el PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function badgeFor(href: string): { status: ConnectionStatus; label: string } | null {
     if (!status) return null;
@@ -59,6 +85,18 @@ function IntegracionesIndex() {
         variables de entorno y el almacén — no es una casilla que se marca a mano.
       </p>
       {error && <p role="alert" className="mt-4 text-[13px] font-medium text-brand-red">{error}</p>}
+
+      <div className="mt-4">
+        <button
+          type="button" onClick={downloadPdf} disabled={downloading} aria-busy={downloading || undefined}
+          className="flex items-center gap-2 rounded-card bg-navy px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-navy/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {downloading && <Spinner />}
+          {downloading ? "Generando…" : "Descargar PDF con toda la documentación"}
+        </button>
+        <p className="mt-1.5 text-[12px] text-slate2">Un único PDF con Codescopic, la API propia y los webhooks — listo para enviar al equipo.</p>
+        {downloadError && <p role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{downloadError}</p>}
+      </div>
 
       <div className="mt-5 flex flex-col gap-2.5">
         {SECTIONS.map((s) => {
