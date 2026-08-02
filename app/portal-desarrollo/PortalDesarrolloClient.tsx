@@ -5,6 +5,8 @@ import { BRAND_NAME } from "@/lib/brand";
 import { Spinner } from "@/components/icons";
 import { DevPortalGate, useDevToken } from "@/components/admin/DevPortalGate";
 import { CODESCOPIC_FIELD_MAP, CODESCOPIC_ENV_VARS, CODESCOPIC_PAYLOAD_SAMPLE, API_CATEGORIES, WEBHOOKS } from "@/lib/integrationsCatalog";
+import { SITE_STRUCTURE } from "@/lib/siteStructure";
+import { SiteStructureDiagram } from "@/components/admin/SiteStructureDiagram";
 
 export default function PortalDesarrolloClient() {
   return (
@@ -42,13 +44,14 @@ function PortalContent() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10 pb-24">
+    <main className="mx-auto max-w-4xl px-5 py-10 pb-24">
       <p className="text-[12px] font-bold uppercase tracking-wide text-brand-red">Onboarding técnico</p>
       <h1 className="mt-1 text-[28px] font-extrabold leading-tight text-navy">Documentación de APIs e integraciones</h1>
       <p className="mt-3 text-[14px] leading-relaxed text-slate2">
         Bienvenido/a al equipo de desarrollo de {BRAND_NAME}. Esta página reúne todo lo que necesitas para empezar a
-        trabajar con las integraciones del sitio: el motor de tarificación externo Codescopic, la API propia de la
-        web y los webhooks salientes/entrantes. Es una página no enlazada desde ningún menú — guárdala en marcadores.
+        trabajar con el sitio: cómo está organizado (páginas, tarificadores), el motor de tarificación externo
+        Codescopic, la API propia de la web y los webhooks salientes/entrantes. Es una página no enlazada desde
+        ningún menú — guárdala en marcadores.
       </p>
 
       <div className="mt-5">
@@ -65,14 +68,27 @@ function PortalContent() {
       <nav aria-label="Contenido" className="mt-8 rounded-card border border-hair bg-white p-4">
         <p className="text-[12px] font-bold uppercase tracking-wide text-slate2">Contenido</p>
         <ul className="mt-2 flex flex-col gap-1 text-[13px] font-semibold text-navy">
-          <li><a href="#codescopic" className="underline underline-offset-2">1. Codescopic</a></li>
-          <li><a href="#api-propia" className="underline underline-offset-2">2. API propia de la web</a></li>
-          <li><a href="#webhooks" className="underline underline-offset-2">3. Webhooks</a></li>
+          <li><a href="#estructura" className="underline underline-offset-2">1. Estructura de la web</a></li>
+          <li><a href="#codescopic" className="underline underline-offset-2">2. Codescopic</a></li>
+          <li><a href="#api-propia" className="underline underline-offset-2">3. API propia de la web</a></li>
+          <li><a href="#webhooks" className="underline underline-offset-2">4. Webhooks</a></li>
         </ul>
       </nav>
 
+      <section id="estructura" className="mt-10 scroll-mt-6">
+        <h2 className="text-[20px] font-extrabold text-navy">1. Estructura de la web</h2>
+        <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
+          Mapa de páginas padre, páginas hijo, secciones y los 4 tipos de tarificador, con la función de cada
+          caja. El sitio público y el panel de administración son las dos ramas principales; el propio portal
+          de desarrollo es la tercera.
+        </p>
+        <div className="mt-4">
+          <SiteStructureDiagram nodes={SITE_STRUCTURE} />
+        </div>
+      </section>
+
       <section id="codescopic" className="mt-10 scroll-mt-6">
-        <h2 className="text-[20px] font-extrabold text-navy">1. Codescopic</h2>
+        <h2 className="text-[20px] font-extrabold text-navy">2. Codescopic</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
           Motor de tarificación externo, todavía no conectado. El tarificador de salud ya recoge todos los datos
           personales que pide su payload de referencia (ver abajo); falta la documentación de acceso de Codescopic
@@ -125,7 +141,7 @@ function PortalContent() {
       </section>
 
       <section id="api-propia" className="mt-10 scroll-mt-6">
-        <h2 className="text-[20px] font-extrabold text-navy">2. API propia de la web</h2>
+        <h2 className="text-[20px] font-extrabold text-navy">3. API propia de la web</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
           Todos los endpoints de asegurados-ventajon.com, agrupados por para qué sirven.
         </p>
@@ -155,7 +171,7 @@ function PortalContent() {
       </section>
 
       <section id="webhooks" className="mt-10 scroll-mt-6">
-        <h2 className="text-[20px] font-extrabold text-navy">3. Webhooks</h2>
+        <h2 className="text-[20px] font-extrabold text-navy">4. Webhooks</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
           Un webhook saliente (avisa a un sistema externo de cada lead nuevo) y dos entrantes (Retell y Bland avisan
           del resultado de una llamada).
