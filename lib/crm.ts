@@ -87,6 +87,14 @@ export type Lead = {
   telefono: string;
   email: string;
   codigoPostal: string;
+  // Identificación y datos preparados para la futura integración con
+  // Codescopic (por ahora solo se rellenan en salud — ver lib/schema.ts).
+  documentoTipo: string;
+  documento: string;
+  apellido1: string;
+  apellido2: string;
+  codigoPostalReal: string;
+  aseguradosAdicionales: { fechaNacimiento: string; sexo: string }[];
   // Salud
   inicio: string;
   numAsegurados: number | null;

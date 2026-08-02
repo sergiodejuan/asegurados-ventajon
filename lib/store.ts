@@ -109,6 +109,7 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
     "tipoVehiculo", "matricula", "marcaVehiculo", "modeloVehiculo", "anioVehiculo",
     "usoVehiculo", "antiguedadCarnet", "coberturaDeseada",
     "seguroActualImporte", "seguroActualPeriodo", "diaLlamada", "turnoLlamada",
+    "documentoTipo", "documento", "apellido1", "apellido2", "codigoPostalReal",
   ];
   for (const k of keys) {
     const dv = draft[k];
@@ -125,6 +126,9 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   // Servicios (array): si el nuevo trae datos y la ficha estaba vacía, se completa.
   if (draft.seguroActualServicios?.length && !lead.seguroActualServicios?.length) {
     lead.seguroActualServicios = draft.seguroActualServicios;
+  }
+  if (draft.aseguradosAdicionales?.length && !lead.aseguradosAdicionales?.length) {
+    lead.aseguradosAdicionales = draft.aseguradosAdicionales;
   }
   if (draft.aceptaPrivacidad) lead.aceptaPrivacidad = true;
   if (draft.autorizaContacto) lead.autorizaContacto = true;
@@ -186,6 +190,9 @@ export async function upsertLead(
     status: "nuevo", nextStep: "",
     agenteAsignadoId: "", agenteAsignadoNombre: "",
     nombre: draft.nombre ?? "", telefono: phone, email, codigoPostal: draft.codigoPostal ?? "",
+    documentoTipo: draft.documentoTipo ?? "", documento: draft.documento ?? "",
+    apellido1: draft.apellido1 ?? "", apellido2: draft.apellido2 ?? "",
+    codigoPostalReal: draft.codigoPostalReal ?? "", aseguradosAdicionales: draft.aseguradosAdicionales ?? [],
     inicio: draft.inicio ?? "", numAsegurados: draft.numAsegurados ?? null, coberturaDental: draft.coberturaDental ?? null,
     motivo: draft.motivo ?? "", fumador: draft.fumador ?? null,
     paraQuien: draft.paraQuien ?? "",

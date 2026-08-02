@@ -20,6 +20,19 @@ export type Step =
       groupB: { field: string; label: string; options: Option[] };
       showIf?: (d: FormData) => boolean;
     }
+  // Documento de identidad + código postal real del titular — preparación
+  // para la futura integración con Codescopic (ver lib/schema.ts). No se
+  // pide dirección completa, solo el CP.
+  | { type: "identificacion"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
+  // Tarjetas compactas (fecha de nacimiento + sexo) para cada asegurado
+  // adicional al titular — solo lo mínimo que pide Codescopic por persona en
+  // este primer contacto; el resto de sus datos se completan más adelante.
+  // `countField` apunta al campo con el nº total de personas (p.ej.
+  // "numAsegurados"): se muestran countField-1 tarjetas.
+  | {
+      type: "aseguradosExtra"; key: string; title: string; helper?: string; countField: string; phase: number;
+      showIf?: (d: FormData) => boolean;
+    }
   | { type: "contact"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean };
 
 export type FormData = Record<string, unknown>;
@@ -67,6 +80,18 @@ export const SALUD_CONFIG: FormConfig = {
     { type: "choice", key: "zona", field: "codigoPostal", phase: 0, title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "numbergrid", key: "asegurados", field: "numAsegurados", phase: 0, title: "¿Cuántas personas queréis aseguraros?", helper: "Cuéntalas incluyéndote a ti." },
     { type: "dobsex", key: "titular", phase: 1, title: "Datos de la persona titular", helper: "Solo la titular; a las demás las añadimos después." },
+    {
+      type: "identificacion", key: "identificacion", phase: 1,
+      title: "Identifícate para preparar tu contrato",
+      helper: "Lo necesitamos para tramitar tu póliza cuando la confirmes. No pedimos tu dirección, solo el código postal.",
+    },
+    { type: "yesno", key: "fumador", field: "fumador", phase: 1, title: "¿Fuma la persona titular?", helper: "Es un dato clave para calcular tu seguro de salud." },
+    {
+      type: "aseguradosExtra", key: "aseguradosExtra", phase: 1, countField: "numAsegurados",
+      title: "Datos de los demás asegurados",
+      helper: "Solo necesitamos su fecha de nacimiento y su sexo para ajustar el precio; el resto lo completamos más adelante.",
+      showIf: (d) => Number(d.numAsegurados) > 1,
+    },
     { type: "yesno", key: "dental", field: "coberturaDental", phase: 1, title: "¿Quieres que incluya cobertura dental?", helper: "Puedes cambiarlo luego con tu asesor." },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes un seguro de salud?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de salud actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_SALUD, showIf: (d) => d.yaTieneSeguro === true },

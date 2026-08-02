@@ -137,6 +137,13 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const next = () => { setErrors({}); setStepIndex((s) => Math.min(s + 1, total)); };
   const back = () => { setErrors({}); setSubmitError(null); setStepIndex((s) => Math.max(s - 1, 0)); };
 
+  type ExtraInsured = { dd?: string; mm?: string; aaaa?: string; sexo?: "hombre" | "mujer" };
+  function updateExtraInsured(i: number, patch: Partial<ExtraInsured>) {
+    const arr = [...(((data.aseguradosExtra as ExtraInsured[]) ?? []))];
+    arr[i] = { ...(arr[i] ?? {}), ...patch };
+    set({ aseguradosExtra: arr });
+  }
+
   function toggleConsent(key: "privacidadAt" | "contactoAt" | "comercialAt", field: string, checked: boolean) {
     set({ [field]: checked });
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
@@ -157,10 +164,21 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     return Object.keys(e).length === 0;
   }
 
+  function validateIdentificacion(): boolean {
+    const e: FieldErrors = {};
+    if (!data.documentoTipo) e.documentoTipo = "Selecciona el tipo de documento.";
+    const doc = String(data.documento ?? "").trim().toUpperCase();
+    if (!/^\d{8}[A-Z]$/.test(doc) && !/^[XYZ]\d{7}[A-Z]$/.test(doc)) e.documento = "Revisa el DNI o NIE (formato no válido).";
+    if (!/^\d{5}$/.test(String(data.codigoPostalReal ?? ""))) e.codigoPostalReal = "El código postal debe tener 5 dígitos.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function submit() {
     setSubmitError(null);
     const e: FieldErrors = {};
     if (!String(data.nombre ?? "").trim() || String(data.nombre).trim().length < 2) e.nombre = "Dinos tu nombre.";
+    if (variant === "salud" && (!String(data.apellido1 ?? "").trim() || String(data.apellido1).trim().length < 2)) e.apellido1 = "Dinos tu primer apellido.";
     if (!/^[6-9]\d{8}$/.test(normalizePhone(String(data.telefono ?? "")))) e.telefono = "Introduce un móvil español válido (9 dígitos).";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email ?? "").trim())) e.email = "Revisa tu correo electrónico.";
     if (!data.aceptaPrivacidad) e.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
@@ -171,7 +189,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       // el error en rojo explicamos brevemente por qué conviene marcarlo
       // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
       if (Object.keys(e).length === 1 && e.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["nombre", "telefono", "email", "aceptaPrivacidad", "autorizaContacto"].find((k) => e[k]);
+      const first = ["nombre", "apellido1", "telefono", "email", "aceptaPrivacidad", "autorizaContacto"].find((k) => e[k]);
       if (first) document.getElementById(`f-${first}`)?.focus();
       return;
     }
@@ -180,6 +198,9 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       ...data,
       fechaNacimiento: `${data.dd ?? ""}/${data.mm ?? ""}/${data.aaaa ?? ""}`,
       seguroActualServicios: (data.seguroActualServicios as string[]) ?? [],
+      aseguradosAdicionales: ((data.aseguradosExtra as ExtraInsured[]) ?? [])
+        .filter((a) => a.dd && a.mm && a.aaaa && a.sexo)
+        .map((a) => ({ fechaNacimiento: `${a.dd}/${a.mm}/${a.aaaa}`, sexo: a.sexo })),
       company: "",
       consent: consentTimes,
       utm: getAttribution(),
@@ -346,6 +367,81 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
             </form>
           </Shell>
         );
+      case "identificacion":
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (validateIdentificacion()) next(); }}>
+              <fieldset>
+                <legend className="mb-2 text-[14px] font-semibold text-ink">Tipo de documento</legend>
+                <div className="flex gap-3">
+                  {(["Dni", "Nie"] as const).map((t) => (
+                    <button key={t} type="button" aria-pressed={data.documentoTipo === t} onClick={() => set({ documentoTipo: t })}
+                      className={`flex-1 rounded-card border px-4 py-3.5 text-[15px] font-semibold uppercase transition-colors ${data.documentoTipo === t ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <FieldError id="err-documentoTipo" msg={errors.documentoTipo} />
+              </fieldset>
+              <div className="mt-4">
+                <Field id="f-documento" label="Número de documento" value={String(data.documento ?? "")}
+                  onChange={(v) => set({ documento: v.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 9) })}
+                  autoComplete="off" error={errors.documento} placeholder="12345678A…" />
+              </div>
+              <div className="mt-4">
+                <Field id="f-codigoPostalReal" label="Código postal" type="text" inputMode="numeric" value={String(data.codigoPostalReal ?? "")}
+                  onChange={(v) => set({ codigoPostalReal: v.replace(/\D/g, "").slice(0, 5) })}
+                  autoComplete="postal-code" error={errors.codigoPostalReal} placeholder="35001…" />
+              </div>
+              <PrimaryButton>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      case "aseguradosExtra": {
+        const count = Math.max(0, (Number(data[step.countField]) || 1) - 1);
+        const arr = (data.aseguradosExtra as ExtraInsured[]) ?? [];
+        const complete = Array.from({ length: count }, (_, i) => arr[i]).every(
+          (a) => !!a?.dd && a.dd.length === 2 && !!a?.mm && a.mm.length === 2 && !!a?.aaaa && a.aaaa.length === 4 && (a?.sexo === "hombre" || a?.sexo === "mujer")
+        );
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (complete) next(); }}>
+              <div className="flex flex-col gap-4">
+                {Array.from({ length: count }, (_, i) => i).map((i) => {
+                  const a = arr[i] ?? {};
+                  return (
+                    <div key={i} className="rounded-card border border-hair bg-mist/40 p-4">
+                      <p className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-navy">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy text-[12px] font-bold text-white">{i + 2}</span>
+                        Asegurado {i + 2}
+                      </p>
+                      <fieldset>
+                        <legend className="sr-only">Fecha de nacimiento del asegurado {i + 2}</legend>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1.5fr)] items-center gap-1 rounded-card border border-hair bg-white px-3 py-1">
+                          <Dob id={`f-extra-${i}-dd`} label="Día" placeholder="dd" max={2} value={String(a.dd ?? "")} onChange={(v) => updateExtraInsured(i, { dd: v })} />
+                          <span aria-hidden="true" className="px-0.5 text-slate2">/</span>
+                          <Dob id={`f-extra-${i}-mm`} label="Mes" placeholder="mm" max={2} value={String(a.mm ?? "")} onChange={(v) => updateExtraInsured(i, { mm: v })} />
+                          <span aria-hidden="true" className="px-0.5 text-slate2">/</span>
+                          <Dob id={`f-extra-${i}-aaaa`} label="Año" placeholder="aaaa" max={4} value={String(a.aaaa ?? "")} onChange={(v) => updateExtraInsured(i, { aaaa: v })} />
+                        </div>
+                      </fieldset>
+                      <div className="mt-2 flex gap-2">
+                        {(["hombre", "mujer"] as const).map((s) => (
+                          <button key={s} type="button" aria-pressed={a.sexo === s} onClick={() => updateExtraInsured(i, { sexo: s })}
+                            className={`flex-1 rounded-card border px-3 py-2.5 text-[14px] font-semibold capitalize transition-colors ${a.sexo === s ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <PrimaryButton disabled={!complete}>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      }
       case "dobsex":
         return (
           <Shell title={step.title} helper={step.helper}>
@@ -426,7 +522,16 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
                 <label htmlFor="f-company">No rellenar</label>
                 <input id="f-company" tabIndex={-1} autoComplete="off" onChange={() => {}} />
               </div>
-              <Field id="f-nombre" label="Nombre y apellidos" value={String(data.nombre ?? "")} onChange={(v) => set({ nombre: v })} autoComplete="name" error={errors.nombre} placeholder="María Pérez…" />
+              {/* El apellido separado solo se pide en salud, de cara a Codescopic (ver
+                  lib/schema.ts); el resto de tarificadores sigue pidiendo el nombre
+                  completo en un único campo, sin cambiar su formato de datos. */}
+              <Field id="f-nombre" label={variant === "salud" ? "Nombre" : "Nombre y apellidos"} value={String(data.nombre ?? "")} onChange={(v) => set({ nombre: v })} autoComplete={variant === "salud" ? "given-name" : "name"} error={errors.nombre} placeholder="María…" />
+              {variant === "salud" && (
+                <>
+                  <Field id="f-apellido1" label="Primer apellido" value={String(data.apellido1 ?? "")} onChange={(v) => set({ apellido1: v })} autoComplete="family-name" error={errors.apellido1} placeholder="Pérez…" />
+                  <Field id="f-apellido2" label="Segundo apellido (opcional)" value={String(data.apellido2 ?? "")} onChange={(v) => set({ apellido2: v })} autoComplete="additional-name" placeholder="García…" />
+                </>
+              )}
               <Field id="f-telefono" label="Teléfono móvil" type="tel" inputMode="tel" value={String(data.telefono ?? "")} onChange={(v) => set({ telefono: v })} autoComplete="tel" error={errors.telefono} placeholder="600 000 000…" />
               <Field id="f-email" label="Correo electrónico" type="email" inputMode="email" value={String(data.email ?? "")} onChange={(v) => set({ email: v })} autoComplete="email" spellCheck={false} autoCapitalize="none" error={errors.email} placeholder="maria@correo.com…" />
               <div className="mt-5 flex flex-col gap-3">

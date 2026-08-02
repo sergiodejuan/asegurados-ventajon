@@ -67,6 +67,41 @@ const dobField = z
     return y >= 1920 && y <= year - 17;
   }, "Revisa la fecha de nacimiento.");
 
+// Igual que dobField pero sin exigir mayoría de edad — para asegurados
+// adicionales (hijos, etc.), no solo el titular/contratante.
+const dobAnyAgeField = z
+  .string()
+  .regex(/^\d{2}\/\d{2}\/\d{4}$/, "Usa el formato dd/mm/aaaa.")
+  .refine((v) => {
+    const [d, m, y] = v.split("/").map(Number);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+    const year = new Date().getFullYear();
+    return y >= 1920 && y <= year;
+  }, "Revisa la fecha de nacimiento.");
+
+// Campos de identificación pensados para la futura integración con
+// Codescopic (ver payload de referencia): tipo + número de documento,
+// apellidos separados y código postal real. Sin validación de letra de
+// control (DNI/NIE): solo formato, la validación fuerte la hará Codescopic.
+const documentoTipoField = z.enum(["Dni", "Nie"], { errorMap: () => ({ message: "Selecciona el tipo de documento." }) });
+function normalizeDocumento(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
+}
+const documentoField = z
+  .string()
+  .transform(normalizeDocumento)
+  .refine((v) => /^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(v), { message: "Revisa el DNI o NIE (formato no válido)." });
+const codigoPostalRealField = z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos.");
+
+// Asegurados adicionales (más allá del titular): solo género y fecha de
+// nacimiento, recogidos de forma ligera dentro del propio tarificador — el
+// resto de datos de cada uno (documento, dirección…) se completan más
+// adelante, no en este primer contacto.
+const aseguradoAdicionalSchema = z.object({
+  fechaNacimiento: dobAnyAgeField,
+  sexo: z.enum(["hombre", "mujer"]),
+});
+
 // Seguro actual (opcional) para comparar / presupuestar.
 const importeField = z.preprocess(
   (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
@@ -87,10 +122,20 @@ export const leadSchema = z.object({
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
+  // Preparado para la futura integración con Codescopic: documento de
+  // identidad, código postal real (además de la "zona" ya existente) y si
+  // fuma, que su payload pide del titular y de cada asegurado.
+  documentoTipo: documentoTipoField,
+  documento: documentoField,
+  codigoPostalReal: codigoPostalRealField,
+  fumador: z.boolean(),
+  aseguradosAdicionales: z.array(aseguradoAdicionalSchema).max(8).optional().default([]),
   coberturaDental: z.boolean(),
   yaTieneSeguro: z.boolean(),
   ...seguroActual,
   nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  apellido1: z.string().trim().min(2, "Dinos tu primer apellido.").max(60),
+  apellido2: z.string().trim().max(60).optional().default(""),
   telefono: phoneField,
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
