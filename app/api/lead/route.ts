@@ -171,7 +171,10 @@ export async function POST(request: Request) {
   // email YA guardado en la ficha en vez de autenticar sin más.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
-  return NextResponse.json({ ok: true, id, deduped });
+  // Exponemos el presupuestoId para que /comparativa pueda pedirle
+  // cotizaciones reales a Codeoscopic (ver app/api/quote/create y
+  // components/Comparativa.tsx). Es solo un id, no revela datos.
+  return NextResponse.json({ ok: true, id, deduped, presupuestoId: presupuesto?.id ?? "" });
 }
 
 export function GET() {

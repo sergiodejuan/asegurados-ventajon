@@ -9,20 +9,30 @@ export const dynamic = "force-dynamic";
 type TestTarget = "codescopic" | "api-propia" | "webhook-saliente" | "webhook-retell" | "webhook-bland";
 
 async function testCodescopic(): Promise<{ ok: boolean; detail: string }> {
-  const baseUrl = process.env.CODESCOPIC_BASE_URL;
-  const missing = CODESCOPIC_ENV_VARS.map((v) => v.nombre).filter((name) => !process.env[name]);
+  // CODESCOPIC_USER_EMAIL es opcional (cabecera X-User-Email); no lo
+  // incluimos en la comprobación de "faltantes".
+  const REQUIRED = CODESCOPIC_ENV_VARS.map((v) => v.nombre).filter((n) => n !== "CODESCOPIC_USER_EMAIL");
+  const missing = REQUIRED.filter((name) => !process.env[name]);
   if (missing.length) {
-    return { ok: false, detail: `Faltan variables de entorno: ${missing.join(", ")}. Añádelas en cuanto tengas las credenciales de Codescopic.` };
+    return { ok: false, detail: `Faltan variables de entorno: ${missing.join(", ")}. Añádelas cuando las tengas de Codeoscopic.` };
   }
-  // No conocemos ningún endpoint de "health check" real de Codescopic (solo
-  // el payload de cotización de referencia que compartió Sergio) — esto solo
-  // comprueba que la URL configurada responde, no que la integración de
-  // cotización en sí funcione.
+
+  // Verificación real: pedimos un access_token con las credenciales
+  // configuradas y, si sale, hacemos una llamada ligera a /insurance-lines
+  // para confirmar que la cuenta tiene acceso al API. Si falla, devolvemos
+  // el detalle para que Sergio sepa exactamente qué corregir.
   try {
-    const res = await fetch(baseUrl!, { method: "HEAD", signal: AbortSignal.timeout(8000) });
-    return { ok: true, detail: `El host configurado en CODESCOPIC_BASE_URL respondió (HTTP ${res.status}). Esto solo confirma que se puede alcanzar la URL, no que la cotización real funcione — aún no hay documentación de sus endpoints de cotización.` };
+    const { codeoscopicFetch } = await import("@/lib/codeoscopic");
+    const lines = await codeoscopicFetch<unknown>("/insurance-lines");
+    const count = Array.isArray(lines) ? lines.length : Array.isArray((lines as { items?: unknown[] })?.items) ? (lines as { items: unknown[] }).items.length : null;
+    return {
+      ok: true,
+      detail: count != null
+        ? `OAuth OK y GET /insurance-lines devolvió ${count} líneas de seguro. La cuenta está operativa.`
+        : "OAuth OK y GET /insurance-lines respondió. La cuenta está operativa.",
+    };
   } catch (err) {
-    return { ok: false, detail: err instanceof Error ? `No se pudo conectar con CODESCOPIC_BASE_URL: ${err.message}` : "No se pudo conectar con CODESCOPIC_BASE_URL." };
+    return { ok: false, detail: err instanceof Error ? `No se pudo autenticar contra Codeoscopic: ${err.message}` : "No se pudo autenticar contra Codeoscopic." };
   }
 }
 

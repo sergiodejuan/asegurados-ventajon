@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
@@ -41,10 +41,28 @@ const COBERTURA_LABELS: Record<string, string> = {
   no_lo_tengo_claro: "Sin decidir",
 };
 
+// Precios REALES devueltos por Codeoscopic (motor Avant2). Sólo se pide el
+// snapshot para ramo salud (los otros aún no tienen mapper server-side, ver
+// lib/codeoscopicMap.ts). Si Codeoscopic no está configurado, el endpoint
+// responde { ok:false, reason:"not_configured" } y la comparativa se queda
+// con el catálogo mock — degradación silenciosa documentada.
+type RealQuote = {
+  id: string;
+  compania: string;
+  producto: string;
+  modalidad: string;
+  premium: number | null;
+  downPayment: number | null;
+  frequency: string;
+  estimate: boolean;
+};
+type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
+
 export function Comparativa() {
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
   const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
+  const presupuestoIdParam = searchParams.get("pid") ?? "";
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -55,6 +73,13 @@ export function Comparativa() {
   const [dental, setDental] = useState(false);
   const [fumador, setFumador] = useState(false);
   const [coberturaDeseada, setCoberturaDeseada] = useState("");
+  // Precios reales de Codeoscopic. Se pueblan al montar si producto=salud y
+  // hay ?pid=... en la URL. Fallback silencioso al catálogo mock si falta
+  // cualquier pieza (Codeoscopic no configurado, lead sin datos suficientes,
+  // etc.). Ver app/api/quote/create y app/api/quote/[insuranceId].
+  const [realQuotes, setRealQuotes] = useState<RealQuote[]>([]);
+  const [realStatus, setRealStatus] = useState<RealStatus>("idle");
+  const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
   useEffect(() => {
     const q = loadQuote();
@@ -75,6 +100,97 @@ export function Comparativa() {
       .then((body) => { if (body.ok) setProducts(body.products); })
       .catch(() => {});
   }, [producto]);
+
+  // Solicita cotizaciones reales a Codeoscopic + polling hasta que dejen de
+  // estar en estimate=true (o hasta un timeout de 90s: pasado ese tiempo,
+  // dejamos de martillear y mostramos lo que haya). Sólo salud por ahora.
+  useEffect(() => {
+    if (producto !== "salud" || !presupuestoIdParam) return;
+    const local: { stop: boolean } = { stop: false };
+    pollingRef.current = local;
+    setRealStatus("loading");
+
+    function parseSnapshot(snapshot: unknown): RealQuote[] {
+      if (!snapshot || typeof snapshot !== "object") return [];
+      const s = snapshot as { mainQuotes?: unknown[]; addonQuotes?: unknown[] };
+      const all = [...(s.mainQuotes ?? []), ...(s.addonQuotes ?? [])];
+      return all
+        .map((raw): RealQuote | null => {
+          if (!raw || typeof raw !== "object") return null;
+          const q = raw as {
+            id?: string;
+            product?: { name?: string; vendor?: { name?: string }; modality?: { name?: string; category?: { name?: string } } };
+            premium?: number;
+            downPayment?: number;
+            paymentFrequency?: { id?: string };
+            estimate?: boolean;
+          };
+          if (!q.id) return null;
+          const compania = q.product?.vendor?.name?.trim() || "";
+          const modalidad = q.product?.modality?.name?.trim() || "";
+          return {
+            id: q.id,
+            compania: compania || (q.product?.name ?? "Compañía"),
+            producto: q.product?.name?.trim() || "",
+            modalidad,
+            premium: typeof q.premium === "number" ? q.premium : null,
+            downPayment: typeof q.downPayment === "number" ? q.downPayment : null,
+            frequency: q.paymentFrequency?.id ?? "",
+            estimate: !!q.estimate,
+          };
+        })
+        .filter((q): q is RealQuote => q !== null);
+    }
+
+    (async () => {
+      try {
+        const createRes = await fetch("/api/quote/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ presupuestoId: presupuestoIdParam }),
+        });
+        const createBody = (await createRes.json().catch(() => null)) as
+          | { ok: true; insuranceId: string; snapshot: unknown }
+          | { ok: false; reason: string }
+          | null;
+        if (local.stop) return;
+        if (!createBody?.ok) {
+          setRealStatus(createBody?.reason === "not_configured" ? "unavailable" : "error");
+          return;
+        }
+        const initial = parseSnapshot(createBody.snapshot);
+        if (initial.length) setRealQuotes(initial);
+        // Si ya vinieron cerradas todas de golpe, no polleamos.
+        const alreadyDone = initial.length > 0 && initial.every((q) => !q.estimate && q.premium != null);
+        if (alreadyDone) { setRealStatus("done"); return; }
+
+        const insuranceId = createBody.insuranceId;
+        const started = Date.now();
+        const TIMEOUT_MS = 90_000;
+        const INTERVAL_MS = 4_000;
+        while (!local.stop && Date.now() - started < TIMEOUT_MS) {
+          await new Promise((r) => setTimeout(r, INTERVAL_MS));
+          if (local.stop) return;
+          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}`);
+          const pollBody = (await pollRes.json().catch(() => null)) as
+            | { ok: true; done: boolean; snapshot: unknown }
+            | { ok: false }
+            | null;
+          if (local.stop) return;
+          if (!pollBody?.ok) continue;
+          const parsed = parseSnapshot(pollBody.snapshot);
+          if (parsed.length) setRealQuotes(parsed);
+          if (pollBody.done) { setRealStatus("done"); return; }
+        }
+        setRealStatus("done"); // timeout: mostramos lo que haya llegado
+      } catch (err) {
+        console.error("[comparativa] Codeoscopic falló:", err);
+        if (!local.stop) setRealStatus("error");
+      }
+    })();
+
+    return () => { local.stop = true; };
+  }, [producto, presupuestoIdParam]);
 
   function saveEdits() {
     const next = updateQuote({
@@ -254,13 +370,43 @@ export function Comparativa() {
         )}
 
         <div className="mt-5 rounded-card border border-hair bg-mist p-4">
-          <p className="text-[13px] font-bold text-navy">Precios orientativos</p>
+          <p className="text-[13px] font-bold text-navy">
+            {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
+          </p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso.
+            {producto === "salud" && realStatus === "loading" && "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."}
+            {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && "Precios reales devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso."}
+            {(producto !== "salud" || realStatus === "unavailable" || realStatus === "error" || (realStatus !== "loading" && realQuotes.length === 0)) && "El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso."}
           </p>
         </div>
 
-        <ul className="mt-5 flex flex-col gap-3">
+        {producto === "salud" && realQuotes.length > 0 && (
+          <ul className="mt-5 flex flex-col gap-3">
+            {realQuotes.map((q) => (
+              <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-[16px] font-bold text-ink">{q.compania}</span>
+                    {(q.producto || q.modalidad) && (
+                      <span className="text-[12px] text-slate2">
+                        {[q.producto, q.modalidad].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-right text-[14px] text-slate2">
+                    {q.premium != null
+                      ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(q.premium)} €</span>/{q.frequency === "Monthly" ? "mes" : "año"}</>
+                      : <span className="text-[13px] italic text-slate2">Calculando…</span>}
+                  </p>
+                </div>
+                {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
+                {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} />}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <ul className={`mt-5 flex-col gap-3 ${producto === "salud" && realQuotes.length > 0 ? "hidden" : "flex"}`}>
           {producto !== "salud"
             ? products.map((c) => {
                 const price = producto === "auto"

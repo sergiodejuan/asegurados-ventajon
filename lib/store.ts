@@ -1056,6 +1056,22 @@ export async function createManualPresupuesto(input: {
 // Registra qué compañía y precio eligió realmente el cliente (al pedir que
 // le llamen sobre una compañía concreta desde la comparativa): se aplica al
 // presupuesto más reciente de ese lead para el mismo producto.
+// Guarda el id devuelto por Codeoscopic al crear el proyecto de seguros
+// (POST /insurances) en el propio presupuesto, para que el polling posterior
+// desde el frontend sepa a qué insurance mirar. Se guarda dentro de `data`
+// para no ampliar el tipo Presupuesto — es un dato específico de una
+// integración externa, no un campo estable del pipeline comercial.
+export async function setPresupuestoCodeoscopicInsurance(
+  presupuestoId: string,
+  insuranceId: string
+): Promise<void> {
+  const p = await jget<Presupuesto>(`presupuesto:${presupuestoId}`);
+  if (!p) return;
+  const data = { ...(p.data ?? {}), codeoscopicInsuranceId: insuranceId };
+  const now = new Date().toISOString();
+  await jset(`presupuesto:${presupuestoId}`, { ...p, data, updatedAt: now });
+}
+
 export async function setPresupuestoEleccion(
   leadId: string,
   producto: string,

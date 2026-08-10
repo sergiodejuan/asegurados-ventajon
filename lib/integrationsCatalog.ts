@@ -22,7 +22,7 @@ export type CodescopicFieldMap = {
 // Mapeo entre el payload de referencia que pasó Sergio (ramo Salud) y los
 // datos que el tarificador de salud ya recoge hoy.
 export const CODESCOPIC_FIELD_MAP: CodescopicFieldMap[] = [
-  { campoCodescopic: "insuranceLine.id", origenEnLaWeb: "fijo: \"salud\" (o el id que asigne Codescopic a esta línea)", estado: "pendiente", nota: "Falta el catálogo de insuranceLine.id de Codescopic para saber qué valor mandar." },
+  { campoCodescopic: "insuranceLine.id", origenEnLaWeb: "fijo: \"Health\"", estado: "listo" },
   { campoCodescopic: "effectiveDate", origenEnLaWeb: "campo \"inicio\" del tarificador (o fechaInicioPersonalizada)", estado: "listo" },
   { campoCodescopic: "holder.identificationDocument.type.id", origenEnLaWeb: "documentoTipo (\"Dni\" | \"Nie\")", estado: "listo" },
   { campoCodescopic: "holder.identificationDocument.id", origenEnLaWeb: "documento (DNI/NIE, formato validado)", estado: "listo" },
@@ -34,11 +34,11 @@ export const CODESCOPIC_FIELD_MAP: CodescopicFieldMap[] = [
   { campoCodescopic: "holder.smoker", origenEnLaWeb: "fumador (boolean)", estado: "listo" },
   { campoCodescopic: "holder.phones[].number", origenEnLaWeb: "telefono", estado: "listo" },
   { campoCodescopic: "holder.addresses[].postalCode", origenEnLaWeb: "codigoPostalReal (5 dígitos)", estado: "listo" },
-  { campoCodescopic: "holder.addresses[].town.id", origenEnLaWeb: "—", estado: "pendiente", nota: "Codescopic pide el id de su catálogo de municipios, no el código postal en sí. Falta ese catálogo (o un endpoint suyo de búsqueda por CP) para poder resolverlo." },
+  { campoCodescopic: "holder.addresses[].town.id", origenEnLaWeb: "codigoPostalReal (resuelto a id de municipio server-side)", estado: "listo", nota: "Resolver interno en lib/codeoscopicTowns.ts — llama a GET /towns?postalCode=… con caché in-memory. Si Codeoscopic devuelve varios municipios para el CP, se toma el primero (rural: se confirma después con el agente)." },
   { campoCodescopic: "risk.insureds[].birthDate", origenEnLaWeb: "aseguradosAdicionales[].fechaNacimiento", estado: "listo" },
   { campoCodescopic: "risk.insureds[].gender.id", origenEnLaWeb: "aseguradosAdicionales[].sexo", estado: "listo" },
   { campoCodescopic: "risk.insureds[].identificationDocument / smoker / addresses", origenEnLaWeb: "—", estado: "pendiente", nota: "A propósito no se piden en el tarificador (solo fecha de nacimiento y sexo, para no añadir fricción): se completarían en un segundo contacto, ya con el agente." },
-  { campoCodescopic: "autenticación (API key / OAuth / certificado…)", origenEnLaWeb: "—", estado: "pendiente", nota: "Codescopic aún no ha compartido su mecanismo de autenticación ni la URL base de su API." },
+  { campoCodescopic: "autenticación (OAuth2 client_credentials)", origenEnLaWeb: "cabeceras Bearer + Accept vnd.codeoscopic.v1 + X-Client-App", estado: "listo", nota: "Cliente en lib/codeoscopic.ts, caché de token en memoria por proceso." },
 ];
 
 // Variables de entorno previstas para cuando llegue esa documentación de
@@ -46,8 +46,12 @@ export const CODESCOPIC_FIELD_MAP: CodescopicFieldMap[] = [
 // ManyChat (ver lib/retell.ts, lib/bland.ts, lib/manychat.ts), a ajustar si
 // Codescopic exige otro esquema de autenticación.
 export const CODESCOPIC_ENV_VARS: { nombre: string; descripcion: string }[] = [
-  { nombre: "CODESCOPIC_BASE_URL", descripcion: "URL base de la API de Codescopic (p.ej. https://api.codescopic.com)." },
-  { nombre: "CODESCOPIC_API_KEY", descripcion: "Credencial de acceso (a confirmar si es API key, OAuth o certificado con la documentación real de Codescopic)." },
+  { nombre: "CODESCOPIC_BASE_URL", descripcion: "URL base de la API de Codeoscopic Integra (o de sandbox si Codeoscopic te dio una distinta). No incluye la /oauth: es solo el prefijo de /insurances, /towns, etc." },
+  { nombre: "CODESCOPIC_OAUTH_URL", descripcion: "URL completa del endpoint OAuth2 (grant_type=client_credentials). No está en la doc pública: se obtiene entrando en portal.api.codeoscopic.io con el botón GET TOKEN e inspeccionando la petición, o pidiéndola a soporteapi@codeoscopic.com." },
+  { nombre: "CODESCOPIC_CLIENT_ID", descripcion: "client_id emitido por Codeoscopic para la correduría." },
+  { nombre: "CODESCOPIC_CLIENT_SECRET", descripcion: "client_secret OAuth2. Sensible: solo en variables de entorno, nunca en el bundle del navegador ni en el tema editable." },
+  { nombre: "CODESCOPIC_APP_HEADER", descripcion: "Valor de la cabecera X-Client-App que Codeoscopic asigna a cada aplicación — identifica esta web ante las aseguradoras." },
+  { nombre: "CODESCOPIC_USER_EMAIL", descripcion: "(Opcional) X-User-Email para operar en nombre de un usuario/organización concreta de la jerarquía Avant2. Sin él, se opera como el propietario del client_id." },
 ];
 
 export const CODESCOPIC_PAYLOAD_SAMPLE = `{

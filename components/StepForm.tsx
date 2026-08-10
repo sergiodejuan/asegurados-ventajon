@@ -212,7 +212,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     try {
       const res = await fetch(config.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) {
-        const body = (await res.json().catch(() => null)) as { id?: string } | null;
+        const body = (await res.json().catch(() => null)) as { id?: string; presupuestoId?: string } | null;
         const quoteProfile = {
           id: body?.id ?? `local-${Date.now()}`,
           producto: variant,
@@ -245,7 +245,12 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
         saveClientProfile({ nombre: quoteProfile.nombre, telefono: quoteProfile.telefono, email: quoteProfile.email });
         try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
         pushDataLayerEvent("generate_lead", { producto: variant, form: "tarificador" });
-        pendingUrlRef.current = `/comparativa?producto=${variant}`;
+        // El pid deja rastro del presupuesto server-side para que /comparativa
+        // pueda pedir cotizaciones reales a Codeoscopic vía /api/quote/create.
+        // Sin pid (leads antiguos o Codeoscopic no configurado), la comparativa
+        // cae al catálogo mock — degradación silenciosa.
+        const pidParam = body?.presupuestoId ? `&pid=${encodeURIComponent(body.presupuestoId)}` : "";
+        pendingUrlRef.current = `/comparativa?producto=${variant}${pidParam}`;
         setFinalizing(true);
         return;
       }
