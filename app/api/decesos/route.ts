@@ -13,6 +13,7 @@ import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,6 +142,14 @@ export async function POST(request: Request) {
   // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, nombre: d.nombre, telefono: d.telefono, email: d.email,
+    producto: "decesos", codigoPostal: d.codigoPostal,
+    precioAprox: presupuesto?.precioAprox ?? null,
+    aceptaComercial: d.aceptaComercial,
+  }).catch((err) => console.error("[decesos] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 

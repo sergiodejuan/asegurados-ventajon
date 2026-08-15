@@ -1670,6 +1670,83 @@ export async function removePushSubscription(leadId: string, endpoint: string): 
   await jset(key, existing.filter((s) => s.endpoint !== endpoint));
 }
 
+/* -------------------- Suscripciones push del equipo (admin) -------------------- */
+// Además del canal cliente (por lead), cada agente del equipo puede activar
+// avisos push en su navegador para enterarse en tiempo real de un lead nuevo.
+// Los avisos son distintos: aquí siempre "algo entra al pipeline", allí
+// "hay novedad en tu ficha". Se guardan aparte para no cruzar suscripciones.
+
+export type StoredTeamPushSubscription = StoredPushSubscription & { agentId: string; savedAt: string };
+
+export async function saveTeamPushSubscription(agentId: string, sub: StoredPushSubscription): Promise<void> {
+  const key = `pushSubs:team:${agentId}`;
+  const existing = (await jget<StoredTeamPushSubscription[]>(key)) ?? [];
+  const now = new Date().toISOString();
+  const next: StoredTeamPushSubscription[] = [
+    { ...sub, agentId, savedAt: now },
+    ...existing.filter((s) => s.endpoint !== sub.endpoint),
+  ].slice(0, 10);
+  await jset(key, next);
+  // Índice de agentes con push activo (para poder listarlos en el fanout sin
+  // recorrer todas las claves KV).
+  const ids = new Set((await jget<string[]>("pushSubs:team:index")) ?? []);
+  ids.add(agentId);
+  await jset("pushSubs:team:index", Array.from(ids));
+}
+
+export async function listTeamPushSubscriptions(agentId: string): Promise<StoredTeamPushSubscription[]> {
+  return (await jget<StoredTeamPushSubscription[]>(`pushSubs:team:${agentId}`)) ?? [];
+}
+
+export async function listAllTeamPushSubscriptions(): Promise<StoredTeamPushSubscription[]> {
+  const ids = (await jget<string[]>("pushSubs:team:index")) ?? [];
+  if (!ids.length) return [];
+  const groups = await Promise.all(ids.map((id) => listTeamPushSubscriptions(id)));
+  return groups.flat();
+}
+
+export async function removeTeamPushSubscription(agentId: string, endpoint: string): Promise<void> {
+  const key = `pushSubs:team:${agentId}`;
+  const existing = (await jget<StoredTeamPushSubscription[]>(key)) ?? [];
+  const next = existing.filter((s) => s.endpoint !== endpoint);
+  await jset(key, next);
+  if (!next.length) {
+    const ids = ((await jget<string[]>("pushSubs:team:index")) ?? []).filter((id) => id !== agentId);
+    await jset("pushSubs:team:index", ids);
+  }
+}
+
+/* --------------------- Configuración de avisos al equipo --------------------- */
+
+const TEAM_NOTIFICATIONS_KEY = "config:team-notifications";
+
+export async function getTeamNotificationsConfig(): Promise<import("./teamNotifications").TeamNotificationsConfig> {
+  const { DEFAULT_TEAM_NOTIFICATIONS } = await import("./teamNotifications");
+  const stored = await jget<import("./teamNotifications").TeamNotificationsConfig>(TEAM_NOTIFICATIONS_KEY);
+  if (!stored) return DEFAULT_TEAM_NOTIFICATIONS;
+  return {
+    ...DEFAULT_TEAM_NOTIFICATIONS,
+    ...stored,
+    email: { ...DEFAULT_TEAM_NOTIFICATIONS.email, ...(stored.email ?? {}) },
+    push: { ...DEFAULT_TEAM_NOTIFICATIONS.push, ...(stored.push ?? {}) },
+  };
+}
+
+export async function saveTeamNotificationsConfig(
+  patch: Partial<import("./teamNotifications").TeamNotificationsConfig>
+): Promise<import("./teamNotifications").TeamNotificationsConfig> {
+  const current = await getTeamNotificationsConfig();
+  const next: import("./teamNotifications").TeamNotificationsConfig = {
+    ...current,
+    ...patch,
+    email: { ...current.email, ...(patch.email ?? {}) },
+    push: { ...current.push, ...(patch.push ?? {}) },
+    updatedAt: new Date().toISOString(),
+  };
+  await jset(TEAM_NOTIFICATIONS_KEY, next);
+  return next;
+}
+
 /* ---------------------------------- Tareas ------------------------------------ */
 
 export async function createTask(draft: TaskDraft): Promise<Task> {

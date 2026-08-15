@@ -7,6 +7,7 @@ import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,14 @@ export async function POST(request: Request) {
   // sesión al momento. Mismo criterio que /api/lead.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, nombre: d.nombre, telefono: d.telefono, email: d.email,
+    producto: d.producto, codigoPostal: d.codigoPostal,
+    precioAprox: d.precioActual,
+    aceptaComercial: d.aceptaComercial,
+    extraNote: `Igualación de precio · ${d.companiaActual} · ${d.precioActual} €/${d.periodicidad}`,
+  }).catch((err) => console.error("[price-match] notifyTeam error", err));
 
   return NextResponse.json({ ok: true, id, deduped });
 }

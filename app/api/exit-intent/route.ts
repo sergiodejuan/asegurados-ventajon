@@ -6,6 +6,7 @@ import { setClientSessionCookie } from "@/lib/clientSession";
 import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
   // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source: SOURCE, nombre: d.nombre, telefono: d.telefono,
+    producto: d.producto, codigoPostal: d.codigoPostal,
+    aceptaComercial: false,
+  }).catch((err) => console.error("[exit-intent] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 

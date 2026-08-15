@@ -13,6 +13,7 @@ import { ageFromDob } from "@/lib/quote";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -171,6 +172,13 @@ export async function POST(request: Request) {
   // email YA guardado en la ficha en vez de autenticar sin más.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, nombre: d.nombre, telefono: d.telefono, email: d.email,
+    producto: "salud", codigoPostal: d.codigoPostal,
+    precioAprox: presupuesto?.precioAprox ?? null,
+    aceptaComercial: d.aceptaComercial,
+  }).catch((err) => console.error("[lead] notifyTeam error", err));
   // Exponemos el presupuestoId para que /comparativa pueda pedirle
   // cotizaciones reales a Codeoscopic (ver app/api/quote/create y
   // components/Comparativa.tsx). Es solo un id, no revela datos.

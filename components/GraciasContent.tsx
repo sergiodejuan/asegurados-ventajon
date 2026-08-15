@@ -7,6 +7,7 @@ import { Check, IconByName, ArrowRight } from "./icons";
 import { BRAND_NAME } from "@/lib/brand";
 import { loadCallResult, type CallResult } from "@/lib/quote";
 import { getProductPage, quoteHref, type ProductSlug } from "@/lib/productPages";
+import { PriceMatchCrossSellBar } from "./PriceMatchCrossSellBar";
 
 // Segundo producto a sugerir según el que se acaba de pedir — pares
 // pensados por afinidad real (protección familiar, patrimonio), no al azar,
@@ -82,6 +83,10 @@ export function GraciasContent() {
           </a>
         </div>
       )}
+
+      <div className="mt-4">
+        <PriceMatchCrossSellBar producto={currentProducto} compact />
+      </div>
 
       <a
         href="/area-cliente"

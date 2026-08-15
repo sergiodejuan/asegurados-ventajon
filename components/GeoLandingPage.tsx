@@ -6,6 +6,7 @@ import { FaqAccordion } from "./FaqAccordion";
 import { Check, IconByName } from "./icons";
 import { PartnerBadge } from "./PartnerBadge";
 import { SocialProofBadge } from "./SocialProofBadge";
+import { PriceMatchCrossSellBar } from "./PriceMatchCrossSellBar";
 import { ECOSYSTEM_MEMBERS, PARTNERS, TRUST_STATS } from "@/lib/brand";
 import { getProductPage } from "@/lib/productPages";
 import type { GeoLandingPage as GeoLandingPageData } from "@/lib/geoLandingPages";
@@ -173,6 +174,11 @@ export async function GeoLandingPage({ geo }: { geo: GeoLandingPageData }) {
               <a href={base.ctaSecondary.href} className="flex items-center justify-center rounded-card border border-white/30 px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-white/10">Te llamamos gratis</a>
             </div>
           </div>
+        </section>
+
+        {/* CROSS-SELL PRECIO MEJOR */}
+        <section aria-label="Precio mejor garantizado" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
+          <PriceMatchCrossSellBar producto="salud" />
         </section>
 
         {/* SEO */}

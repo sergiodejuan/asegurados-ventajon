@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { PriceMatchLanding } from "@/components/landings/PriceMatchLanding";
 import { getPriceMatchLandingConfig, getTheme } from "@/lib/store";
-import { CALLER_NUMBERS } from "@/lib/brand";
-import { SITE_URL } from "@/lib/brand";
+import { BRAND_NAME, CALLER_NUMBERS, SITE_URL } from "@/lib/brand";
 
 // Landing "igualación de precio" — /precio-mejor-garantizado.
 // A diferencia de /lp/salud, esta va INDEXABLE por defecto (robots.index
@@ -35,11 +34,47 @@ export default async function PriceMatchLandingPage() {
     getTheme(),
   ]);
   const phone = CALLER_NUMBERS[0]?.number || "";
+  const url = `${SITE_URL}/precio-mejor-garantizado`;
+
+  const serviceJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: "Igualación de precio de seguros",
+    serviceType: "Correduría de seguros — estudio comparativo",
+    description: config.metaDescription,
+    provider: { "@type": "InsuranceAgency", name: BRAND_NAME, url: SITE_URL },
+    areaServed: { "@type": "Country", name: "España" },
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "EUR",
+      availability: "https://schema.org/InStock",
+      description: "Estudio gratuito y sin compromiso, respuesta en menos de 24 horas laborables.",
+    },
+    url,
+  };
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: config.faq.items.map((it) => ({
+      "@type": "Question",
+      name: it.q,
+      acceptedAnswer: { "@type": "Answer", text: it.a },
+    })),
+  };
+
   return (
-    <PriceMatchLanding
-      config={config}
-      logoUrl={theme.logoUrl || theme.minimalLogoUrl || ""}
-      phone={phone}
-    />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
+      {config.faq.items.length > 0 && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      )}
+      <PriceMatchLanding
+        config={config}
+        logoUrl={theme.logoUrl || theme.minimalLogoUrl || ""}
+        phone={phone}
+      />
+    </>
   );
 }

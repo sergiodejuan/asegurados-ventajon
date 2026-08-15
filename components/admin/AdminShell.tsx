@@ -89,6 +89,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
       { href: "/admin/configuracion/cookies", label: "Cookies", key: "cookies", modulo: "configuracion" },
       { href: "/admin/configuracion/analitica", label: "Seguimiento (GTM/GA4)", key: "analitica", modulo: "configuracion" },
       { href: "/admin/configuracion/accesibilidad", label: "Accesibilidad", key: "accesibilidad", modulo: "configuracion" },
+      { href: "/admin/configuracion/avisos", label: "Avisos al equipo", key: "avisos", modulo: "configuracion" },
       { href: "/admin/rgpd", label: "RGPD", key: "rgpd", modulo: "rgpd" },
     ],
   },
@@ -115,7 +116,7 @@ export type AdminActiveKey =
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
   | "integraciones" | "integraciones-codescopic" | "integraciones-api" | "integraciones-webhooks"
-  | "cookies" | "analitica" | "accesibilidad" | "rgpd" | "agentes" | "permisos" | "registro";
+  | "cookies" | "analitica" | "accesibilidad" | "avisos" | "rgpd" | "agentes" | "permisos" | "registro";
 
 function visibleFor(identity: Identity | null) {
   const canSee = (modulo: AdminModule) => !identity || identity.rol === "admin" || identity.permisos.includes(modulo);

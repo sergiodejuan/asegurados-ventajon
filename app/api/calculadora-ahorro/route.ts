@@ -7,6 +7,7 @@ import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { getSeoLandingPage, resolvePrice } from "@/lib/seoLandingPages";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,15 @@ export async function POST(request: Request) {
   // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, nombre: d.nombre, telefono: d.telefono,
+    producto: "salud",
+    precioAprox: precioEstimado,
+    aceptaComercial: false,
+    extraNote: ahorro != null ? `Ahorro estimado ${ahorro} €/mes` : undefined,
+  }).catch((err) => console.error("[calculadora-ahorro] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped, precioEstimado, ahorro });
 }
 

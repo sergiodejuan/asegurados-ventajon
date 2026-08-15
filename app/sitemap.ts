@@ -3,7 +3,7 @@ import { SITE_URL } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
 import { SEO_LANDING_PAGES } from "@/lib/seoLandingPages";
-import { listPosts, listPromotions, listTestimonios } from "@/lib/store";
+import { listPosts, listPromotions, listTestimonios, getPriceMatchLandingConfig } from "@/lib/store";
 
 // Las landings de captación SEO (/seguro-de-salud-las-palmas, .../barato…)
 // están hechas a propósito para no aparecer en el menú de navegación — se
@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await listPosts({ onlyPublished: true }).catch(() => []);
   const promotions = await listPromotions({ onlyPublished: true }).catch(() => []);
   const testimonios = await listTestimonios({ onlyPublished: true }).catch(() => []);
+  const priceMatch = await getPriceMatchLandingConfig().catch(() => null);
 
   const estaticas: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: "weekly", priority: 1 },
@@ -31,6 +32,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/tarificador-auto`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/tarificador-decesos`, changeFrequency: "monthly", priority: 0.6 },
   ];
+
+  if (priceMatch?.robotsIndex !== false) {
+    estaticas.push({ url: `${SITE_URL}/precio-mejor-garantizado`, changeFrequency: "weekly", priority: 0.8 });
+  }
 
   const productos: MetadataRoute.Sitemap = PRODUCT_PAGES.map((p) => ({
     url: `${SITE_URL}${p.path}`, changeFrequency: "monthly", priority: 0.8,

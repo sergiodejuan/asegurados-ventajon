@@ -11,6 +11,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +135,15 @@ export async function POST(request: Request) {
   // se concede sesión, lo cual es el comportamiento seguro por defecto.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, nombre: d.nombre ?? "(sin nombre)", telefono: d.telefono,
+    producto: d.producto ?? "salud", codigoPostal: d.codigoPostal,
+    precioAprox: d.precioElegido ?? null,
+    aceptaComercial: d.aceptaComercial,
+    extraNote: d.detalleConsulta,
+  }).catch((err) => console.error("[call-request] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 
