@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   await notifyTeamNewLead({
-    leadId: id, source: guia.source, nombre: d.nombre, email: d.email,
+    leadId: id, source: guia.source,
     aceptaComercial: d.aceptaComercial,
     extraNote: `Descargó "${guia.label}"`,
   }).catch((err) => console.error("[lead-magnet] notifyTeam error", err));

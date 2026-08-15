@@ -61,9 +61,7 @@ export async function POST(request: Request) {
   else setClientSessionCookie(id);
 
   await notifyTeamNewLead({
-    leadId: id, source: SOURCE, nombre: d.nombre, telefono: d.telefono,
-    producto: d.producto, codigoPostal: d.codigoPostal,
-    aceptaComercial: false,
+    leadId: id, source: SOURCE, aceptaComercial: false,
   }).catch((err) => console.error("[exit-intent] notifyTeam error", err));
 
   return NextResponse.json({ ok: true, id, deduped });

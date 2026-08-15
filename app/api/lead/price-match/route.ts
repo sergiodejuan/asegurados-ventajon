@@ -88,11 +88,7 @@ export async function POST(request: Request) {
   else setClientSessionCookie(id);
 
   await notifyTeamNewLead({
-    leadId: id, source, nombre: d.nombre, telefono: d.telefono, email: d.email,
-    producto: d.producto, codigoPostal: d.codigoPostal,
-    precioAprox: d.precioActual,
-    aceptaComercial: d.aceptaComercial,
-    extraNote: `Igualación de precio · ${d.companiaActual} · ${d.precioActual} €/${d.periodicidad}`,
+    leadId: id, source, aceptaComercial: d.aceptaComercial,
   }).catch((err) => console.error("[price-match] notifyTeam error", err));
 
   return NextResponse.json({ ok: true, id, deduped });

@@ -137,9 +137,7 @@ export async function POST(request: Request) {
   else setClientSessionCookie(id);
 
   await notifyTeamNewLead({
-    leadId: id, source, nombre: d.nombre ?? "(sin nombre)", telefono: d.telefono,
-    producto: d.producto ?? "salud", codigoPostal: d.codigoPostal,
-    precioAprox: d.precioElegido ?? null,
+    leadId: id, source, presupuestoId: d.presupuestoId,
     aceptaComercial: d.aceptaComercial,
     extraNote: d.detalleConsulta,
   }).catch((err) => console.error("[call-request] notifyTeam error", err));

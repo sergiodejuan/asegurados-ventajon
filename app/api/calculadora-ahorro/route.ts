@@ -71,10 +71,7 @@ export async function POST(request: Request) {
   else setClientSessionCookie(id);
 
   await notifyTeamNewLead({
-    leadId: id, source, nombre: d.nombre, telefono: d.telefono,
-    producto: "salud",
-    precioAprox: precioEstimado,
-    aceptaComercial: false,
+    leadId: id, source, aceptaComercial: false,
     extraNote: ahorro != null ? `Ahorro estimado ${ahorro} €/mes` : undefined,
   }).catch((err) => console.error("[calculadora-ahorro] notifyTeam error", err));
 
