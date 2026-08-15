@@ -82,10 +82,11 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
       <main id="contenido" className="mx-auto max-w-5xl px-4 pb-32 md:pb-16">
         {/* ---------------------- HERO ---------------------- */}
         {/* Un solo bloque centrado en todos los tamaños (como la referencia
-            de Línea Directa): texto arriba y imagen debajo, cero grid a dos
-            columnas. Botones a ancho completo en móvil para maximizar
-            área táctil y CTR — min-h 52px cumple accesibilidad WCAG. */}
-        <section className="pt-6 text-center md:pt-10">
+            de Línea Directa): título → precio → prueba social con estrellas
+            → imagen → CTAs debajo. Espacio holgado sobre el título para
+            que respire tras el navbar (pt-12/pt-16). Botones a ancho
+            completo con min-h 52px para cumplir área táctil WCAG. */}
+        <section className="pt-12 text-center md:pt-16">
           {config.hero.kicker && (
             <p className="text-[12px] font-bold uppercase tracking-wide text-brand-red">{config.hero.kicker}</p>
           )}
@@ -94,8 +95,33 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-[18px] font-bold text-ink md:text-[20px]">{config.hero.priceHighlight}</p>
           {config.hero.socialProof && (
-            <p className="mx-auto mt-2 max-w-2xl text-[14px] text-slate2">{config.hero.socialProof}</p>
+            <div className="mx-auto mt-3 flex max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1">
+              <span className="flex items-center gap-0.5 text-amber-400" aria-hidden="true">
+                <Star width={16} height={16} />
+                <Star width={16} height={16} />
+                <Star width={16} height={16} />
+                <Star width={16} height={16} />
+                {/* Media estrella: dos halves superpuestos en un contenedor
+                    de 16px de ancho para simular el fill parcial que se ve
+                    en la referencia (★★★★½). */}
+                <span className="relative inline-block h-4 w-4">
+                  <span className="absolute inset-0 text-slate-300"><Star width={16} height={16} /></span>
+                  <span className="absolute inset-0 overflow-hidden" style={{ width: "50%" }}><Star width={16} height={16} /></span>
+                </span>
+              </span>
+              <p className="text-[14px] text-slate2">{config.hero.socialProof}</p>
+            </div>
           )}
+          <div className="mx-auto mt-8 max-w-3xl">
+            {config.hero.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={config.hero.imageUrl} alt="" className="w-full rounded-[24px] object-cover" />
+            ) : (
+              <div className="grid aspect-[4/3] w-full place-items-center rounded-[24px] bg-mist text-[13px] font-semibold text-slate2">
+                Sube la imagen del hero desde /admin
+              </div>
+            )}
+          </div>
           <div className="mx-auto mt-6 flex max-w-md flex-col gap-3">
             <Link
               href={buildTarificadorHref(config)}
@@ -111,16 +137,6 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
             >
               {config.hero.ctaLlamarLabel}
             </button>
-          </div>
-          <div className="mx-auto mt-8 max-w-3xl">
-            {config.hero.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={config.hero.imageUrl} alt="" className="w-full rounded-[24px] object-cover" />
-            ) : (
-              <div className="grid aspect-[4/3] w-full place-items-center rounded-[24px] bg-mist text-[13px] font-semibold text-slate2">
-                Sube la imagen del hero desde /admin
-              </div>
-            )}
           </div>
         </section>
 
