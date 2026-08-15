@@ -288,21 +288,32 @@ export function PriceMatchLanding({ config, logoUrl, phone }: { config: PriceMat
       </main>
 
       {/* ---------------------- STICKY BOTTOM BAR ---------------------- */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 bg-brand-red shadow-[0_-16px_40px_-16px_rgba(200,49,42,0.55)] pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 md:gap-4 md:px-6 md:py-4">
+      {/* Mismo patrón visual que la home (rounded top + sombra hacia arriba)
+          y distribución al estilo Línea Directa: "Llámanos + teléfono" a la
+          izquierda + dos CTAs pill (outlined + filled) a la derecha. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-brand-red shadow-[0_-16px_40px_-16px_rgba(18,32,79,0.45)] pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:gap-6 md:px-8 md:py-4">
           <a href={phoneHref} onClick={() => trackCta("phone_bottom")}
-            className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-pill bg-white/15 px-3 text-[13px] font-bold text-white hover:bg-white/25 md:min-h-[52px] md:px-5 md:text-[15px]">
-            <Phone width={16} height={16} />
-            <span className="tnums">{phone}</span>
+            className="inline-flex shrink-0 items-center gap-2 text-white">
+            <span className="hidden flex-col text-left leading-tight md:flex">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-white/75">Llámanos</span>
+              <span className="text-[16px] font-extrabold tnums">{phone}</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[14px] font-extrabold md:hidden">
+              <Phone width={16} height={16} />
+              <span className="tnums">{phone}</span>
+            </span>
           </a>
-          <a href={phoneHref} onClick={() => trackCta("bottom_llamar")}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-pill border-2 border-white bg-transparent px-4 text-[14px] font-bold text-white hover:bg-white/10 md:min-h-[52px] md:text-[15px]">
-            Te llamamos gratis
-          </a>
-          <button type="button" onClick={() => openModal("bottom_enviar")}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-pill bg-white px-4 text-[14px] font-bold text-brand-red hover:bg-white/90 md:min-h-[52px] md:text-[15px]">
-            Envía tu precio
-          </button>
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            <a href={phoneHref} onClick={() => trackCta("bottom_llamar")}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-pill border-2 border-white bg-transparent px-3 text-[13px] font-bold text-white hover:bg-white/10 md:min-h-[48px] md:px-6 md:text-[14px]">
+              Te llamamos gratis
+            </a>
+            <button type="button" onClick={() => openModal("bottom_enviar")}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-pill bg-white px-3 text-[13px] font-bold text-brand-red hover:bg-white/90 md:min-h-[48px] md:px-6 md:text-[14px]">
+              Envía tu precio
+            </button>
+          </div>
         </div>
       </div>
 
