@@ -27,6 +27,12 @@ export const SOURCE_LABELS: Record<string, string> = {
   // CRM y la newsletter, pero sin la fricción de una llamada.
   "guia-seguro-salud-canarias-baleares": "Guía seguro de salud (Canarias/Baleares)",
   "checklist-seguro-auto-canarias-baleares": "Checklist seguro de auto (Canarias/Baleares)",
+  // Solicitud de "igualación de precio" desde /precio-mejor-garantizado o
+  // desde el módulo de rescate dentro de la comparativa. El lead trae el
+  // precio y compañía del presupuesto que el usuario ya tenía, para que el
+  // asesor le busque una alternativa igual o mejor.
+  "price-match": "Igualación de precio",
+  "price-match-comparativa": "Igualación de precio (desde comparativa)",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;
@@ -127,6 +133,18 @@ export type Lead = {
   // Presupuesto (tarificador) al que se vincula la solicitud, si procede
   // (p.ej. una reprogramación de llamada lanzada desde el área de cliente).
   presupuestoId: string;
+  // Solicitud de "igualación de precio" del flujo /precio-mejor-garantizado.
+  // El usuario aporta el precio y compañía de su presupuesto actual (o de
+  // otra oferta que le hicieron) para que el equipo comercial le busque una
+  // alternativa. La captura es opcional (data URI del PDF/imagen).
+  priceMatch: {
+    companiaActual: string;
+    precioActual: number | null;
+    periodicidad: string; // 'mes' | 'año'
+    capturaUrl: string; // data URI o URL externa; "" = sin captura
+    comentario: string;
+    solicitadoAt: string; // marca cuándo se envió la solicitud
+  } | null;
   // Consentimientos (estado actual + auditoría completa)
   aceptaPrivacidad: boolean;
   autorizaContacto: boolean;

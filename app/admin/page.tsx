@@ -34,6 +34,14 @@ type Lead = {
   fechaNacimiento: string; sexo: string; yaTieneSeguro: boolean | null;
   seguroActualImporte: number | null; seguroActualPeriodo: string; seguroActualServicios: string[];
   diaLlamada: string; turnoLlamada: string; presupuestoId: string;
+  priceMatch: {
+    companiaActual: string;
+    precioActual: number | null;
+    periodicidad: string;
+    capturaUrl: string;
+    comentario: string;
+    solicitadoAt: string;
+  } | null;
   aceptaPrivacidad: boolean; autorizaContacto: boolean; aceptaComercial: boolean;
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
@@ -358,6 +366,36 @@ function LeadsCrm() {
 
           {/* DERECHA (70%): paneles colapsables */}
           <div className="flex flex-col gap-4">
+            {l.priceMatch && (
+              <CollapsiblePanel title="Solicitud de igualación de precio">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                  <dt className="text-slate2">Compañía actual</dt>
+                  <dd className="text-right font-semibold text-ink">{l.priceMatch.companiaActual || "—"}</dd>
+                  <dt className="text-slate2">Precio actual</dt>
+                  <dd className="text-right font-semibold tnums text-ink">
+                    {l.priceMatch.precioActual != null ? `${l.priceMatch.precioActual.toFixed(2)} €/${l.priceMatch.periodicidad || "?"}` : "—"}
+                  </dd>
+                  <dt className="text-slate2">Solicitado</dt>
+                  <dd className="text-right text-slate2">{fmt(l.priceMatch.solicitadoAt)}</dd>
+                </dl>
+                {l.priceMatch.comentario && (
+                  <p className="mt-3 rounded-card border border-hair bg-mist/60 p-3 text-[13px] leading-relaxed text-ink">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate2">Comentario del cliente</span>
+                    {l.priceMatch.comentario}
+                  </p>
+                )}
+                {l.priceMatch.capturaUrl && (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate2">Captura del presupuesto</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <a href={l.priceMatch.capturaUrl} target="_blank" rel="noreferrer">
+                      <img src={l.priceMatch.capturaUrl} alt="Captura del presupuesto del cliente" className="max-h-64 w-auto rounded-card border border-hair" />
+                    </a>
+                  </div>
+                )}
+              </CollapsiblePanel>
+            )}
+
             <CollapsiblePanel title="Actividad">
               <ActivityPanel activity={l.activity} />
             </CollapsiblePanel>
@@ -492,7 +530,17 @@ function LeadsCrm() {
             <li key={l.id}>
               <button onClick={() => openLead(l.id)} className="flex w-full items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
                 <div className="min-w-0">
-                  <p className="truncate text-[15px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
+                  <p className="truncate text-[15px] font-semibold text-ink">
+                    {l.nombre || "Sin nombre"}
+                    {l.priceMatch && (
+                      <span
+                        title={`Iguala precio: ${l.priceMatch.precioActual ?? "?"} €/${l.priceMatch.periodicidad} en ${l.priceMatch.companiaActual}`}
+                        className="ml-1.5 inline-flex items-center rounded-pill bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-800"
+                      >
+                        Iguala precio
+                      </span>
+                    )}
+                  </p>
                   <p className="truncate text-[13px] text-slate2 tnums">
                     {[l.telefono || l.email, sources[l.source] ?? l.source, l.producto || null, l.agenteAsignadoNombre || null, fmt(l.updatedAt)].filter(Boolean).join(" · ")}
                   </p>

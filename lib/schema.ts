@@ -327,3 +327,46 @@ export const leadMagnetSchema = z.object({
   utm: utmField,
 });
 export type LeadMagnetInput = z.input<typeof leadMagnetSchema>;
+
+/* --------------------- Igualación de precio (price-match) ------------------ */
+// Formulario del flujo "¿ya tienes un precio? Te lo estudiamos". El usuario
+// llega con presupuesto de otra compañía (habitualmente su renovación) y
+// pide que le busquemos una alternativa igual o mejor. Se convierte en un
+// lead con source="price-match" y un bloque `priceMatch` con los datos
+// aportados — el equipo comercial trabaja el caso desde /admin.
+//
+// La captura (foto/PDF del presupuesto) es opcional pero muy útil para el
+// asesor: viene comprimida desde el cliente como data URI hasta 900KB
+// (mismo tope que resto del panel: ver components/admin/ImageField.tsx).
+const capturaPresupuestoField = z
+  .string()
+  .max(900_000, "El archivo es demasiado grande.")
+  .optional()
+  .default("");
+
+export const priceMatchSchema = z.object({
+  producto: z.enum(["salud", "vida", "auto", "decesos", "hogar"]),
+  companiaActual: z.string().trim().min(2, "Dinos qué compañía te lo ofrece.").max(120),
+  precioActual: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number().positive("Debe ser un importe positivo.").max(100000, "El importe parece demasiado alto.")
+  ),
+  periodicidad: z.enum(["mes", "año"]),
+  capturaUrl: capturaPresupuestoField,
+  nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  telefono: phoneField,
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
+  codigoPostal: zonaField,
+  // Contexto opcional: le sirve al asesor para dimensionar el caso (renovar
+  // caro, un asegurado con enfermedad preexistente...). Máx. 500 caracteres
+  // para que no se convierta en un chat.
+  comentario: z.string().trim().max(500).optional().default(""),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  aceptaComercial: z.boolean().default(false),
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+  turnstileToken: z.string().max(2000).optional().default(""),
+});
+export type PriceMatchInput = z.input<typeof priceMatchSchema>;

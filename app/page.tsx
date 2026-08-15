@@ -207,6 +207,22 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-6 md:mx-auto md:max-w-2xl"><CoverageTabs /></div>
+
+          {/* Cross-sell del flujo "igualación de precio" — enlace discreto
+              para el usuario que ya tiene presupuesto de otra compañía.
+              Es un canal de conversión distinto al del tarificador. */}
+          <div className="mt-8 md:mx-auto md:max-w-2xl">
+            <a href="/precio-mejor-garantizado"
+              className="flex items-center justify-between gap-3 rounded-[16px] border border-hair bg-mist/60 p-4 transition-colors hover:border-navy/40 hover:bg-mist">
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-navy">¿Ya tienes un precio?</p>
+                <p className="mt-0.5 text-[12px] leading-relaxed text-slate2">
+                  Envíanos tu presupuesto y estudiamos la mejor alternativa del mercado sin compromiso.
+                </p>
+              </div>
+              <span className="shrink-0 text-[13px] font-semibold text-navy">Enviar →</span>
+            </a>
+          </div>
         </section>
 
         {/* CONFIANZA + COMPAÑÍAS */}

@@ -139,7 +139,96 @@ function InformesAdmin() {
       </ReportSection>
 
       <CodeoscopicSection />
+      <PriceMatchSection />
     </main>
+  );
+}
+
+/* ---------------- Sección Igualación de precio (price-match) --------------- */
+type PriceMatchMetrics = {
+  totalSolicitudes: number;
+  precioMedioOfrecido: number | null;
+  topCompeticion: { compania: string; solicitudes: number; precioMedio: number | null }[];
+  cerrados: number;
+  ratioCierre: number;
+  ultimoSolicitadoAt: string;
+};
+
+function PriceMatchSection() {
+  const { token } = useAdminToken();
+  const [metrics, setMetrics] = useState<PriceMatchMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/informes/price-match", { headers: { "x-admin-token": token } });
+      const body = await res.json();
+      if (!res.ok || !body.ok) { setError(body.error ?? "No se pudo cargar."); setLoading(false); return; }
+      setMetrics(body.metrics);
+    } catch { setError("Error de conexión."); }
+    setLoading(false);
+  }
+
+  const eurMes = (n: number | null) => n == null ? "—" : `${n.toLocaleString("es-ES", { maximumFractionDigits: 0 })} €/mes`;
+
+  return (
+    <ReportSection title="Igualación de precio (rescate comercial)">
+      {!metrics && !loading && (
+        <div>
+          <p className="text-[13px] leading-relaxed text-slate2">
+            Solicitudes recibidas desde /precio-mejor-garantizado y desde el módulo de rescate en la comparativa.
+            Ranking de compañías competidoras y ratio de cierre.
+          </p>
+          <button type="button" onClick={load} className="mt-3 rounded-card border border-hair bg-white px-4 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+            Calcular métricas
+          </button>
+        </div>
+      )}
+      {loading && <p className="text-[13px] text-slate2">Calculando…</p>}
+      {error && <p role="alert" className="text-[13px] font-medium text-brand-red">{error}</p>}
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-navy">{metrics.totalSolicitudes}</p>
+              <p className="text-[11px] font-medium text-slate2">Solicitudes totales</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-navy">{metrics.cerrados}</p>
+              <p className="text-[11px] font-medium text-slate2">Cierres (con elección)</p>
+              <p className="mt-0.5 text-[11px] tnums text-slate2/80">{Math.round(metrics.ratioCierre * 1000) / 10}%</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-emerald-700">{eurMes(metrics.precioMedioOfrecido)}</p>
+              <p className="text-[11px] font-medium text-slate2">Precio medio traído por el cliente</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[13px] font-semibold tnums text-navy">
+                {metrics.ultimoSolicitadoAt ? new Date(metrics.ultimoSolicitadoAt).toLocaleDateString("es-ES") : "—"}
+              </p>
+              <p className="text-[11px] font-medium text-slate2">Última solicitud</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <h4 className="text-[13px] font-bold text-navy">Compañías competidoras más frecuentes</h4>
+            <div className="mt-2">
+              <BarList
+                items={metrics.topCompeticion.map((c) => ({ label: c.compania, value: c.solicitudes }))}
+                formatValue={(v, i) => {
+                  const c = metrics.topCompeticion[i];
+                  return `${v} solicitud${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                }}
+              />
+            </div>
+          </div>
+          <button type="button" onClick={load} className="mt-4 text-[12px] font-semibold text-navy underline">
+            Recalcular
+          </button>
+        </>
+      )}
+    </ReportSection>
   );
 }
 

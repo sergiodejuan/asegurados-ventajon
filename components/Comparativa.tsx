@@ -6,6 +6,7 @@ import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
+import { PriceMatchForm } from "./PriceMatchForm";
 import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import type { Product } from "@/lib/catalog";
@@ -85,6 +86,10 @@ export function Comparativa() {
   const [insuranceId, setInsuranceId] = useState("");
   // Modal de coberturas de una cotización concreta (Ver coberturas → detalle).
   const [coveragesFor, setCoveragesFor] = useState<RealQuote | null>(null);
+  // Modal de rescate "igualación de precio" — se ofrece al usuario que ya
+  // vio las cotizaciones (reales o mock) por si tiene un precio más bajo de
+  // otra fuente y quiere que se lo estudiemos.
+  const [priceMatchOpen, setPriceMatchOpen] = useState(false);
   const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
   useEffect(() => {
@@ -491,6 +496,60 @@ export function Comparativa() {
                 );
               })}
         </ul>
+
+        {/* Rescate "igualación de precio": bloque discreto pero visible
+            debajo de las cotizaciones. Objetivo — recuperar al usuario que
+            no se convence por precio y tiene otra oferta que quiere
+            estudiar. Genera un lead con source="price-match-comparativa"
+            para poder medir por separado la efectividad de este canal. */}
+        <div className="mt-6 rounded-[20px] border border-hair bg-mist/50 p-5">
+          <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold text-navy">¿Ya tienes un precio más bajo?</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-slate2">
+                Envíanoslo y estudiamos la mejor alternativa del mercado en menos de 24 h. Gratis y sin compromiso.
+              </p>
+            </div>
+            <button
+              type="button" onClick={() => setPriceMatchOpen(true)}
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-card border-2 border-navy bg-white px-5 text-[14px] font-semibold text-navy transition-colors hover:bg-mist"
+            >
+              Envíanos tu presupuesto →
+            </button>
+          </div>
+        </div>
+
+        {priceMatchOpen && (
+          <div
+            role="dialog" aria-modal="true" aria-label="Envíanos tu presupuesto"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
+            onClick={(e) => { if (e.currentTarget === e.target) setPriceMatchOpen(false); }}
+          >
+            <div className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+              <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-brand-red">Igualación de precio</p>
+                  <h3 className="text-[16px] font-extrabold text-navy">Envíanos tu presupuesto</h3>
+                </div>
+                <button type="button" onClick={() => setPriceMatchOpen(false)} aria-label="Cerrar"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 hover:bg-mist">
+                  ✕
+                </button>
+              </header>
+              <div className="max-h-[calc(90vh-72px)] overflow-y-auto p-5">
+                <p className="mb-3 text-[13px] leading-relaxed text-slate2">
+                  Un asesor humano estudia tu caso entre las principales aseguradoras del mercado y te responde en menos de 24 h.
+                </p>
+                <PriceMatchForm
+                  origen="comparativa"
+                  defaultProducto={producto as "salud" | "vida" | "auto" | "decesos"}
+                  onSuccess={() => setPriceMatchOpen(false)}
+                  redirectOnSuccess={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>

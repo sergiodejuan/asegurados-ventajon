@@ -18,6 +18,7 @@ import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./te
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { DEFAULT_PAID_LANDING_SALUD, type PaidLandingSaludConfig } from "./paidLandingSalud";
+import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -142,6 +143,9 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   // al último presupuesto referenciado (p.ej. una reprogramación de llamada),
   // no solo si la ficha estaba vacía.
   if (draft.presupuestoId) lead.presupuestoId = draft.presupuestoId;
+  // priceMatch: si el lead vuelve con nueva solicitud de igualación, guardamos
+  // la última (la más reciente es la que interesa al asesor).
+  if (draft.priceMatch) lead.priceMatch = draft.priceMatch;
   // Servicios (array): si el nuevo trae datos y la ficha estaba vacía, se completa.
   if (draft.seguroActualServicios?.length && !lead.seguroActualServicios?.length) {
     lead.seguroActualServicios = draft.seguroActualServicios;
@@ -226,6 +230,7 @@ export async function upsertLead(
     diaLlamada: draft.diaLlamada ?? "",
     turnoLlamada: draft.turnoLlamada ?? "",
     presupuestoId: draft.presupuestoId ?? "",
+    priceMatch: draft.priceMatch ?? null,
     aceptaPrivacidad: !!draft.aceptaPrivacidad, autorizaContacto: !!draft.autorizaContacto, aceptaComercial: !!draft.aceptaComercial,
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
@@ -954,6 +959,51 @@ export async function savePaidLandingSaludConfig(next: PaidLandingSaludConfig): 
   return stamped;
 }
 
+/* ---------------- Landing "igualación de precio" ---------------- */
+// Editable desde /admin/campanas/precio-mejor. Mismo criterio de merge que
+// paidLandingSalud: mantiene defaults por sub-sección para no romper la
+// landing si se guarda una config parcial.
+
+const PRICE_MATCH_KEY = "landing:price-match";
+
+export async function getPriceMatchLandingConfig(): Promise<PriceMatchLandingConfig> {
+  const stored = await jget<PriceMatchLandingConfig>(PRICE_MATCH_KEY);
+  if (!stored) return DEFAULT_PRICE_MATCH_LANDING;
+  return {
+    ...DEFAULT_PRICE_MATCH_LANDING,
+    ...stored,
+    hero: { ...DEFAULT_PRICE_MATCH_LANDING.hero, ...(stored.hero ?? {}) },
+    compromisoBadges: Array.isArray(stored.compromisoBadges) ? stored.compromisoBadges : DEFAULT_PRICE_MATCH_LANDING.compromisoBadges,
+    comoFunciona: {
+      ...DEFAULT_PRICE_MATCH_LANDING.comoFunciona,
+      ...(stored.comoFunciona ?? {}),
+      steps: Array.isArray(stored.comoFunciona?.steps) ? stored.comoFunciona!.steps : DEFAULT_PRICE_MATCH_LANDING.comoFunciona.steps,
+    },
+    socialProof: {
+      ...DEFAULT_PRICE_MATCH_LANDING.socialProof,
+      ...(stored.socialProof ?? {}),
+      testimonios: Array.isArray(stored.socialProof?.testimonios) ? stored.socialProof!.testimonios : DEFAULT_PRICE_MATCH_LANDING.socialProof.testimonios,
+    },
+    faq: {
+      ...DEFAULT_PRICE_MATCH_LANDING.faq,
+      ...(stored.faq ?? {}),
+      items: Array.isArray(stored.faq?.items) ? stored.faq!.items : DEFAULT_PRICE_MATCH_LANDING.faq.items,
+    },
+    footer: {
+      ...DEFAULT_PRICE_MATCH_LANDING.footer,
+      ...(stored.footer ?? {}),
+      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_PRICE_MATCH_LANDING.footer.enlaces,
+    },
+    utm: { ...DEFAULT_PRICE_MATCH_LANDING.utm, ...(stored.utm ?? {}) },
+  };
+}
+
+export async function savePriceMatchLandingConfig(next: PriceMatchLandingConfig): Promise<PriceMatchLandingConfig> {
+  const stamped: PriceMatchLandingConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(PRICE_MATCH_KEY, stamped);
+  return stamped;
+}
+
 /* ------------------------ Exit-intent de la web general --------------------- */
 
 const EXIT_INTENT_KEY = "exitintent:general";
@@ -1226,6 +1276,66 @@ export async function computeCodeoscopicMetrics(): Promise<CodeoscopicMetrics> {
     topCompanias,
     topElecciones,
     ultimoSnapshotAt,
+  };
+}
+
+/* ------------------- Métricas "igualación de precio" ---------------------- */
+// Escanea leads con priceMatch para /admin/informes. Devuelve total,
+// distribución por compañía competidora, precio medio ofrecido, ratio de
+// cierre (leads price-match con eleccion registrada).
+
+export type PriceMatchMetrics = {
+  totalSolicitudes: number;
+  precioMedioOfrecido: number | null;
+  topCompeticion: { compania: string; solicitudes: number; precioMedio: number | null }[];
+  cerrados: number; // leads price-match que acabaron con presupuesto.eleccion
+  ratioCierre: number; // 0-1
+  ultimoSolicitadoAt: string;
+};
+
+export async function computePriceMatchMetrics(): Promise<PriceMatchMetrics> {
+  const all = await listLeads();
+  const pmLeads = all.filter((l) => l.priceMatch);
+  const precios: number[] = [];
+  const byCompania = new Map<string, number[]>();
+  let ultimo = "";
+
+  for (const l of pmLeads) {
+    const pm = l.priceMatch!;
+    if (typeof pm.precioActual === "number") {
+      // Mensualizamos si viene anual para comparar en la misma escala.
+      const mensual = pm.periodicidad === "año" ? pm.precioActual / 12 : pm.precioActual;
+      precios.push(mensual);
+      const bucket = byCompania.get(pm.companiaActual || "—") ?? [];
+      bucket.push(mensual);
+      byCompania.set(pm.companiaActual || "—", bucket);
+    }
+    if (pm.solicitadoAt && pm.solicitadoAt > ultimo) ultimo = pm.solicitadoAt;
+  }
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  // Cierre: leads price-match cuyo presupuesto asociado tiene eleccion.
+  // Escaneamos presupuestos y cruzamos por leadId.
+  const allPresupuestos = await listPresupuestos();
+  const cerradosSet = new Set<string>();
+  const pmLeadIds = new Set(pmLeads.map((l) => l.id));
+  for (const p of allPresupuestos) {
+    if (pmLeadIds.has(p.leadId) && p.eleccion?.compania) cerradosSet.add(p.leadId);
+  }
+
+  const topCompeticion = Array.from(byCompania.entries())
+    .map(([compania, arr]) => ({ compania, solicitudes: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.solicitudes - a.solicitudes)
+    .slice(0, 10);
+
+  return {
+    totalSolicitudes: pmLeads.length,
+    precioMedioOfrecido: avg(precios),
+    topCompeticion,
+    cerrados: cerradosSet.size,
+    ratioCierre: pmLeads.length > 0 ? cerradosSet.size / pmLeads.length : 0,
+    ultimoSolicitadoAt: ultimo,
   };
 }
 
