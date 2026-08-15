@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     promotionSourceFromUtm(d.utm) ??
     (d.origen === "asistente" ? "tarificador-salud-widget"
     : d.origen === "seo-landing" ? "tarificador-salud-seo"
+    : d.origen === "lp-salud" ? "tarificador-salud-lp"
     : "tarificador-salud");
 
   // La página exacta de origen viaja en el Referer del navegador — útil para

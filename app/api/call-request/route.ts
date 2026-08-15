@@ -38,7 +38,9 @@ export async function POST(request: Request) {
   // página normal: se distingue en el source para poder medirlo aparte. Si
   // viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
   const source = promotionSourceFromUtm(d.utm) ??
-    (d.origen === "asistente" ? "quiero-que-me-llamen-widget" : "quiero-que-me-llamen");
+    (d.origen === "asistente" ? "quiero-que-me-llamen-widget"
+    : d.origen === "lp-salud" ? "quiero-que-me-llamen-lp"
+    : "quiero-que-me-llamen");
 
   const consent = buildConsent(request, source, "/quiero-que-me-llamen",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },

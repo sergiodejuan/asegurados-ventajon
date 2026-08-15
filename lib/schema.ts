@@ -55,7 +55,7 @@ const honeypot = z.string().max(0).optional().default("");
 // página, el widget asistente flotante, o el tarificador embebido en una
 // landing de captación SEO — para poder distinguirlo en el origen del lead
 // sin tocar la atribución de marketing real (utm).
-const origenField = z.enum(["web", "asistente", "seo-landing"]).optional().default("web");
+const origenField = z.enum(["web", "asistente", "seo-landing", "lp-salud"]).optional().default("web");
 
 const dobField = z
   .string()
@@ -237,7 +237,7 @@ export type AutoInput = z.input<typeof autoSchema>;
 export const callRequestSchema = z.object({
   nombre: z.string().trim().max(120).optional().default(""),
   telefono: phoneField,
-  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  codigoPostal: z.union([z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."), z.literal("")]).optional().default(""),
   producto: z.string().max(40).optional().default("salud"),
   compania: z.string().max(60).optional(),
   precioElegido: z.preprocess(

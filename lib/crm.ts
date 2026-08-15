@@ -33,6 +33,11 @@ export const SOURCE_LABELS: Record<string, string> = {
   // asesor le busque una alternativa igual o mejor.
   "price-match": "Igualación de precio",
   "price-match-comparativa": "Igualación de precio (desde comparativa)",
+  // Landing PAID de salud (/lp/salud). Al tener su propio tarificador y su
+  // propia página de "que me llamen" independientes, se miden aparte para
+  // saber el ROI real de las campañas de anuncios frente al tráfico orgánico.
+  "tarificador-salud-lp": "Tarificador salud (landing paid)",
+  "quiero-que-me-llamen-lp": "Quiero que me llamen (landing paid)",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;
