@@ -944,6 +944,13 @@ export async function getPaidLandingSaludConfig(): Promise<PaidLandingSaludConfi
       rows: Array.isArray(stored.comparativa?.rows) ? stored.comparativa!.rows : DEFAULT_PAID_LANDING_SALUD.comparativa.rows,
     },
     rating: { ...DEFAULT_PAID_LANDING_SALUD.rating, ...(stored.rating ?? {}) },
+    resenas: {
+      ...DEFAULT_PAID_LANDING_SALUD.resenas,
+      ...(stored.resenas ?? {}),
+      items: Array.isArray(stored.resenas?.items) && stored.resenas!.items.length > 0
+        ? stored.resenas!.items
+        : DEFAULT_PAID_LANDING_SALUD.resenas.items,
+    },
     footer: {
       ...DEFAULT_PAID_LANDING_SALUD.footer,
       ...(stored.footer ?? {}),

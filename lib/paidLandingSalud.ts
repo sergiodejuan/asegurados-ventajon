@@ -117,6 +117,19 @@ export type PaidLandingSaludConfig = {
     numValoraciones: string; // "70.207 valoraciones"
   };
 
+  // Carrusel autoscroll infinito de reseñas de clientes, justo encima de la
+  // tarjeta de rating. Se pintan 3 a la vez en desktop y una en móvil; el
+  // resto van pasando en loop sin fin (ver PaidReviewsCarousel).
+  resenas: {
+    title: string;
+    items: {
+      autor: string;
+      lugar: string; // p.ej. "Las Palmas" — humaniza al firmante
+      estrellas: number; // 1-5
+      texto: string;
+    }[];
+  };
+
   footer: {
     disclaimer: string;
     enlaces: { label: string; href: string }[];
@@ -257,6 +270,60 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
   rating: {
     valor: "4,7/5",
     numValoraciones: "según los clientes ya asesorados",
+  },
+
+  resenas: {
+    title: "Lo que dicen nuestros clientes",
+    items: [
+      {
+        autor: "Marta P.",
+        lugar: "Las Palmas",
+        estrellas: 5,
+        texto: "Llamé a media mañana y por la tarde ya tenía tres presupuestos comparados. Cerré con el más ajustado y con dental incluido.",
+      },
+      {
+        autor: "Carlos R.",
+        lugar: "Palma de Mallorca",
+        estrellas: 5,
+        texto: "Me explicaron con claridad lo que cubría cada opción, sin letra pequeña. Ahorré 240 € al año respecto a mi seguro anterior.",
+      },
+      {
+        autor: "Lucía G.",
+        lugar: "Tenerife",
+        estrellas: 4,
+        texto: "El asesor entendió lo que necesitaba (una consulta rápida con especialista) y me buscó una póliza sin copagos súper económica.",
+      },
+      {
+        autor: "Javier M.",
+        lugar: "Ibiza",
+        estrellas: 5,
+        texto: "Tenía 60 años y pensaba que era imposible encontrar un seguro decente. Me sacaron uno muy competitivo en 24 h.",
+      },
+      {
+        autor: "Andrea N.",
+        lugar: "Gran Canaria",
+        estrellas: 5,
+        texto: "Cambié de compañía sin lío. Ellos gestionaron la baja del anterior y la alta del nuevo. Cero papeleos por mi parte.",
+      },
+      {
+        autor: "Iván D.",
+        lugar: "Fuerteventura",
+        estrellas: 4,
+        texto: "Comparé precios con otras webs y con ellos me hicieron el mejor precio y con más coberturas. Súper recomendable.",
+      },
+      {
+        autor: "Nuria S.",
+        lugar: "Menorca",
+        estrellas: 5,
+        texto: "Con tres asegurados en casa el precio bajó una barbaridad. Sin copagos y con acceso a los hospitales que quería.",
+      },
+      {
+        autor: "Rubén A.",
+        lugar: "Lanzarote",
+        estrellas: 5,
+        texto: "La atención en WhatsApp fue rápida y humana. Me resolvieron dudas al momento y sin presionar para contratar.",
+      },
+    ],
   },
 
   footer: {

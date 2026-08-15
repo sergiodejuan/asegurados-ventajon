@@ -6,6 +6,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { type PaidLandingSaludConfig } from "@/lib/paidLandingSalud";
 import { IconByName, Phone, Check, Star, ChevronDown } from "@/components/icons";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
+import { PaidReviewsCarousel } from "@/components/landings/PaidReviewsCarousel";
 
 // Landing PAID de salud (/lp/salud). Réplica del layout de Línea Directa
 // Salud pero con paleta y voz de marca Asegurados Ventajon. Toda la copia,
@@ -370,9 +371,14 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           </div>
         </section>
 
+        {/* ---------------------- RESEÑAS (carrusel autoscroll) ---------------------- */}
+        {config.resenas?.items?.length > 0 && (
+          <PaidReviewsCarousel title={config.resenas.title} items={config.resenas.items} />
+        )}
+
         {/* ---------------------- RATING ---------------------- */}
         {(config.rating.valor || config.rating.numValoraciones) && (
-          <section className="mx-auto mt-16 max-w-6xl px-5 md:mt-24">
+          <section className="mx-auto mt-10 max-w-6xl px-5 md:mt-14">
             <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-[20px] bg-white p-6 text-center shadow-soft">
               <div className="flex items-center gap-0.5 text-amber-400">
                 {[0, 1, 2, 3, 4].map((i) => <Star key={i} width={20} height={20} />)}
