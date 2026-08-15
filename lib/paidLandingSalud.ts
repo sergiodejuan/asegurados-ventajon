@@ -18,6 +18,10 @@ export type PaidLandingProduct = {
   description: string;
   ctaLabel: string; // "Calcula tu seguro" | "Te llamamos gratis"
   ctaAction: "calcular" | "llamar";
+  // Imagen de fondo de la tarjeta (opcional). Cuando existe, se pinta como
+  // background con overlay oscuro y todo el texto en blanco — estilo de la
+  // referencia de Línea Directa. Sin imagen, se muestra card blanca clásica.
+  imageUrl: string;
 };
 
 export type PaidLandingComparativaRow = {
@@ -56,6 +60,11 @@ export type PaidLandingSaludConfig = {
   hero: {
     kicker: string;
     h1: string;
+    // Fragmento del H1 que se resalta en rojo (case-insensitive). Todo lo
+    // demás del H1 se pinta en navy. Por defecto "Seguro de Salud" para
+    // que "El Seguro de Salud para que tu salud no espere" quede como en
+    // la referencia de Línea Directa: la parte de producto en color marca.
+    h1Highlight: string;
     priceHighlight: string;
     socialProof: string;
     imageUrl: string;
@@ -138,6 +147,7 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
   hero: {
     kicker: "",
     h1: "El Seguro de Salud para que tu salud no espere",
+    h1Highlight: "Seguro de Salud",
     priceHighlight: "Desde 19,90 €/mes y sin copagos",
     socialProof: "Más de 350.000 personas ya comparan con nosotros",
     imageUrl: "",
@@ -193,6 +203,7 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
         description: "Acceso directo a consultas médicas y pruebas diagnósticas.",
         ctaLabel: "Calcula tu seguro",
         ctaAction: "calcular",
+        imageUrl: "",
       },
       {
         id: "completo",
@@ -202,6 +213,7 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
         description: "Acceso a urgencias, intervenciones quirúrgicas y tratamientos complejos.",
         ctaLabel: "Calcula tu seguro",
         ctaAction: "calcular",
+        imageUrl: "",
       },
       {
         id: "dental",
@@ -211,6 +223,7 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
         description: "Tu sonrisa en las mejores manos, a un precio muy económico.",
         ctaLabel: "Te llamamos gratis",
         ctaAction: "llamar",
+        imageUrl: "",
       },
     ],
   },

@@ -8,13 +8,31 @@ import { IconByName, Phone, Check, Star, ChevronDown } from "@/components/icons"
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { CallRequestForm } from "@/components/CallRequestForm";
 
+// Resalta en rojo el fragmento del H1 que coincide con `highlight`
+// (case-insensitive, primera coincidencia). El resto queda en navy. Sin
+// coincidencia, todo se pinta en navy — degradación silenciosa para no
+// romper si el admin cambia el H1 y se olvida del highlight.
+function highlightH1(h1: string, highlight: string) {
+  if (!highlight) return <span>{h1}</span>;
+  const idx = h1.toLowerCase().indexOf(highlight.toLowerCase());
+  if (idx < 0) return <span>{h1}</span>;
+  const before = h1.slice(0, idx);
+  const match = h1.slice(idx, idx + highlight.length);
+  const after = h1.slice(idx + highlight.length);
+  return (
+    <>
+      {before}<span className="text-brand-red">{match}</span>{after}
+    </>
+  );
+}
+
 // Landing PAID de salud (/lp/salud). Réplica del layout de la landing de
 // Línea Directa Salud pero con paleta y voz de marca Asegurados Ventajon.
 // Toda la copia, imágenes, precios, partners, beneficios y filas de la
 // comparativa vienen del store (config) — se editan sin desplegar desde
 // /admin/campanas/lp-salud.
 
-export function PaidLandingSalud({ config }: { config: PaidLandingSaludConfig }) {
+export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSaludConfig; logoUrl?: string }) {
   const [showAllRows, setShowAllRows] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
 
@@ -39,64 +57,70 @@ export function PaidLandingSalud({ config }: { config: PaidLandingSaludConfig })
 
   return (
     <div className="bg-white text-ink">
-      {/* Sticky top bar — teléfono comercial y CTA compactos */}
+      {/* Sticky top bar — logo de la marca (si hay) o wordmark textual, y
+          teléfono comercial visible siempre. Alto ampliado a 56px para que
+          el logo se vea a un tamaño usable y el táctil sea cómodo. */}
       <header className="sticky top-0 z-40 border-b border-hair bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
-          <span translate="no" className="font-display text-[14px] font-extrabold text-navy">{BRAND_NAME}</span>
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={BRAND_NAME} className="h-9 w-auto max-w-[170px] object-contain" />
+          ) : (
+            <span translate="no" className="font-display text-[15px] font-extrabold text-navy">{BRAND_NAME}</span>
+          )}
           <a
             href={phoneHref}
             onClick={() => trackCta("phone_top")}
-            className="inline-flex items-center gap-1.5 rounded-pill bg-brand-red px-3 py-1.5 text-[13px] font-bold text-white transition-colors hover:bg-brand-red-deep"
+            className="inline-flex items-center gap-1.5 rounded-pill bg-brand-red px-4 py-2 text-[14px] font-bold text-white transition-colors hover:bg-brand-red-deep"
           >
-            <Phone width={14} height={14} />
+            <Phone width={16} height={16} />
             <span className="tnums">{config.phone}</span>
           </a>
         </div>
       </header>
 
-      <main id="contenido" className="mx-auto max-w-5xl px-4 pb-28 md:pb-16">
+      <main id="contenido" className="mx-auto max-w-5xl px-4 pb-32 md:pb-16">
         {/* ---------------------- HERO ---------------------- */}
-        <section className="pt-6 md:pt-10">
-          <div className="grid gap-6 md:grid-cols-2 md:items-center md:gap-10">
-            <div>
-              {config.hero.kicker && (
-                <p className="text-[12px] font-bold uppercase tracking-wide text-brand-red">{config.hero.kicker}</p>
-              )}
-              <h1 className="mt-1 text-[28px] font-extrabold leading-[1.15] text-navy md:text-[40px]">
-                <span className="text-brand-red">El </span>
-                {config.hero.h1.replace(/^El\s+/i, "")}
-              </h1>
-              <p className="mt-4 text-[17px] font-bold text-ink md:text-[19px]">{config.hero.priceHighlight}</p>
-              {config.hero.socialProof && (
-                <p className="mt-2 text-[14px] text-slate2">{config.hero.socialProof}</p>
-              )}
-              <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-                <Link
-                  href={buildTarificadorHref(config)}
-                  onClick={() => trackCta("hero_calcular")}
-                  className="inline-flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:min-w-[220px]"
-                >
-                  {config.hero.ctaCalcularLabel}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => openCall("salud")}
-                  className="inline-flex items-center justify-center rounded-card border-2 border-navy px-5 py-3.5 text-[15px] font-semibold text-navy transition-colors hover:bg-mist sm:min-w-[220px]"
-                >
-                  {config.hero.ctaLlamarLabel}
-                </button>
+        {/* Un solo bloque centrado en todos los tamaños (como la referencia
+            de Línea Directa): texto arriba y imagen debajo, cero grid a dos
+            columnas. Botones a ancho completo en móvil para maximizar
+            área táctil y CTR — min-h 52px cumple accesibilidad WCAG. */}
+        <section className="pt-6 text-center md:pt-10">
+          {config.hero.kicker && (
+            <p className="text-[12px] font-bold uppercase tracking-wide text-brand-red">{config.hero.kicker}</p>
+          )}
+          <h1 className="mx-auto mt-1 max-w-3xl text-[30px] font-extrabold leading-[1.15] text-navy md:text-[44px]">
+            {highlightH1(config.hero.h1, config.hero.h1Highlight)}
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-[18px] font-bold text-ink md:text-[20px]">{config.hero.priceHighlight}</p>
+          {config.hero.socialProof && (
+            <p className="mx-auto mt-2 max-w-2xl text-[14px] text-slate2">{config.hero.socialProof}</p>
+          )}
+          <div className="mx-auto mt-6 flex max-w-md flex-col gap-3">
+            <Link
+              href={buildTarificadorHref(config)}
+              onClick={() => trackCta("hero_calcular")}
+              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-card bg-brand-red px-6 text-[16px] font-semibold text-white shadow-soft transition-colors hover:bg-brand-red-deep"
+            >
+              {config.hero.ctaCalcularLabel}
+            </Link>
+            <button
+              type="button"
+              onClick={() => openCall("salud")}
+              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-card border-2 border-navy bg-white px-6 text-[16px] font-semibold text-navy transition-colors hover:bg-mist"
+            >
+              {config.hero.ctaLlamarLabel}
+            </button>
+          </div>
+          <div className="mx-auto mt-8 max-w-3xl">
+            {config.hero.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={config.hero.imageUrl} alt="" className="w-full rounded-[24px] object-cover" />
+            ) : (
+              <div className="grid aspect-[4/3] w-full place-items-center rounded-[24px] bg-mist text-[13px] font-semibold text-slate2">
+                Sube la imagen del hero desde /admin
               </div>
-            </div>
-            <div>
-              {config.hero.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={config.hero.imageUrl} alt="" className="w-full rounded-[24px] object-cover" />
-              ) : (
-                <div className="grid aspect-[4/3] w-full place-items-center rounded-[24px] bg-mist text-[13px] font-semibold text-slate2">
-                  Sube la imagen del hero desde /admin
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </section>
 
@@ -152,34 +176,32 @@ export function PaidLandingSalud({ config }: { config: PaidLandingSaludConfig })
         </section>
 
         {/* ---------------------- BANNER INTERMEDIO ---------------------- */}
+        {/* Banner navy centrado (como la referencia). Si hay imagen configurada,
+            se usa como background con overlay oscuro para mantener legibilidad
+            del texto blanco; sin imagen, fondo navy plano. */}
         <section className="mt-14 md:mt-20">
-          <div className="overflow-hidden rounded-[24px] border border-hair bg-navy text-white">
-            <div className="grid gap-0 md:grid-cols-[1fr_1.1fr]">
-              <div className="p-6 md:p-10">
-                <h2 className="text-[22px] font-extrabold md:text-[28px]">{config.bannerIntermedio.title}</h2>
-                {config.bannerIntermedio.subtitle && (
-                  <p className="mt-3 text-[15px] leading-relaxed text-white/85">{config.bannerIntermedio.subtitle}</p>
-                )}
-                <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-                  <Link href={buildTarificadorHref(config)} onClick={() => trackCta("banner_calcular")}
-                    className="inline-flex items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[15px] font-semibold text-white sm:min-w-[200px]">
-                    {config.hero.ctaCalcularLabel}
-                  </Link>
-                  <button type="button" onClick={() => openCall()}
-                    className="inline-flex items-center justify-center rounded-card border-2 border-white px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-white/10 sm:min-w-[200px]">
-                    {config.hero.ctaLlamarLabel}
-                  </button>
-                </div>
-              </div>
-              <div className="min-h-[220px] bg-navy-deep">
-                {config.bannerIntermedio.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={config.bannerIntermedio.imageUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="grid h-full min-h-[220px] w-full place-items-center text-[12px] text-white/60">
-                    Sube la imagen del banner desde /admin
-                  </div>
-                )}
+          <div
+            className="relative overflow-hidden rounded-[24px] bg-navy text-center text-white"
+            style={config.bannerIntermedio.imageUrl ? {
+              backgroundImage: `linear-gradient(rgba(13,21,58,0.82), rgba(13,21,58,0.82)), url("${config.bannerIntermedio.imageUrl}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            } : undefined}
+          >
+            <div className="mx-auto max-w-2xl px-6 py-12 md:px-10 md:py-16">
+              <h2 className="text-[24px] font-extrabold leading-tight md:text-[32px]">{config.bannerIntermedio.title}</h2>
+              {config.bannerIntermedio.subtitle && (
+                <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-white/85 md:text-[16px]">{config.bannerIntermedio.subtitle}</p>
+              )}
+              <div className="mx-auto mt-6 flex max-w-md flex-col gap-3">
+                <Link href={buildTarificadorHref(config)} onClick={() => trackCta("banner_calcular")}
+                  className="inline-flex min-h-[52px] w-full items-center justify-center rounded-card bg-brand-red px-6 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+                  {config.hero.ctaCalcularLabel}
+                </Link>
+                <button type="button" onClick={() => openCall()}
+                  className="inline-flex min-h-[52px] w-full items-center justify-center rounded-card border-2 border-white bg-transparent px-6 text-[16px] font-semibold text-white transition-colors hover:bg-white/10">
+                  {config.hero.ctaLlamarLabel}
+                </button>
               </div>
             </div>
           </div>
@@ -194,27 +216,44 @@ export function PaidLandingSalud({ config }: { config: PaidLandingSaludConfig })
             </p>
           )}
           <ul className="mt-8 grid gap-4 md:grid-cols-3">
-            {config.productos.items.map((p) => (
-              <li key={p.id} className="flex flex-col rounded-[20px] border border-hair bg-white p-6 shadow-soft">
-                <h3 className="text-[19px] font-extrabold text-navy">{p.title}</h3>
-                <p className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-slate2">{p.priceLabel}</p>
-                <p className="mt-0.5 text-[22px] font-extrabold tnums text-brand-red">{p.price}</p>
-                <p className="mt-3 text-[14px] leading-relaxed text-ink">{p.description}</p>
-                <div className="mt-5">
-                  {p.ctaAction === "calcular" ? (
-                    <Link href={buildTarificadorHref(config, p.id)} onClick={() => trackCta("producto_calcular", p.id)}
-                      className="inline-flex w-full items-center justify-center rounded-card bg-brand-red px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
-                      {p.ctaLabel}
-                    </Link>
-                  ) : (
-                    <button type="button" onClick={() => openCall(p.id)}
-                      className="inline-flex w-full items-center justify-center rounded-card border-2 border-navy px-5 py-3 text-[14px] font-semibold text-navy transition-colors hover:bg-mist">
-                      {p.ctaLabel}
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+            {config.productos.items.map((p) => {
+              const hasBg = !!p.imageUrl;
+              // Con imagen de fondo (estilo referencia LD): tarjeta oscura con
+              // background image + gradiente sólido para legibilidad. Todo el
+              // texto en blanco, precio en rojo para máximo contraste. Sin
+              // imagen, fallback a la tarjeta blanca clásica.
+              return (
+                <li
+                  key={p.id}
+                  className={`flex min-h-[380px] flex-col overflow-hidden rounded-[20px] ${hasBg ? "text-white" : "border border-hair bg-white shadow-soft"}`}
+                  style={hasBg ? {
+                    backgroundImage: `linear-gradient(180deg, rgba(13,21,58,0.25) 0%, rgba(13,21,58,0.65) 55%, rgba(13,21,58,0.92) 100%), url("${p.imageUrl}")`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  } : undefined}
+                >
+                  <div className={`mt-auto flex flex-col p-6 ${hasBg ? "" : ""}`}>
+                    <h3 className={`text-[22px] font-extrabold ${hasBg ? "text-white" : "text-navy"}`}>{p.title}</h3>
+                    <p className={`mt-2 text-[12px] font-semibold uppercase tracking-wide ${hasBg ? "text-white/80" : "text-slate2"}`}>{p.priceLabel}</p>
+                    <p className={`mt-0.5 text-[22px] font-extrabold tnums ${hasBg ? "text-white" : "text-brand-red"}`}>{p.price}</p>
+                    <p className={`mt-3 text-[14px] leading-relaxed ${hasBg ? "text-white/90" : "text-ink"}`}>{p.description}</p>
+                    <div className="mt-5">
+                      {p.ctaAction === "calcular" ? (
+                        <Link href={buildTarificadorHref(config, p.id)} onClick={() => trackCta("producto_calcular", p.id)}
+                          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-card bg-brand-red px-5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+                          {p.ctaLabel}
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={() => openCall(p.id)}
+                          className={`inline-flex min-h-[48px] w-full items-center justify-center rounded-card border-2 px-5 text-[15px] font-semibold transition-colors ${hasBg ? "border-white bg-transparent text-white hover:bg-white/10" : "border-navy bg-white text-navy hover:bg-mist"}`}>
+                          {p.ctaLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
 
@@ -338,16 +377,19 @@ export function PaidLandingSalud({ config }: { config: PaidLandingSaludConfig })
         </footer>
       </main>
 
-      {/* Sticky bottom bar en móvil — teléfono + CTA principal siempre visibles. */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-hair bg-white p-3 md:hidden">
+      {/* Sticky bottom bar en móvil — teléfono + CTA principal siempre
+          visibles. Botones a 48px min height (WCAG), tipografía 14/15px
+          para máxima legibilidad. Safe-area por dentro para no chocar con
+          la home indicator en iPhone. */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-hair bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+12px)] md:hidden">
         <div className="mx-auto flex max-w-5xl items-center gap-2">
           <a href={phoneHref} onClick={() => trackCta("phone_bottom")}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-card border border-hair bg-white px-3 py-3 text-[13px] font-bold text-navy">
+            className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-card border border-hair bg-white px-3 text-[14px] font-bold text-navy">
             <Phone width={16} height={16} />
             <span className="tnums">{config.phone}</span>
           </a>
           <Link href={buildTarificadorHref(config)} onClick={() => trackCta("bottom_calcular")}
-            className="inline-flex flex-1 items-center justify-center rounded-card bg-brand-red px-4 py-3 text-[14px] font-semibold text-white">
+            className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-card bg-brand-red px-4 text-[15px] font-semibold text-white shadow-soft">
             {config.hero.ctaCalcularLabel}
           </Link>
         </div>

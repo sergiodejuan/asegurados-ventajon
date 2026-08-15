@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PaidLandingSalud } from "@/components/landings/PaidLandingSalud";
-import { getPaidLandingSaludConfig } from "@/lib/store";
+import { getPaidLandingSaludConfig, getTheme } from "@/lib/store";
 
 // Landing PAID de salud. Servida solo a tráfico de anuncios (Google/Meta):
 // robots noindex/nofollow para no canibalizar el orgánico de /seguro-de-salud
@@ -31,6 +31,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LpSaludPage() {
-  const config = await getPaidLandingSaludConfig();
-  return <PaidLandingSalud config={config} />;
+  // Cargamos config + logo del tema en paralelo. El logo lo edita el
+  // equipo desde /admin/diseno/logos igual que el del resto de la web —
+  // así la landing usa siempre la marca visual actual sin depender de
+  // subir el logo aparte para esta ruta.
+  const [config, theme] = await Promise.all([
+    getPaidLandingSaludConfig(),
+    getTheme(),
+  ]);
+  return <PaidLandingSalud config={config} logoUrl={theme.logoUrl || theme.minimalLogoUrl || ""} />;
 }

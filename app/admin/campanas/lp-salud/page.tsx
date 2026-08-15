@@ -120,6 +120,11 @@ function Editor() {
       <Section title="Hero (arriba del todo)">
         <Field label="Kicker (opcional)" value={config.hero.kicker} onChange={(v) => patchHero({ kicker: v })} />
         <Field label="Titular (H1)" value={config.hero.h1} onChange={(v) => patchHero({ h1: v })} />
+        <Field
+          label={`Resaltar en rojo dentro del H1 (por defecto "Seguro de Salud")`}
+          value={config.hero.h1Highlight}
+          onChange={(v) => patchHero({ h1Highlight: v })}
+        />
         <Field label="Precio destacado" value={config.hero.priceHighlight} onChange={(v) => patchHero({ priceHighlight: v })} />
         <Field label="Frase de prueba social" value={config.hero.socialProof} onChange={(v) => patchHero({ socialProof: v })} />
         <ImageOrUrlField label="Imagen del hero" value={config.hero.imageUrl} onChange={(v) => patchHero({ imageUrl: v })} preview="h-24 w-32" />
@@ -127,6 +132,9 @@ function Editor() {
           <Field label="Texto CTA calcular" value={config.hero.ctaCalcularLabel} onChange={(v) => patchHero({ ctaCalcularLabel: v })} />
           <Field label="Texto CTA llamar" value={config.hero.ctaLlamarLabel} onChange={(v) => patchHero({ ctaLlamarLabel: v })} />
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate2">
+          El logo del navbar se toma automáticamente de <a className="underline" href="/admin/diseno/logos">Diseño → Logos</a>.
+        </p>
       </Section>
 
       {/* ---------------------- Partners / hospitales ---------------------- */}
@@ -229,6 +237,12 @@ function Editor() {
                 </label>
               </div>
               <FieldCompact label="Descripción" value={p.description} onChange={(v) => updateProducto(i, { description: v })} textarea />
+              <ImageOrUrlField
+                label="Imagen de fondo de la tarjeta (opcional)"
+                value={p.imageUrl}
+                onChange={(v) => updateProducto(i, { imageUrl: v })}
+                preview="h-16 w-24"
+              />
               {p.ctaAction === "calcular" && (
                 <p className="mt-2 break-all text-[11px] text-slate2">
                   URL final del botón: <code className="rounded bg-mist px-1 py-0.5">{buildTarificadorHref(config, p.id)}</code>
@@ -236,7 +250,7 @@ function Editor() {
               )}
             </div>
           ))}
-          <button type="button" onClick={() => setConfig((c) => ({ ...c, productos: { ...c.productos, items: [...c.productos.items, { id: `producto-${c.productos.items.length + 1}`, title: "", priceLabel: "Desde", price: "", description: "", ctaLabel: "Calcula tu seguro", ctaAction: "calcular" } as PaidLandingProduct] } }))}
+          <button type="button" onClick={() => setConfig((c) => ({ ...c, productos: { ...c.productos, items: [...c.productos.items, { id: `producto-${c.productos.items.length + 1}`, title: "", priceLabel: "Desde", price: "", description: "", ctaLabel: "Calcula tu seguro", ctaAction: "calcular", imageUrl: "" } as PaidLandingProduct] } }))}
             className="rounded-card border border-hair px-3 py-1.5 text-[12px] font-semibold text-navy hover:bg-mist">
             + Añadir tarjeta de producto
           </button>
