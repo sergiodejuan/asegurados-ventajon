@@ -114,6 +114,18 @@ function Editor() {
         <Field label="Meta title (etiqueta <title>)" value={config.metaTitle} onChange={(v) => setConfig((c) => ({ ...c, metaTitle: v }))} />
         <Field label="Meta description" value={config.metaDescription} onChange={(v) => setConfig((c) => ({ ...c, metaDescription: v }))} textarea />
         <Field label="Teléfono comercial (aparece en top bar y bottom bar)" value={config.phone} onChange={(v) => setConfig((c) => ({ ...c, phone: v }))} />
+        <label className="mt-4 flex items-start gap-3 rounded-card border border-hair bg-white p-3">
+          <input type="checkbox" checked={config.hideAssistant}
+            onChange={(e) => setConfig((c) => ({ ...c, hideAssistant: e.target.checked }))}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-hair" />
+          <span className="text-[13px] leading-relaxed text-ink">
+            <span className="font-semibold text-navy">Ocultar el widget asistente en esta landing</span>
+            <span className="mt-0.5 block text-[12px] text-slate2">
+              Cuando está activado, el asistente flotante no aparece en <code className="rounded bg-mist px-1 py-0.5">/lp/salud</code>.
+              Útil para minimizar distracciones y forzar el flujo hacia los CTAs principales.
+            </span>
+          </span>
+        </label>
       </Section>
 
       {/* ---------------------- Hero ---------------------- */}

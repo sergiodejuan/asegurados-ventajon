@@ -31,6 +31,11 @@ export type PriceMatchLandingConfig = {
   // otra ruta del sitio.
   robotsIndex: boolean;
 
+  // Ocultar el widget flotante del asistente en esta landing. Por defecto
+  // false; se puede desactivar desde admin para que el usuario no tenga
+  // otra vía de conversión que le distraiga del propio flujo price-match.
+  hideAssistant: boolean;
+
   hero: {
     kicker: string; // "MEJOR PRECIO GARANTIZADO", "IGUALACIÓN DE PRIMA"...
     h1: string;
@@ -92,6 +97,7 @@ export const DEFAULT_PRICE_MATCH_LANDING: PriceMatchLandingConfig = {
   metaDescription:
     "¿Ya tienes un presupuesto de seguro? Envíanoslo y estudiamos la mejor alternativa del mercado sin compromiso, en menos de 24 horas.",
   robotsIndex: true,
+  hideAssistant: false,
 
   hero: {
     kicker: "SIN COMPROMISO · RESPUESTA EN 24 H",

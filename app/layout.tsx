@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { BRAND_NAME, SITE_URL } from "@/lib/brand";
-import { getTheme } from "@/lib/store";
+import { getTheme, getPaidLandingSaludConfig, getPriceMatchLandingConfig } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
@@ -69,7 +69,18 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const theme = await getTheme();
+  // Cargamos las tres configs en paralelo. Las dos landings se leen aquí
+  // para saber si su flag hideAssistant está activado — si sí, añadimos su
+  // ruta a la lista de rutas donde el widget flotante no debe aparecer.
+  const [theme, lpSalud, priceMatch] = await Promise.all([
+    getTheme(),
+    getPaidLandingSaludConfig().catch(() => null),
+    getPriceMatchLandingConfig().catch(() => null),
+  ]);
+  const assistantExtraExcluded: string[] = [];
+  if (lpSalud?.hideAssistant) assistantExtraExcluded.push("/lp/salud");
+  if (priceMatch?.hideAssistant) assistantExtraExcluded.push("/precio-mejor-garantizado");
+
   const displayFont = findFont(DISPLAY_FONT_OPTIONS, theme.displayFont);
   const bodyFont = findFont(BODY_FONT_OPTIONS, theme.bodyFont);
   const googleFontFamilies = [displayFont.google, bodyFont.google].filter(Boolean);
@@ -111,7 +122,7 @@ export default async function RootLayout({
           {children}
           <Analytics />
           <PageTransitionLoader />
-          <AssistantWidget />
+          <AssistantWidget extraExcludedPaths={assistantExtraExcluded} />
           <AccessibilityWidget />
           <GeneralExitIntentModal />
           <CookieConsentBanner />

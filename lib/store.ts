@@ -919,6 +919,7 @@ export async function getPaidLandingSaludConfig(): Promise<PaidLandingSaludConfi
   return {
     ...DEFAULT_PAID_LANDING_SALUD,
     ...stored,
+    hideAssistant: typeof stored.hideAssistant === "boolean" ? stored.hideAssistant : DEFAULT_PAID_LANDING_SALUD.hideAssistant,
     hero: { ...DEFAULT_PAID_LANDING_SALUD.hero, ...(stored.hero ?? {}) },
     porQueElegir: {
       ...DEFAULT_PAID_LANDING_SALUD.porQueElegir,
@@ -979,6 +980,7 @@ export async function getPriceMatchLandingConfig(): Promise<PriceMatchLandingCon
   return {
     ...DEFAULT_PRICE_MATCH_LANDING,
     ...stored,
+    hideAssistant: typeof stored.hideAssistant === "boolean" ? stored.hideAssistant : DEFAULT_PRICE_MATCH_LANDING.hideAssistant,
     hero: { ...DEFAULT_PRICE_MATCH_LANDING.hero, ...(stored.hero ?? {}) },
     compromisoBadges: Array.isArray(stored.compromisoBadges) ? stored.compromisoBadges : DEFAULT_PRICE_MATCH_LANDING.compromisoBadges,
     comoFunciona: {

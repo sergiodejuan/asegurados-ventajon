@@ -28,10 +28,18 @@ const EXCLUDED_PREFIXES = [
   "/gracias",
   "/quiero-que-me-llamen",
   "/comparativa",
+  // Las páginas de embudo propias de la landing paid de salud (wizard y
+  // "que me llamen") son de por sí un funnel de captura — no queremos que
+  // el asistente compita con el CTA principal. La landing /lp/salud NO se
+  // excluye aquí: eso lo decide admin desde su editor (hideAssistant).
+  "/lp/salud/tarificador",
+  "/lp/salud/llamada",
 ];
 
-export function isAssistantAllowed(pathname: string): boolean {
-  return !EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+export function isAssistantAllowed(pathname: string, extraExcludedPaths: string[] = []): boolean {
+  if (EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  if (extraExcludedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  return true;
 }
 
 const DEFAULT_CONTEXT: AssistantContext = {

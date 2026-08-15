@@ -51,6 +51,12 @@ export type PaidLandingSaludConfig = {
   metaTitle: string;
   metaDescription: string;
 
+  // Ocultar el widget flotante del asistente en esta landing. Por defecto
+  // false porque en la mayoría de campañas queremos mostrar el mayor número
+  // de vías de contacto; se puede desactivar desde admin para landings donde
+  // se quiera un funnel visualmente más limpio (más CRO, menos distracción).
+  hideAssistant: boolean;
+
   // Teléfono comercial de la campaña (aparece en las sticky bars y en el
   // bloque "Contrata por teléfono"). Debe ser el número al que el equipo
   // reciba las llamadas de esta landing concreta — si es distinto del
@@ -154,6 +160,8 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
   metaTitle: "Seguro de Salud para que tu salud no espere — Asegurados Ventajon",
   metaDescription:
     "Compara y elige tu Seguro de Salud desde 19,90 €/mes y sin copagos. Más de 1.000 centros y hospitales, 50.000 especialistas en toda España.",
+
+  hideAssistant: false,
 
   phone: "919 151 151",
 

@@ -167,7 +167,7 @@ function formatDate(iso: string): string {
 // Montado una única vez en el layout raíz: al vivir fuera de cada página, el
 // estado de la conversación no se pierde al navegar entre páginas donde el
 // asistente está disponible.
-export function AssistantWidget() {
+export function AssistantWidget({ extraExcludedPaths = [] }: { extraExcludedPaths?: string[] } = {}) {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -238,7 +238,7 @@ export function AssistantWidget() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const allowed = isAssistantAllowed(pathname);
+  const allowed = isAssistantAllowed(pathname, extraExcludedPaths);
   const context = getAssistantContext(pathname);
   const firstName = userName.trim().split(/\s+/)[0] || undefined;
 

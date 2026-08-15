@@ -90,6 +90,17 @@ function Editor() {
           <input type="checkbox" checked={config.robotsIndex} onChange={(e) => setConfig((c) => ({ ...c, robotsIndex: e.target.checked }))} className="h-4 w-4 accent-brand-red" />
           <span className="text-[13px] text-ink">Indexable en Google (recomendado para SEO orgánico)</span>
         </label>
+        <label className="mt-3 flex items-start gap-2">
+          <input type="checkbox" checked={config.hideAssistant}
+            onChange={(e) => setConfig((c) => ({ ...c, hideAssistant: e.target.checked }))}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-red" />
+          <span className="text-[13px] leading-relaxed text-ink">
+            <span className="font-semibold text-navy">Ocultar el widget asistente en esta landing</span>
+            <span className="mt-0.5 block text-[12px] text-slate2">
+              Sin él, el usuario solo tiene los CTAs propios de la página — menos distracción, más CRO.
+            </span>
+          </span>
+        </label>
       </Section>
 
       <Section title="Hero">
