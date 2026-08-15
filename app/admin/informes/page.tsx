@@ -137,7 +137,118 @@ function InformesAdmin() {
           agente (ver el pie de la barra lateral del panel).
         </p>
       </ReportSection>
+
+      <CodeoscopicSection />
     </main>
+  );
+}
+
+/* ------------------------ Sección Codeoscopic ---------------------------- */
+// Métricas específicas de la integración Codeoscopic Avant2: cobertura de la
+// integración (cuántos leads tienen cotización real) y ranking de compañías
+// tanto en cotización como en elección final del cliente.
+
+type CodeoscopicMetrics = {
+  totalPresupuestos: number;
+  soloSalud: number;
+  conInsuranceId: number;
+  conSnapshot: number;
+  snapshotCompleto: number;
+  cotizacionesTotales: number;
+  precioMedioMensual: number | null;
+  topCompanias: { compania: string; cotizaciones: number; precioMedio: number | null }[];
+  topElecciones: { compania: string; elecciones: number; precioMedio: number | null }[];
+  ultimoSnapshotAt: string;
+};
+
+function CodeoscopicSection() {
+  const { token } = useAdminToken();
+  const [metrics, setMetrics] = useState<CodeoscopicMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/informes/codeoscopic", { headers: { "x-admin-token": token } });
+      const body = await res.json();
+      if (!res.ok || !body.ok) { setError(body.error ?? "No se pudo cargar."); setLoading(false); return; }
+      setMetrics(body.metrics);
+    } catch { setError("Error de conexión."); }
+    setLoading(false);
+  }
+
+  const pct = (num: number, denom: number) => denom > 0 ? Math.round((num / denom) * 1000) / 10 : 0;
+  const eurMes = (n: number | null) => n == null ? "—" : `${n.toLocaleString("es-ES", { maximumFractionDigits: 0 })} €/mes`;
+
+  return (
+    <ReportSection title="Codeoscopic (motor Avant2)">
+      {!metrics && !loading && (
+        <div>
+          <p className="text-[13px] leading-relaxed text-slate2">
+            Cobertura de la integración con Codeoscopic y ranking de compañías cotizadas y elegidas por el cliente.
+            El cálculo escanea todos los presupuestos y puede tardar unos segundos en bases grandes.
+          </p>
+          <button type="button" onClick={load} className="mt-3 rounded-card border border-hair bg-white px-4 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+            Calcular métricas
+          </button>
+        </div>
+      )}
+      {loading && <p className="text-[13px] text-slate2">Calculando…</p>}
+      {error && <p role="alert" className="text-[13px] font-medium text-brand-red">{error}</p>}
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <KpiCard label="Leads de salud" value={metrics.soloSalud.toString()} />
+            <KpiCard label="Con cotización Codeoscopic" value={`${metrics.conInsuranceId}`} sub={`${pct(metrics.conInsuranceId, metrics.soloSalud)}%`} />
+            <KpiCard label="Con snapshot cerrado" value={`${metrics.snapshotCompleto}`} sub={`${pct(metrics.snapshotCompleto, metrics.conSnapshot)}% de los que tienen`} />
+            <KpiCard label="Cotizaciones totales" value={metrics.cotizacionesTotales.toString()} sub={`~${eurMes(metrics.precioMedioMensual)} de media`} />
+          </div>
+          {metrics.ultimoSnapshotAt && (
+            <p className="mt-3 text-[11px] text-slate2">Último snapshot registrado: {new Date(metrics.ultimoSnapshotAt).toLocaleString("es-ES")}</p>
+          )}
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div>
+              <h4 className="text-[13px] font-bold text-navy">Compañías con más cotizaciones</h4>
+              <div className="mt-2">
+                <BarList
+                  items={metrics.topCompanias.map((c) => ({ label: c.compania, value: c.cotizaciones }))}
+                  formatValue={(v, i) => {
+                    const c = metrics.topCompanias[i];
+                    return `${v} cotización${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-navy">Compañías más elegidas por el cliente</h4>
+              <div className="mt-2">
+                <BarList
+                  items={metrics.topElecciones.map((c) => ({ label: c.compania, value: c.elecciones }))}
+                  formatValue={(v, i) => {
+                    const c = metrics.topElecciones[i];
+                    return `${v} elección${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={load} className="mt-4 text-[12px] font-semibold text-navy underline">
+            Recalcular
+          </button>
+        </>
+      )}
+    </ReportSection>
+  );
+}
+
+function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-card border border-hair bg-white p-3">
+      <p className="text-[20px] font-extrabold tnums text-navy">{value}</p>
+      <p className="text-[11px] font-medium text-slate2">{label}</p>
+      {sub && <p className="mt-0.5 text-[11px] tnums text-slate2/80">{sub}</p>}
+    </div>
   );
 }
 

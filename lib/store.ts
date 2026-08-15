@@ -1145,6 +1145,90 @@ export type CodeoscopicQuoteSummary = {
   estimate: boolean;
 };
 
+/* ------------------------- Métricas Codeoscopic --------------------------- */
+// Escanea todos los presupuestos y agrega KPIs de la integración Codeoscopic
+// para /admin/informes. Es O(N) sobre el listado — bien mientras no sean
+// decenas de miles; en ese caso movemos esto a un cron con precómputo.
+
+export type CodeoscopicMetrics = {
+  totalPresupuestos: number;
+  soloSalud: number;
+  conInsuranceId: number;
+  conSnapshot: number;
+  snapshotCompleto: number;
+  cotizacionesTotales: number;
+  precioMedioMensual: number | null;
+  topCompanias: { compania: string; cotizaciones: number; precioMedio: number | null }[];
+  topElecciones: { compania: string; elecciones: number; precioMedio: number | null }[];
+  ultimoSnapshotAt: string;
+};
+
+export async function computeCodeoscopicMetrics(): Promise<CodeoscopicMetrics> {
+  const all = await listPresupuestos();
+  const salud = all.filter((p) => p.producto === "salud");
+  let conInsuranceId = 0;
+  let conSnapshot = 0;
+  let snapshotCompleto = 0;
+  let cotizacionesTotales = 0;
+  let ultimoSnapshotAt = "";
+  const preciosMensuales: number[] = [];
+  const cotXCompania = new Map<string, number[]>();
+  const eleccionesXCompania = new Map<string, number[]>();
+
+  for (const p of salud) {
+    const data = (p.data ?? {}) as Record<string, unknown>;
+    const insuranceId = typeof data.codeoscopicInsuranceId === "string" ? data.codeoscopicInsuranceId : "";
+    if (insuranceId) conInsuranceId += 1;
+    const snap = data.codeoscopicSnapshot as { updatedAt?: string; done?: boolean; quotes?: unknown[] } | undefined;
+    if (snap && Array.isArray(snap.quotes)) {
+      conSnapshot += 1;
+      if (snap.done) snapshotCompleto += 1;
+      if (snap.updatedAt && (!ultimoSnapshotAt || snap.updatedAt > ultimoSnapshotAt)) ultimoSnapshotAt = snap.updatedAt;
+      for (const q of snap.quotes) {
+        const quote = q as { compania?: string; premium?: number | null; frequency?: string };
+        cotizacionesTotales += 1;
+        if (typeof quote.premium === "number") {
+          const mensual = quote.frequency === "Annually" ? quote.premium / 12 : quote.premium;
+          preciosMensuales.push(mensual);
+          const bucket = cotXCompania.get(quote.compania ?? "—") ?? [];
+          bucket.push(mensual);
+          cotXCompania.set(quote.compania ?? "—", bucket);
+        }
+      }
+    }
+    if (p.eleccion?.compania) {
+      const bucket = eleccionesXCompania.get(p.eleccion.compania) ?? [];
+      if (typeof p.eleccion.precio === "number") bucket.push(p.eleccion.precio);
+      eleccionesXCompania.set(p.eleccion.compania, bucket);
+    }
+  }
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  const topCompanias = Array.from(cotXCompania.entries())
+    .map(([compania, arr]) => ({ compania, cotizaciones: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.cotizaciones - a.cotizaciones)
+    .slice(0, 10);
+
+  const topElecciones = Array.from(eleccionesXCompania.entries())
+    .map(([compania, arr]) => ({ compania, elecciones: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.elecciones - a.elecciones)
+    .slice(0, 10);
+
+  return {
+    totalPresupuestos: all.length,
+    soloSalud: salud.length,
+    conInsuranceId,
+    conSnapshot,
+    snapshotCompleto,
+    cotizacionesTotales,
+    precioMedioMensual: avg(preciosMensuales),
+    topCompanias,
+    topElecciones,
+    ultimoSnapshotAt,
+  };
+}
+
 export async function setPresupuestoCodeoscopicSnapshot(
   presupuestoId: string,
   snapshot: { insuranceId: string; quotes: CodeoscopicQuoteSummary[]; done: boolean }

@@ -9,6 +9,7 @@ import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue, PRESUPUESTO_STATUS
 import { CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 import { NpsCard } from "@/components/admin/NpsCard";
+import { ProductFormWidget } from "@/components/ProductFormWidget";
 
 type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };
 type PresupuestoEleccion = { compania: string; precio: number | null; condiciones?: string; servicios?: string[]; at: string };
@@ -280,6 +281,9 @@ function CodeoscopicPanel({ presupuesto, onUpdated }: { presupuesto: Presupuesto
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Widget AvantProductForm: se abre en modal por cotización, permite al
+  // agente afinar coberturas/franquicias antes de presentar el precio final.
+  const [configuring, setConfiguring] = useState<{ quoteId: string; compania: string } | null>(null);
 
   const insuranceId = typeof presupuesto.data?.codeoscopicInsuranceId === "string" ? presupuesto.data.codeoscopicInsuranceId : "";
   const rawSnapshot = presupuesto.data?.codeoscopicSnapshot as CodeoscopicSnapshot | undefined;
@@ -352,7 +356,7 @@ function CodeoscopicPanel({ presupuesto, onUpdated }: { presupuesto: Presupuesto
                   <span className="text-[11px] text-slate2">{[q.producto, q.modalidad].filter(Boolean).join(" · ")}</span>
                 )}
               </div>
-              <div className="ml-auto text-right">
+              <div className="ml-auto flex flex-col items-end gap-1">
                 {q.premium != null ? (
                   <p className="text-[13px] font-bold tnums text-navy">
                     {q.premium.toFixed(2)} €<span className="text-[11px] font-medium text-slate2">/{q.frequency === "Monthly" ? "mes" : q.frequency === "Annually" ? "año" : "período"}</span>
@@ -364,6 +368,13 @@ function CodeoscopicPanel({ presupuesto, onUpdated }: { presupuesto: Presupuesto
                   <p className="text-[11px] text-slate2">Prima inicial {q.downPayment.toFixed(2)} €</p>
                 )}
                 {q.estimate && <p className="text-[11px] italic text-slate2">Estimativo</p>}
+                <button
+                  type="button"
+                  onClick={() => setConfiguring({ quoteId: q.id, compania: q.compania })}
+                  className="mt-1 rounded-card border border-hair bg-white px-2.5 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-mist"
+                >
+                  Configurar cobertura
+                </button>
               </div>
             </li>
           ))}
@@ -372,6 +383,38 @@ function CodeoscopicPanel({ presupuesto, onUpdated }: { presupuesto: Presupuesto
         <p className="mt-3 text-[12px] text-slate2">
           Aún sin cotizaciones registradas. Pulsa &quot;Refrescar snapshot&quot; para pedirlas a Codeoscopic ahora.
         </p>
+      )}
+
+      {configuring && (
+        <div
+          role="dialog" aria-modal="true"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
+          onClick={(e) => { if (e.currentTarget === e.target) setConfiguring(null); }}
+        >
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+            <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate2">Configurar cobertura</p>
+                <h3 className="truncate text-[16px] font-extrabold text-navy">{configuring.compania}</h3>
+              </div>
+              <button type="button" onClick={() => setConfiguring(null)} aria-label="Cerrar"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 hover:bg-mist">
+                ✕
+              </button>
+            </header>
+            <div className="max-h-[calc(90vh-72px)] overflow-y-auto p-5">
+              <ProductFormWidget
+                insuranceId={insuranceId}
+                quoteId={configuring.quoteId}
+                onFinished={async () => {
+                  // Al terminar la configuración, refrescamos el snapshot
+                  // para pintar el precio afinado sin cerrar el modal.
+                  await onUpdated();
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </CollapsiblePanel>
   );

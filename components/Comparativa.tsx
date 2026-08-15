@@ -83,6 +83,8 @@ export function Comparativa() {
   // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
   // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
   const [insuranceId, setInsuranceId] = useState("");
+  // Modal de coberturas de una cotización concreta (Ver coberturas → detalle).
+  const [coveragesFor, setCoveragesFor] = useState<RealQuote | null>(null);
   const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
   useEffect(() => {
@@ -416,10 +418,22 @@ export function Comparativa() {
                   </p>
                 )}
                 {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
-                {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} />}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCoveragesFor(q)}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
+                  >
+                    Ver coberturas
+                  </button>
+                  {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} />}
+                </div>
               </li>
             ))}
           </ul>
+        )}
+        {coveragesFor && insuranceId && (
+          <CoveragesModal insuranceId={insuranceId} quote={coveragesFor} onClose={() => setCoveragesFor(null)} />
         )}
 
         {producto === "salud" && realQuotes.length > 0 && insuranceId && (
@@ -508,6 +522,121 @@ function CompanyActions({ producto, compania, precio }: { producto: string; comp
       >
         Que te llamen gratis
       </a>
+    </div>
+  );
+}
+
+/* ---------------------------- Modal de coberturas -------------------------- */
+// Detalle de coberturas real de la cotización, tal cual lo devuelve
+// Codeoscopic. Se agrupan por categoría (Coberturas médicas, Dental,
+// Extras…) — el shape lo normaliza el propio endpoint server-side
+// (/api/quote/{id}/coverages), aquí solo pintamos.
+type CoverageItem = { concepto: string; descripcion: string; cubierto: boolean; limite: string; copago: string };
+type CoverageGroup = { categoria: string; items: CoverageItem[] };
+type CoveragesState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; grupos: CoverageGroup[] };
+
+function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; quote: RealQuote; onClose: () => void }) {
+  const [state, setState] = useState<CoveragesState>({ kind: "loading" });
+
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}/coverages?quoteId=${encodeURIComponent(quote.id)}`);
+        const body = (await res.json().catch(() => null)) as { ok: true; grupos: CoverageGroup[] } | { ok: false; reason: string } | null;
+        if (stop) return;
+        if (!body?.ok) {
+          const reasonLabel =
+            body?.reason === "not_configured" ? "El motor de coberturas no está activo en este momento."
+            : body?.reason === "offer_not_found" ? "No pudimos localizar el detalle de coberturas para esta cotización."
+            : "No pudimos cargar las coberturas. Inténtalo de nuevo en un momento.";
+          setState({ kind: "error", message: reasonLabel });
+          return;
+        }
+        setState({ kind: "ok", grupos: body.grupos });
+      } catch {
+        if (!stop) setState({ kind: "error", message: "Fallo de red. Inténtalo de nuevo." });
+      }
+    })();
+    return () => { stop = true; };
+  }, [insuranceId, quote.id]);
+
+  // Bloquear scroll de fondo mientras el modal está abierto.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div
+      role="dialog" aria-modal="true" aria-label={`Coberturas de ${quote.compania}`}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
+      onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
+    >
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+        <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate2">Coberturas</p>
+            <h3 className="truncate text-[17px] font-extrabold text-navy">{quote.compania}</h3>
+            {(quote.producto || quote.modalidad) && (
+              <p className="truncate text-[12px] text-slate2">
+                {[quote.producto, quote.modalidad].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <button
+            type="button" onClick={onClose} aria-label="Cerrar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
+          >
+            ✕
+          </button>
+        </header>
+        <div className="max-h-[calc(90vh-72px)] overflow-y-auto px-5 pb-6 pt-4">
+          {state.kind === "loading" && (
+            <p className="py-8 text-center text-[13px] text-slate2">Cargando coberturas…</p>
+          )}
+          {state.kind === "error" && (
+            <p role="alert" className="py-8 text-center text-[13px] font-medium text-brand-red">{state.message}</p>
+          )}
+          {state.kind === "ok" && state.grupos.length === 0 && (
+            <p className="py-8 text-center text-[13px] text-slate2">La aseguradora no ha proporcionado detalle de coberturas para este producto.</p>
+          )}
+          {state.kind === "ok" && state.grupos.map((g) => (
+            <section key={g.categoria} className="mt-4 first:mt-0">
+              <h4 className="text-[13px] font-bold uppercase tracking-wide text-brand-red">{g.categoria}</h4>
+              <ul className="mt-2 divide-y divide-hair rounded-card border border-hair bg-white">
+                {g.items.map((it, i) => (
+                  <li key={i} className="flex items-start gap-3 p-3">
+                    <span
+                      className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                        it.cubierto ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {it.cubierto ? <Check width={14} height={14} /> : "—"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold text-ink">{it.concepto}</p>
+                      {it.descripcion && <p className="mt-0.5 text-[12px] leading-relaxed text-slate2">{it.descripcion}</p>}
+                      {(it.limite || it.copago) && (
+                        <p className="mt-1 text-[12px] tnums text-slate2">
+                          {it.limite && <>Límite: <span className="font-semibold text-ink">{it.limite}</span></>}
+                          {it.limite && it.copago && <span className="px-1.5 text-slate2/50">·</span>}
+                          {it.copago && <>Copago: <span className="font-semibold text-ink">{it.copago}</span></>}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
