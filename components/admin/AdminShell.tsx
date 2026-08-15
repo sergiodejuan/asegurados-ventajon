@@ -47,6 +47,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
       { href: "/admin/testimonios", label: "Testimonios", key: "testimonios", modulo: "testimonios" },
       { href: "/admin/promociones", label: "Promociones", key: "promociones", modulo: "promociones" },
       { href: "/admin/promociones?tab=campana", label: "Campaña", key: "campana", modulo: "campana" },
+      { href: "/admin/campanas/lp-salud", label: "Landing paid — salud", key: "lp-salud", modulo: "campana" },
       { href: "/admin/exit-intents", label: "Exit-intent", key: "exitintents", modulo: "exitintents" },
     ],
   },
@@ -108,7 +109,7 @@ function groupKeyForActive(active: string): string | null {
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "lp-salud" | "blog"
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"

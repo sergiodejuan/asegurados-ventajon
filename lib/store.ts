@@ -17,6 +17,7 @@ import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDr
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
+import { DEFAULT_PAID_LANDING_SALUD, type PaidLandingSaludConfig } from "./paidLandingSalud";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -895,6 +896,62 @@ export async function saveCampaignConfig(patch: Partial<CampaignConfig>): Promis
   const next: CampaignConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(CAMPAIGN_KEY, next);
   return next;
+}
+
+/* ---------------------- Landing de paid (/lp/salud) ------------------------ */
+// Editable desde /admin/campanas/lp-salud. Reemplaza campos vacíos por los
+// defaults para no romper la landing si se guarda una config parcial.
+
+const LP_SALUD_KEY = "landing:lp-salud";
+
+export async function getPaidLandingSaludConfig(): Promise<PaidLandingSaludConfig> {
+  const stored = await jget<PaidLandingSaludConfig>(LP_SALUD_KEY);
+  if (!stored) return DEFAULT_PAID_LANDING_SALUD;
+  // Merge poco profundo por sección; los arrays (partners, beneficios,
+  // productos, comparativa.rows) sí se reemplazan enteros — así el admin
+  // puede vaciarlos si quiere. Los sub-objetos se mergean para no perder
+  // campos nuevos añadidos al tipo tras un despliegue.
+  return {
+    ...DEFAULT_PAID_LANDING_SALUD,
+    ...stored,
+    hero: { ...DEFAULT_PAID_LANDING_SALUD.hero, ...(stored.hero ?? {}) },
+    porQueElegir: {
+      ...DEFAULT_PAID_LANDING_SALUD.porQueElegir,
+      ...(stored.porQueElegir ?? {}),
+      partners: Array.isArray(stored.porQueElegir?.partners) ? stored.porQueElegir!.partners : DEFAULT_PAID_LANDING_SALUD.porQueElegir.partners,
+    },
+    beneficios: {
+      ...DEFAULT_PAID_LANDING_SALUD.beneficios,
+      ...(stored.beneficios ?? {}),
+      items: Array.isArray(stored.beneficios?.items) ? stored.beneficios!.items : DEFAULT_PAID_LANDING_SALUD.beneficios.items,
+    },
+    bannerIntermedio: { ...DEFAULT_PAID_LANDING_SALUD.bannerIntermedio, ...(stored.bannerIntermedio ?? {}) },
+    productos: {
+      ...DEFAULT_PAID_LANDING_SALUD.productos,
+      ...(stored.productos ?? {}),
+      items: Array.isArray(stored.productos?.items) ? stored.productos!.items : DEFAULT_PAID_LANDING_SALUD.productos.items,
+    },
+    contrataTelefono: { ...DEFAULT_PAID_LANDING_SALUD.contrataTelefono, ...(stored.contrataTelefono ?? {}) },
+    comparativa: {
+      ...DEFAULT_PAID_LANDING_SALUD.comparativa,
+      ...(stored.comparativa ?? {}),
+      columns: Array.isArray(stored.comparativa?.columns) ? stored.comparativa!.columns : DEFAULT_PAID_LANDING_SALUD.comparativa.columns,
+      rows: Array.isArray(stored.comparativa?.rows) ? stored.comparativa!.rows : DEFAULT_PAID_LANDING_SALUD.comparativa.rows,
+    },
+    rating: { ...DEFAULT_PAID_LANDING_SALUD.rating, ...(stored.rating ?? {}) },
+    footer: {
+      ...DEFAULT_PAID_LANDING_SALUD.footer,
+      ...(stored.footer ?? {}),
+      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_PAID_LANDING_SALUD.footer.enlaces,
+    },
+    utm: { ...DEFAULT_PAID_LANDING_SALUD.utm, ...(stored.utm ?? {}) },
+  };
+}
+
+export async function savePaidLandingSaludConfig(next: PaidLandingSaludConfig): Promise<PaidLandingSaludConfig> {
+  const stamped: PaidLandingSaludConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(LP_SALUD_KEY, stamped);
+  return stamped;
 }
 
 /* ------------------------ Exit-intent de la web general --------------------- */
