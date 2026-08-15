@@ -87,10 +87,11 @@ function PresupuestoDetail() {
     try {
       const res = await fetch("/api/presupuesto/pdf", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
         body: JSON.stringify({
           producto: p.producto,
           compania,
+          presupuestoId: p.id,
           quote: {
             id: p.leadId, nombre: p.nombre, telefono: p.telefono, email: p.email,
             codigoPostal: p.data.codigoPostal, fechaNacimiento: p.data.fechaNacimiento,

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TestimonioStoryPage } from "@/components/TestimonioStoryPage";
 import { SITE_URL } from "@/lib/brand";
 import { getTestimonioBySlug } from "@/lib/store";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const testimonio = await getTestimonioBySlug(params.slug, { onlyPublished: true });
@@ -36,7 +37,7 @@ export default async function TestimonioRoute({ params }: { params: { slug: stri
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <TestimonioStoryPage testimonio={testimonio} />
     </>
   );

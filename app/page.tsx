@@ -15,6 +15,8 @@ import { SocialProofBadge } from "@/components/SocialProofBadge";
 import { BRAND_NAME, SITE_URL, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
+import { safeJsonLd } from "@/lib/safeJsonLd";
+import { safeHref } from "@/lib/safeHref";
 
 const HOME_TITLE = `${BRAND_NAME} | Compara seguros y paga menos`;
 const HOME_DESCRIPTION =
@@ -78,7 +80,7 @@ export default async function Home() {
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <Header />
 
       <main id="contenido">
@@ -120,7 +122,7 @@ export default async function Home() {
 
             <div id="home-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
               {hero.ctaPrimaryHref ? (
-                <a href={hero.ctaPrimaryHref}
+                <a href={safeHref(hero.ctaPrimaryHref)}
                   className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
                   {hero.ctaPrimaryLabel}
                 </a>
@@ -129,7 +131,7 @@ export default async function Home() {
                   {hero.ctaPrimaryLabel}
                 </InsuranceQuoteCta>
               )}
-              <a href={hero.ctaSecondaryHref}
+              <a href={safeHref(hero.ctaSecondaryHref)}
                 className="flex items-center justify-center rounded-card bg-navy px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-navy-deep sm:flex-1">
                 {hero.ctaSecondaryLabel}
               </a>

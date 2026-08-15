@@ -9,7 +9,19 @@ export const AGENT_SESSION_COOKIE = "ventajon_agent_session";
 const AGENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 días
 
 function secret(): string {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_TOKEN || "ventajon-dev-secret-change-me";
+  const configured = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_TOKEN;
+  if (configured) return configured;
+  // Mismo criterio que lib/clientSession.ts: fail-loud en producción para
+  // que ningún despliegue quede firmando cookies de agente con un secreto
+  // conocido públicamente (auditoría S-01). En dev, fallback para no
+  // bloquear el desarrollo local.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[agentAuth] Falta ADMIN_SESSION_SECRET (o al menos ADMIN_TOKEN) en producción. " +
+      "Configura una cadena larga aleatoria en Vercel → Environment Variables antes de reiniciar."
+    );
+  }
+  return "ventajon-dev-secret-change-me";
 }
 function sign(value: string): string {
   return crypto.createHmac("sha256", secret()).update(value).digest("base64url");

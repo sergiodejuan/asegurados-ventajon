@@ -74,6 +74,7 @@ export function CompanyDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           producto, compania: entry!.compania, quote,
+          presupuestoId: quote?.id ?? "",
           precio: producto === "salud" ? { conCopago: precioSalud.conCopago, sinCopago: precioSalud.sinCopago } : { precio: precioUnico },
           servicios: entry!.servicios, condiciones: entry!.condiciones,
         }),

@@ -281,6 +281,11 @@ export async function updateLeadContactByLookup(
   if (patch.telefono !== undefined) {
     const newPhone = normalizePhone(patch.telefono);
     if (newPhone && newPhone !== lead.telefono) {
+      // IMPORTANTE: borrar el índice del teléfono viejo antes de escribir el
+      // nuevo, si no un futuro usuario que se registre con el teléfono viejo
+      // recibiría la ficha del anterior (colisión de identidad — ver
+      // auditoría, hallazgo P-01).
+      if (lead.telefono) await jdel(`idx:phone:${lead.telefono}`).catch(() => {});
       await jset(`idx:phone:${newPhone}`, id);
       lead.telefono = newPhone;
       changes.push("teléfono");
@@ -289,6 +294,9 @@ export async function updateLeadContactByLookup(
   if (patch.email !== undefined) {
     const newEmail = patch.email.trim().toLowerCase();
     if (newEmail && newEmail !== lead.email) {
+      // Igual que con el teléfono: liberar el índice del email viejo antes
+      // de escribir el nuevo (auditoría P-01).
+      if (lead.email) await jdel(`idx:email:${lead.email}`).catch(() => {});
       await jset(`idx:email:${newEmail}`, id);
       lead.email = newEmail;
       changes.push("email");

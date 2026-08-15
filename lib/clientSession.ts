@@ -16,7 +16,20 @@ export const CLIENT_SESSION_COOKIE = "ventajon_client_session";
 export const CLIENT_SESSION_MAX_AGE = 60 * 60 * 24 * 180; // 180 días
 
 function secret(): string {
-  return process.env.CLIENT_SESSION_SECRET || process.env.ADMIN_TOKEN || "ventajon-dev-secret-change-me";
+  const configured = process.env.CLIENT_SESSION_SECRET || process.env.ADMIN_TOKEN;
+  if (configured) return configured;
+  // Fail-loud en producción: no debe existir un fallback público conocido
+  // como secreto de firma (ver auditoría, S-01) — sería forjable.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[clientSession] Falta CLIENT_SESSION_SECRET (o al menos ADMIN_TOKEN) en producción. " +
+      "Configura una cadena larga aleatoria en Vercel → Environment Variables antes de reiniciar."
+    );
+  }
+  // Solo en dev: fallback conocido, no rota nada de la experiencia local
+  // pero deja un secreto no-secreto para no perder tokens al reiniciar
+  // Node. En prod NUNCA llega aquí gracias al throw.
+  return "ventajon-dev-secret-change-me";
 }
 
 function sign(value: string): string {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createProduct, listProducts, createAuditLog } from "@/lib/store";
 import { requireModule } from "@/lib/agentAuth";
 import { makeProductId, type Product } from "@/lib/catalog";
+import { isValidImageDataUri } from "@/lib/media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,8 +31,13 @@ export async function POST(request: Request) {
   if (body.producto !== "salud" && body.producto !== "vida" && body.producto !== "auto" && body.producto !== "decesos") {
     return NextResponse.json({ ok: false, error: "Producto no válido." }, { status: 400 });
   }
-  if (typeof body.logoUrl === "string" && body.logoUrl.length > MAX_LOGO_LENGTH) {
-    return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+  if (typeof body.logoUrl === "string") {
+    if (body.logoUrl.length > MAX_LOGO_LENGTH) {
+      return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+    }
+    if (!isValidImageDataUri(body.logoUrl)) {
+      return NextResponse.json({ ok: false, error: "El logo no es una imagen válida (PNG/JPEG/WebP/GIF)." }, { status: 400 });
+    }
   }
 
   const id = makeProductId(body.producto, body.compania);

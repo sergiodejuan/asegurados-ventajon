@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PriceMatchLanding } from "@/components/landings/PriceMatchLanding";
 import { getPriceMatchLandingConfig, getTheme } from "@/lib/store";
 import { BRAND_NAME, CALLER_NUMBERS, SITE_URL } from "@/lib/brand";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 // Landing "igualación de precio" — /precio-mejor-garantizado.
 // A diferencia de /lp/salud, esta va INDEXABLE por defecto (robots.index
@@ -66,9 +67,9 @@ export default async function PriceMatchLandingPage() {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(serviceJsonLd) }} />
       {config.faq.items.length > 0 && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }} />
       )}
       <PriceMatchLanding
         config={config}

@@ -27,8 +27,13 @@ export async function verifyTurnstile(token: string | undefined, ip: string): Pr
     return !!body?.success;
   } catch (err) {
     console.error("[turnstile] error de verificación", err);
-    // Si Cloudflare no responde, no se bloquea el formulario por un fallo
-    // ajeno — el rate limiting sigue protegiendo de todas formas.
-    return true;
+    // Fail-closed cuando el secreto está configurado (ver auditoría, N-01):
+    // si Cloudflare no responde, rechazamos el envío. Un atacante podría
+    // provocar el timeout para saltarse la verificación; el rate limiting
+    // sigue siendo la segunda barrera, pero no vamos a fiarnos solo de él.
+    // La rama previa (sin secret) ya devuelve true por otro camino, así que
+    // aquí sabemos que el operador HA configurado Turnstile y espera que
+    // funcione.
+    return false;
   }
 }

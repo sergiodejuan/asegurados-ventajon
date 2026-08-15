@@ -3,6 +3,7 @@ import { GeoLandingPage } from "@/components/GeoLandingPage";
 import { getGeoLandingPage } from "@/lib/geoLandingPages";
 import { getProductPage } from "@/lib/productPages";
 import { BRAND_NAME, SITE_URL } from "@/lib/brand";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 const geo = getGeoLandingPage("lanzarote-fuerteventura")!;
 const base = getProductPage("salud")!;
@@ -48,7 +49,7 @@ export default function SeguroDeSaludLanzaroteFuerteventuraPage() {
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <GeoLandingPage geo={geo} />
     </>
   );

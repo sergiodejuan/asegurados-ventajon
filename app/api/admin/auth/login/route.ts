@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAgentByEmail, touchAgentLogin, createAuditLog } from "@/lib/store";
 import { verifyPassword, setAgentSessionCookie } from "@/lib/agentAuth";
 import { toPublicAgent } from "@/lib/crm";
-import { rateLimitFail } from "@/lib/rateLimit";
+import { checkRateLimit, rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +11,7 @@ export const dynamic = "force-dynamic";
 // ADMIN_TOKEN maestro, que sigue funcionando igual que siempre en la
 // pantalla de acceso de /admin.
 export async function POST(request: Request) {
-  // Sin esto, el login es fuerza-bruteable: cualquiera podría probar
-  // contraseñas sin límite contra un email conocido.
+  // Rate limit por IP (anti-spam global): 10 intentos cada 10 minutos.
   const limited = await rateLimitFail(request, { bucket: "admin-login", limit: 10, windowSeconds: 600 });
   if (limited) return limited;
 
@@ -24,7 +23,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Introduce tu email y contraseña." }, { status: 400 });
   }
 
-  const agent = await getAgentByEmail(body.email);
+  const emailNormalized = body.email.trim().toLowerCase();
+
+  // Segundo rate limit por CUENTA: 10 fallos por email cada hora → bloqueo
+  // temporal. Sin esto, un atacante con muchas IPs (botnet) puede probar
+  // millones de contraseñas contra el mismo email sin que se corte nunca
+  // porque cada IP tiene su propia cuota (ver auditoría, S-02). La cuenta
+  // solo penaliza fallos; los logins con éxito no consumen del contador.
+  const acctLimit = await checkRateLimit(`admin-login:acct:${emailNormalized}`, 10, 3600);
+  if (!acctLimit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "Demasiados intentos con este email. Prueba de nuevo en una hora." },
+      { status: 429, headers: { "Retry-After": String(acctLimit.retryAfterSeconds) } }
+    );
+  }
+
+  const agent = await getAgentByEmail(emailNormalized);
   if (!agent || !agent.activo || !agent.passwordHash) {
     return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos." }, { status: 401 });
   }

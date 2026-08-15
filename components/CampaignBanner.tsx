@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CampaignConfig } from "@/lib/campaign";
 import { withPromotionUtm, type Promotion } from "@/lib/promotions";
 import { BRAND_NAME } from "@/lib/brand";
+import { safeHref } from "@/lib/safeHref";
 import { IconByName } from "./icons";
 
 // Diapositiva ya normalizada, venga de una campaña "a mano" (pestaña
@@ -80,7 +81,7 @@ export function CampaignBanner() {
       <ul aria-label="Promociones" className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 scroll-pl-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-auto md:max-w-5xl md:grid md:grid-cols-3 md:snap-none md:overflow-visible md:px-5 md:pb-0 lg:max-w-6xl">
         {slides.map((s) => (
           <li key={s.id} className="w-[320px] shrink-0 snap-start overflow-hidden rounded-[20px] shadow-soft md:w-auto">
-            <a href={s.href} className="group relative block h-[420px] w-full overflow-hidden bg-navy-deep md:h-64">
+            <a href={safeHref(s.href)} className="group relative block h-[420px] w-full overflow-hidden bg-navy-deep md:h-64">
               {s.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.imageUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />

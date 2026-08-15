@@ -35,11 +35,14 @@ export async function POST(request: Request) {
   const raw = await request.text();
 
   const secret = process.env.BLAND_WEBHOOK_SECRET;
-  if (secret) {
-    const sig = request.headers.get("x-webhook-signature");
-    if (!verifySignature(raw, sig, secret)) {
-      return NextResponse.json({ ok: false, error: "Firma no válida." }, { status: 401 });
-    }
+  // Fail-closed: sin BLAND_WEBHOOK_SECRET rechazamos cualquier evento
+  // entrante para no aceptar inyecciones de actividad no firmadas (X-05).
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "Verificación de firma no configurada (BLAND_WEBHOOK_SECRET)." }, { status: 503 });
+  }
+  const sig = request.headers.get("x-webhook-signature");
+  if (!verifySignature(raw, sig, secret)) {
+    return NextResponse.json({ ok: false, error: "Firma no válida." }, { status: 401 });
   }
 
   let body: BlandEvent;
