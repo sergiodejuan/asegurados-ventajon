@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getPresupuesto, getLead, setPresupuestoCodeoscopicInsurance } from "@/lib/store";
+import { getPresupuesto, getLead, setPresupuestoCodeoscopicSnapshot } from "@/lib/store";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
+import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
 
 // Endpoint que la comparativa llama al montarse para pedir cotizaciones
 // reales a Codeoscopic. Flujo:
@@ -59,7 +60,9 @@ export async function POST(req: NextRequest) {
   if (existingId) {
     try {
       const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(existingId)}`);
-      return NextResponse.json({ ok: true, insuranceId: existingId, snapshot });
+      const summary = summarizeInsurance(snapshot);
+      await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
+      return NextResponse.json({ ok: true, insuranceId: existingId, snapshot, summary });
     } catch (err) {
       // Si Codeoscopic ya no reconoce el id (raro pero posible tras rotar
       // credenciales entre entornos), lo tratamos como si no existiera y
@@ -82,8 +85,9 @@ export async function POST(req: NextRequest) {
     if (!created?.id) {
       return NextResponse.json({ ok: false, reason: "codeoscopic_sin_id" }, { status: 502 });
     }
-    await setPresupuestoCodeoscopicInsurance(presupuesto.id, created.id);
-    return NextResponse.json({ ok: true, insuranceId: created.id, snapshot: created });
+    const summary = summarizeInsurance(created);
+    await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
+    return NextResponse.json({ ok: true, insuranceId: created.id, snapshot: created, summary });
   } catch (err) {
     const status = err instanceof CodeoscopicError ? err.status : 502;
     console.error("[quote/create] Codeoscopic falló:", (err as Error).message);

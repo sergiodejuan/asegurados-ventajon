@@ -650,6 +650,14 @@ function PresupuestosPanel({ leadId }: { leadId: string }) {
                 <p className="truncate text-[13px] font-semibold tnums text-ink">
                   #{quoteNumber(s.id)} <span className="font-normal capitalize text-slate2">· {s.producto}</span>
                   {s.eleccion && <span className="font-normal text-slate2"> · {s.eleccion.compania}</span>}
+                  {typeof (s.data as { codeoscopicInsuranceId?: unknown })?.codeoscopicInsuranceId === "string" && (
+                    <span
+                      title={`Cotizado en Codeoscopic: ${(s.data as { codeoscopicInsuranceId: string }).codeoscopicInsuranceId}`}
+                      className="ml-1.5 inline-flex items-center gap-0.5 rounded-pill bg-emerald-50 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-emerald-700"
+                    >
+                      Codeoscopic ✓
+                    </span>
+                  )}
                 </p>
                 <p className="text-[12px] text-slate2">{statusLabels[s.status] ?? s.status} · {fmt(s.updatedAt)}</p>
               </button>

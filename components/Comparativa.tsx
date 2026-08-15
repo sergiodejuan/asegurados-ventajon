@@ -79,6 +79,10 @@ export function Comparativa() {
   // etc.). Ver app/api/quote/create y app/api/quote/[insuranceId].
   const [realQuotes, setRealQuotes] = useState<RealQuote[]>([]);
   const [realStatus, setRealStatus] = useState<RealStatus>("idle");
+  // insuranceId real de Codeoscopic — se muestra al pie de la sección de
+  // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
+  // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
+  const [insuranceId, setInsuranceId] = useState("");
   const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
   useEffect(() => {
@@ -160,6 +164,7 @@ export function Comparativa() {
         }
         const initial = parseSnapshot(createBody.snapshot);
         if (initial.length) setRealQuotes(initial);
+        setInsuranceId(createBody.insuranceId);
         // Si ya vinieron cerradas todas de golpe, no polleamos.
         const alreadyDone = initial.length > 0 && initial.every((q) => !q.estimate && q.premium != null);
         if (alreadyDone) { setRealStatus("done"); return; }
@@ -171,7 +176,9 @@ export function Comparativa() {
         while (!local.stop && Date.now() - started < TIMEOUT_MS) {
           await new Promise((r) => setTimeout(r, INTERVAL_MS));
           if (local.stop) return;
-          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}`);
+          // Pasamos pid al polling para que el endpoint persista el snapshot
+          // en el presupuesto server-side (para el bloque de admin).
+          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuestoIdParam)}`);
           const pollBody = (await pollRes.json().catch(() => null)) as
             | { ok: true; done: boolean; snapshot: unknown }
             | { ok: false }
@@ -374,8 +381,12 @@ export function Comparativa() {
             {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
           </p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            {producto === "salud" && realStatus === "loading" && "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."}
-            {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && "Precios reales devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso."}
+            {producto === "salud" && realStatus === "loading" && (
+              realQuotes.length > 0
+                ? `Consultando en tiempo real con las aseguradoras — ${realQuotes.length} ${realQuotes.length === 1 ? "compañía" : "compañías"} ${realQuotes.length === 1 ? "ha" : "han"} respondido, esperando al resto…`
+                : "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."
+            )}
+            {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && `Precios reales de ${realQuotes.length} ${realQuotes.length === 1 ? "aseguradora" : "aseguradoras"} devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso.`}
             {(producto !== "salud" || realStatus === "unavailable" || realStatus === "error" || (realStatus !== "loading" && realQuotes.length === 0)) && "El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso."}
           </p>
         </div>
@@ -399,11 +410,23 @@ export function Comparativa() {
                       : <span className="text-[13px] italic text-slate2">Calculando…</span>}
                   </p>
                 </div>
+                {q.downPayment != null && q.downPayment > 0 && q.downPayment !== q.premium && (
+                  <p className="mt-1 text-[12px] text-slate2">
+                    Primera prima: <span className="font-semibold tnums text-ink">{euros(q.downPayment)} €</span>
+                  </p>
+                )}
                 {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
                 {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} />}
               </li>
             ))}
           </ul>
+        )}
+
+        {producto === "salud" && realQuotes.length > 0 && insuranceId && (
+          <p className="mt-3 text-[11px] leading-relaxed text-slate2">
+            Cotización Codeoscopic Nº <span className="tnums font-semibold text-ink">{insuranceId}</span>
+            <span className="text-slate2/80"> · Guárdalo por si tu asesor te lo pide para localizarlo al instante.</span>
+          </p>
         )}
 
         <ul className={`mt-5 flex-col gap-3 ${producto === "salud" && realQuotes.length > 0 ? "hidden" : "flex"}`}>

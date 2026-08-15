@@ -1072,6 +1072,41 @@ export async function setPresupuestoCodeoscopicInsurance(
   await jset(`presupuesto:${presupuestoId}`, { ...p, data, updatedAt: now });
 }
 
+// Snapshot resumido de las cotizaciones que devuelve Codeoscopic — lo que
+// se muestra en el bloque "Codeoscopic" de /admin/presupuestos/[id] para
+// que el equipo comercial vea el detalle real sin depender de que la API
+// de Codeoscopic responda en ese momento. Se refresca en cada
+// POST /api/quote/create y cada GET /api/quote/[insuranceId].
+export type CodeoscopicQuoteSummary = {
+  id: string;
+  compania: string;
+  producto: string;
+  modalidad: string;
+  premium: number | null;
+  downPayment: number | null;
+  frequency: string;
+  estimate: boolean;
+};
+
+export async function setPresupuestoCodeoscopicSnapshot(
+  presupuestoId: string,
+  snapshot: { insuranceId: string; quotes: CodeoscopicQuoteSummary[]; done: boolean }
+): Promise<void> {
+  const p = await jget<Presupuesto>(`presupuesto:${presupuestoId}`);
+  if (!p) return;
+  const now = new Date().toISOString();
+  const data = {
+    ...(p.data ?? {}),
+    codeoscopicInsuranceId: snapshot.insuranceId,
+    codeoscopicSnapshot: {
+      updatedAt: now,
+      done: snapshot.done,
+      quotes: snapshot.quotes,
+    },
+  };
+  await jset(`presupuesto:${presupuestoId}`, { ...p, data, updatedAt: now });
+}
+
 export async function setPresupuestoEleccion(
   leadId: string,
   producto: string,
