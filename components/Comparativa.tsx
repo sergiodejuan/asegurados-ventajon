@@ -9,6 +9,7 @@ import { Check } from "./icons";
 import { PriceMatchForm } from "./PriceMatchForm";
 import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
+import { normalizePhone } from "@/lib/schema";
 import type { Product } from "@/lib/catalog";
 import {
   loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
@@ -92,6 +93,20 @@ export function Comparativa() {
   const [priceMatchOpen, setPriceMatchOpen] = useState(false);
   const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
+  // Comparativa bloqueada tras un velo (blur) hasta que el usuario confirma
+  // sus datos de contacto y consentimientos — ver ComparativaGate más abajo.
+  // Se precarga con lo que ya sepamos (normalmente ya viene del tarificador),
+  // así que para la mayoría es solo "revisar y confirmar", no volver a
+  // escribir todo desde cero.
+  const [unlocked, setUnlocked] = useState(false);
+  const [gateNombre, setGateNombre] = useState("");
+  const [gateTelefono, setGateTelefono] = useState("");
+  const [gateEmail, setGateEmail] = useState("");
+  const [gateAceptaPrivacidad, setGateAceptaPrivacidad] = useState(false);
+  const [gateAceptaComercial, setGateAceptaComercial] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
+
   useEffect(() => {
     const q = loadQuote();
     setQuote(q);
@@ -102,8 +117,45 @@ export function Comparativa() {
       setDental(!!q.coberturaDental);
       setFumador(!!q.fumador);
       setCoberturaDeseada(q.coberturaDeseada ?? "");
+      setGateNombre(q.nombre ?? "");
+      setGateTelefono(q.telefono ?? "");
+      setGateEmail(q.email ?? "");
     }
   }, []);
+
+  async function unlockComparativa(e: React.FormEvent) {
+    e.preventDefault();
+    setGateError(null);
+    if (!gateNombre.trim() || gateNombre.trim().length < 2) { setGateError("Dinos tu nombre."); return; }
+    if (!/^[6-9]\d{8}$/.test(normalizePhone(gateTelefono))) { setGateError("Introduce un móvil español válido (9 dígitos)."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim())) { setGateError("Revisa tu correo electrónico."); return; }
+    if (!gateAceptaPrivacidad) { setGateError("Necesitamos que aceptes la política de privacidad."); return; }
+
+    setGateSubmitting(true);
+    try {
+      await fetch("/api/client/update-contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lookupPhone: quote?.telefono,
+          lookupEmail: quote?.email,
+          patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: gateAceptaComercial },
+        }),
+      });
+    } catch { /* mejor esfuerzo: si falla, igualmente desbloqueamos localmente */ }
+    finally { setGateSubmitting(false); }
+
+    const next = updateQuote({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
+    if (next) setQuote(next);
+    setUnlocked(true);
+  }
+
+  // Salir del velo sin dejar (más) datos. A diferencia de algunos
+  // competidores, el cierre aquí funciona de verdad — no es un patrón
+  // oscuro que finge cerrarse para forzar el formulario.
+  function skipGate() {
+    setUnlocked(true);
+  }
 
   useEffect(() => {
     fetch(`/api/products?producto=${producto}`)
@@ -383,119 +435,140 @@ export function Comparativa() {
           </div>
         )}
 
-        <div className="mt-5 rounded-card border border-hair bg-mist p-4">
-          <p className="text-[13px] font-bold text-navy">
-            {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
-          </p>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            {producto === "salud" && realStatus === "loading" && (
-              realQuotes.length > 0
-                ? `Consultando en tiempo real con las aseguradoras — ${realQuotes.length} ${realQuotes.length === 1 ? "compañía" : "compañías"} ${realQuotes.length === 1 ? "ha" : "han"} respondido, esperando al resto…`
-                : "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."
-            )}
-            {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && `Precios reales de ${realQuotes.length} ${realQuotes.length === 1 ? "aseguradora" : "aseguradoras"} devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso.`}
-            {(producto !== "salud" || realStatus === "unavailable" || realStatus === "error" || (realStatus !== "loading" && realQuotes.length === 0)) && "El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso."}
-          </p>
-        </div>
-
-        {producto === "salud" && realQuotes.length > 0 && (
-          <ul className="mt-5 flex flex-col gap-3">
-            {realQuotes.map((q) => (
-              <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex flex-col">
-                    <span className="text-[16px] font-bold text-ink">{q.compania}</span>
-                    {(q.producto || q.modalidad) && (
-                      <span className="text-[12px] text-slate2">
-                        {[q.producto, q.modalidad].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-right text-[14px] text-slate2">
-                    {q.premium != null
-                      ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(q.premium)} €</span>/{q.frequency === "Monthly" ? "mes" : "año"}</>
-                      : <span className="text-[13px] italic text-slate2">Calculando…</span>}
-                  </p>
-                </div>
-                {q.downPayment != null && q.downPayment > 0 && q.downPayment !== q.premium && (
-                  <p className="mt-1 text-[12px] text-slate2">
-                    Primera prima: <span className="font-semibold tnums text-ink">{euros(q.downPayment)} €</span>
-                  </p>
+        <div className="relative mt-5">
+          <div aria-hidden={!unlocked} className={!unlocked ? "pointer-events-none select-none blur-sm" : undefined}>
+            <div className="rounded-card border border-hair bg-mist p-4">
+              <p className="text-[13px] font-bold text-navy">
+                {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-slate2">
+                {producto === "salud" && realStatus === "loading" && (
+                  realQuotes.length > 0
+                    ? `Consultando en tiempo real con las aseguradoras — ${realQuotes.length} ${realQuotes.length === 1 ? "compañía" : "compañías"} ${realQuotes.length === 1 ? "ha" : "han"} respondido, esperando al resto…`
+                    : "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."
                 )}
-                {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCoveragesFor(q)}
-                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
-                  >
-                    Ver coberturas
-                  </button>
-                  {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} />}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {coveragesFor && insuranceId && (
-          <CoveragesModal insuranceId={insuranceId} quote={coveragesFor} onClose={() => setCoveragesFor(null)} />
-        )}
+                {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && `Precios reales de ${realQuotes.length} ${realQuotes.length === 1 ? "aseguradora" : "aseguradoras"} devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso.`}
+                {(producto !== "salud" || realStatus === "unavailable" || realStatus === "error" || (realStatus !== "loading" && realQuotes.length === 0)) && "El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso."}
+              </p>
+            </div>
 
-        {producto === "salud" && realQuotes.length > 0 && insuranceId && (
-          <p className="mt-3 text-[11px] leading-relaxed text-slate2">
-            Cotización Codeoscopic Nº <span className="tnums font-semibold text-ink">{insuranceId}</span>
-            <span className="text-slate2/80"> · Guárdalo por si tu asesor te lo pide para localizarlo al instante.</span>
-          </p>
-        )}
-
-        <ul className={`mt-5 flex-col gap-3 ${producto === "salud" && realQuotes.length > 0 ? "hidden" : "flex"}`}>
-          {producto !== "salud"
-            ? products.map((c) => {
-                const price = producto === "auto"
-                  ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
-                  : producto === "decesos"
-                  ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
-                  : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
-                return (
-                  <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+            {producto === "salud" && realQuotes.length > 0 && (
+              <ul className="mt-5 flex flex-col gap-3">
+                {realQuotes.map((q) => (
+                  <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        {c.logoUrl
-                          ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
-                          : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
-                        {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
+                      <div className="flex flex-col">
+                        <span className="text-[16px] font-bold text-ink">{q.compania}</span>
+                        {(q.producto || q.modalidad) && (
+                          <span className="text-[12px] text-slate2">
+                            {[q.producto, q.modalidad].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
                       </div>
                       <p className="text-right text-[14px] text-slate2">
-                        Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
+                        {q.premium != null
+                          ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(q.premium)} €</span>/{q.frequency === "Monthly" ? "mes" : "año"}</>
+                          : <span className="text-[13px] italic text-slate2">Calculando…</span>}
                       </p>
                     </div>
-                    <CompanyActions producto={producto} compania={c.compania} precio={price.precio} />
+                    {q.downPayment != null && q.downPayment > 0 && q.downPayment !== q.premium && (
+                      <p className="mt-1 text-[12px] text-slate2">
+                        Primera prima: <span className="font-semibold tnums text-ink">{euros(q.downPayment)} €</span>
+                      </p>
+                    )}
+                    {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCoveragesFor(q)}
+                        tabIndex={unlocked ? 0 : -1}
+                        className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
+                      >
+                        Ver coberturas
+                      </button>
+                      {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} />}
+                    </div>
                   </li>
-                );
-              })
-            : products.map((c) => {
-                const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
-                return (
-                  <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
-                    <div className="flex items-center gap-2">
-                      {c.logoUrl
-                        ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
-                        : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
-                      {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                      <span>Con copago</span>
-                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                      <span>Sin copago</span>
-                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
-                    </div>
-                    <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} />
-                  </li>
-                );
-              })}
-        </ul>
+                ))}
+              </ul>
+            )}
+            {coveragesFor && insuranceId && unlocked && (
+              <CoveragesModal insuranceId={insuranceId} quote={coveragesFor} onClose={() => setCoveragesFor(null)} />
+            )}
+
+            {producto === "salud" && realQuotes.length > 0 && insuranceId && (
+              <p className="mt-3 text-[11px] leading-relaxed text-slate2">
+                Cotización Codeoscopic Nº <span className="tnums font-semibold text-ink">{insuranceId}</span>
+                <span className="text-slate2/80"> · Guárdalo por si tu asesor te lo pide para localizarlo al instante.</span>
+              </p>
+            )}
+
+            <ul className={`mt-5 flex-col gap-3 ${producto === "salud" && realQuotes.length > 0 ? "hidden" : "flex"}`}>
+              {producto !== "salud"
+                ? products.map((c) => {
+                    const price = producto === "auto"
+                      ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+                      : producto === "decesos"
+                      ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
+                      : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
+                    return (
+                      <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            {c.logoUrl
+                              ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                              : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
+                            {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
+                          </div>
+                          <p className="text-right text-[14px] text-slate2">
+                            Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
+                          </p>
+                        </div>
+                        <CompanyActions producto={producto} compania={c.compania} precio={price.precio} locked={!unlocked} recommended={!!c.destacado} />
+                      </li>
+                    );
+                  })
+                : products.map((c) => {
+                    const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
+                    return (
+                      <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+                        <div className="flex items-center gap-2">
+                          {c.logoUrl
+                            ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                            : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
+                          {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
+                          <span>Con copago</span>
+                          <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
+                          <span>Sin copago</span>
+                          <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
+                        </div>
+                        <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} locked={!unlocked} recommended={!!c.destacado} />
+                      </li>
+                    );
+                  })}
+            </ul>
+          </div>
+
+          {!unlocked && (
+            <div className="absolute inset-x-0 top-0">
+              <ComparativaGate
+                nombre={gateNombre} onNombre={setGateNombre}
+                telefono={gateTelefono} onTelefono={setGateTelefono}
+                email={gateEmail} onEmail={setGateEmail}
+                aceptaPrivacidad={gateAceptaPrivacidad} onAceptaPrivacidad={setGateAceptaPrivacidad}
+                aceptaComercial={gateAceptaComercial} onAceptaComercial={setGateAceptaComercial}
+                error={gateError}
+                submitting={gateSubmitting}
+                onSubmit={unlockComparativa}
+                onSkip={skipGate}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Rescate "igualación de precio": bloque discreto pero visible
             debajo de las cotizaciones. Objetivo — recuperar al usuario que
@@ -566,21 +639,126 @@ export function CompanyLogo({
   return <img src={logoUrl} alt={compania} className={`w-auto shrink-0 object-contain ${size}`} />;
 }
 
-function CompanyActions({ producto, compania, precio }: { producto: string; compania: string; precio: number }) {
+// El botón primario se muestra en verde mientras la comparativa está
+// bloqueada tras el velo (empuja a completar el gate para "desbloquear" el
+// color normal, un empujón visual más hacia dejar el dato) y también, ya
+// desbloqueada, en la opción recomendada — esa se queda en verde a
+// propósito para que siga destacando, en vez de volver a rojo como el resto.
+function CompanyActions({
+  producto, compania, precio, locked = false, recommended = false,
+}: {
+  producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
+}) {
+  const green = locked || recommended;
   return (
     <div className="mt-3 flex gap-2">
       <a
         href={`/comparativa/${slugify(compania)}?producto=${producto}`}
+        tabIndex={locked ? -1 : 0}
         className="flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold text-navy transition-colors hover:border-navy/40 hover:bg-mist"
       >
         Más información
       </a>
       <a
         href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
-        className="flex-1 rounded-card bg-brand-red px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+        tabIndex={locked ? -1 : 0}
+        className={`flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
       >
         Que te llamen gratis
       </a>
+    </div>
+  );
+}
+
+/* ------------------------------ Gate de contacto --------------------------- */
+// Vela la comparativa (blur) hasta que el usuario confirma sus datos de
+// contacto y consentimientos. A diferencia de algunos formularios de
+// referencia del sector, "Ver sin completar" cierra de verdad — no fingimos
+// un cierre que en realidad no hace nada, eso solo genera desconfianza.
+function ComparativaGate({
+  nombre, onNombre, telefono, onTelefono, email, onEmail,
+  aceptaPrivacidad, onAceptaPrivacidad, aceptaComercial, onAceptaComercial,
+  error, submitting, onSubmit, onSkip,
+}: {
+  nombre: string; onNombre: (v: string) => void;
+  telefono: string; onTelefono: (v: string) => void;
+  email: string; onEmail: (v: string) => void;
+  aceptaPrivacidad: boolean; onAceptaPrivacidad: (v: boolean) => void;
+  aceptaComercial: boolean; onAceptaComercial: (v: boolean) => void;
+  error: string | null;
+  submitting: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-md rounded-[20px] border border-hair bg-white p-5 shadow-card sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[18px] font-extrabold leading-snug text-navy">¡Ya casi está!</h2>
+          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
+            Confirma tus datos para ver el precio completo de cada compañía.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSkip}
+          aria-label="Ver la comparativa sin completar el formulario"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
+        >
+          ✕
+        </button>
+      </div>
+
+      <form onSubmit={onSubmit} noValidate className="mt-4 flex flex-col gap-3">
+        <input
+          type="text" value={nombre} onChange={(e) => onNombre(e.target.value)}
+          placeholder="Nombre y apellidos" autoComplete="name"
+          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+        />
+        <input
+          type="tel" inputMode="tel" value={telefono} onChange={(e) => onTelefono(e.target.value)}
+          placeholder="Teléfono móvil" autoComplete="tel"
+          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+        />
+        <input
+          type="email" inputMode="email" value={email} onChange={(e) => onEmail(e.target.value)}
+          placeholder="Correo electrónico" autoComplete="email"
+          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+        />
+
+        <p className="text-[12px] leading-relaxed text-slate2">
+          {BRAND_NAME}, como responsable del tratamiento, usará tus datos para mostrarte tu comparativa y que un asesor pueda confirmarte el precio final.{" "}
+          <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
+        </p>
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={aceptaPrivacidad} onChange={(e) => onAceptaPrivacidad(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+          <span className="text-[12px] leading-relaxed text-slate2">
+            He leído y acepto la <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={aceptaComercial} onChange={(e) => onAceptaComercial(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+          <span className="text-[12px] leading-relaxed text-slate2">
+            Quiero recibir comunicaciones comerciales personalizadas de {BRAND_NAME} (opcional).
+          </span>
+        </label>
+
+        {error && <p role="alert" className="text-[12px] font-medium text-brand-red">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          aria-busy={submitting || undefined}
+          className="mt-1 inline-flex min-h-[48px] w-full items-center justify-center rounded-[12px] bg-emerald-600 px-5 text-[15px] font-bold text-white transition-colors hover:bg-emerald-700 disabled:bg-slate2/40"
+        >
+          {submitting ? "Comprobando…" : "Ver mi comparativa completa"}
+        </button>
+        <button type="button" onClick={onSkip} className="text-center text-[12px] font-medium text-slate2 underline">
+          Ver sin completar
+        </button>
+      </form>
     </div>
   );
 }

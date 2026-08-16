@@ -258,7 +258,7 @@ export async function upsertLead(
 
 export async function updateLeadContactByLookup(
   lookup: { leadId?: string; telefono?: string; email?: string },
-  patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string }
+  patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string; aceptaComercial?: boolean }
 ): Promise<Lead | null> {
   const lookupPhone = lookup.telefono ? normalizePhone(lookup.telefono) : "";
   const lookupEmail = lookup.email ? lookup.email.trim().toLowerCase() : "";
@@ -309,6 +309,13 @@ export async function updateLeadContactByLookup(
   if (patch.turnoLlamada !== undefined && patch.turnoLlamada !== lead.turnoLlamada) {
     lead.turnoLlamada = patch.turnoLlamada;
     changes.push("turno preferido");
+  }
+  // Consentimiento comercial: solo se registra al concederlo (nunca se
+  // retira por esta vía) — pensado para el "desbloqueo" de la comparativa,
+  // donde el cliente puede marcar la casilla opcional sin haberlo hecho antes.
+  if (patch.aceptaComercial === true && !lead.aceptaComercial) {
+    lead.aceptaComercial = true;
+    changes.push("comunicaciones comerciales");
   }
 
   if (changes.length) {
