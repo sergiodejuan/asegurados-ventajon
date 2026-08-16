@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
@@ -331,6 +331,84 @@ function AseguradosStep({ value, onChange, error }: { value: number; onChange: (
   );
 }
 
+// Fecha de nacimiento en 3 campos separados (dd / mm / aaaa) con
+// teclado numérico y auto-avance al rellenar cada tramo. Antes era un
+// input único con placeholder "dd/mm/aaaa", pero en móvil el teclado
+// numérico no tiene "/" y el usuario se quedaba atascado. Este patrón
+// es el mismo que usa StepForm en la home — coherencia + tocar cero.
+function DobInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const parts = /^(\d{0,2})\/?(\d{0,2})\/?(\d{0,4})$/.exec(value ?? "") ?? ["", "", "", ""];
+  const [dd, setDd] = useState(parts[1] ?? "");
+  const [mm, setMm] = useState(parts[2] ?? "");
+  const [aaaa, setAaaa] = useState(parts[3] ?? "");
+  const mmRef = useRef<HTMLInputElement>(null);
+  const aaaaRef = useRef<HTMLInputElement>(null);
+
+  // Cuando el padre cambia value (ej. reset del form), resincroniza.
+  useEffect(() => {
+    const p = /^(\d{0,2})\/?(\d{0,2})\/?(\d{0,4})$/.exec(value ?? "") ?? ["", "", "", ""];
+    setDd(p[1] ?? ""); setMm(p[2] ?? ""); setAaaa(p[3] ?? "");
+  }, [value]);
+
+  function compose(nd: string, nm: string, na: string) {
+    if (!nd && !nm && !na) return "";
+    return `${nd.padStart(2, "0")}/${nm.padStart(2, "0")}/${na.padStart(4, "0")}`;
+  }
+  function emitIfComplete(nd: string, nm: string, na: string) {
+    if (nd.length === 2 && nm.length === 2 && na.length === 4) onChange(compose(nd, nm, na));
+    else onChange(""); // string vacío marca "incompleto" para la validación
+  }
+
+  const inputCls = "w-full rounded-[12px] border border-hair bg-white px-3 py-3.5 text-center text-[18px] font-semibold tnums text-ink focus:border-navy focus:outline-none";
+
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr_auto_1.4fr] items-center gap-2">
+      <input
+        type="text" inputMode="numeric" pattern="\d*" maxLength={2}
+        aria-label="Día" placeholder="dd" autoComplete="bday-day"
+        value={dd}
+        onChange={(e) => {
+          const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+          setDd(v);
+          if (v.length === 2) mmRef.current?.focus();
+          emitIfComplete(v, mm, aaaa);
+        }}
+        className={inputCls}
+      />
+      <span aria-hidden="true" className="text-[16px] font-semibold text-slate2">/</span>
+      <input
+        ref={mmRef} type="text" inputMode="numeric" pattern="\d*" maxLength={2}
+        aria-label="Mes" placeholder="mm" autoComplete="bday-month"
+        value={mm}
+        onChange={(e) => {
+          const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+          setMm(v);
+          if (v.length === 2) aaaaRef.current?.focus();
+          emitIfComplete(dd, v, aaaa);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Backspace" && !mm) {
+            (e.currentTarget.previousElementSibling as HTMLInputElement | null)?.previousElementSibling?.dispatchEvent(new Event("focus"));
+          }
+        }}
+        className={inputCls}
+      />
+      <span aria-hidden="true" className="text-[16px] font-semibold text-slate2">/</span>
+      <input
+        ref={aaaaRef} type="text" inputMode="numeric" pattern="\d*" maxLength={4}
+        aria-label="Año" placeholder="aaaa" autoComplete="bday-year"
+        value={aaaa}
+        onChange={(e) => {
+          const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+          setAaaa(v);
+          emitIfComplete(dd, mm, v);
+        }}
+        className={inputCls}
+      />
+    </div>
+  );
+}
+
 function SaludStep({ form, set, errors }: {
   form: Form;
   set: <K extends keyof Form>(k: K, v: Form[K]) => void;
@@ -343,12 +421,10 @@ function SaludStep({ form, set, errors }: {
         Necesitamos estos datos para calcular tu precio. Todo es confidencial y solo lo verá tu asesor.
       </p>
       <div className="mt-6 flex flex-col gap-5">
-        <Field label="Fecha de nacimiento" error={errors.fechaNacimiento}>
-          <input
-            type="text" inputMode="numeric" placeholder="dd/mm/aaaa"
+        <Field label="Fecha de nacimiento" error={errors.fechaNacimiento} hint="Escribe día, mes y año.">
+          <DobInput
             value={form.fechaNacimiento}
-            onChange={(e) => set("fechaNacimiento", e.target.value)}
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums text-ink focus:border-navy focus:outline-none"
+            onChange={(v) => set("fechaNacimiento", v)}
           />
         </Field>
         <Field label="Sexo" error={errors.sexo}>
