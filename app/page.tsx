@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { CoverageTabs } from "@/components/CoverageTabs";
+import { HeroQuoteCTA } from "@/components/HeroQuoteModal";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import {
   BRAND_NAME, PARTNERS, ECOSYSTEM_MEMBERS, CONTACT_HOURS,
@@ -36,10 +37,9 @@ export default function Home() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3">
-            <a href="/tarificador"
-              className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
+            <HeroQuoteCTA className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep">
               Calcula tu precio
-            </a>
+            </HeroQuoteCTA>
             <a href="/quiero-que-me-llamen"
               className="flex items-center justify-center rounded-card bg-navy px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-navy-deep">
               Te llamamos gratis

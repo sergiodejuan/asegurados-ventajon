@@ -4,10 +4,36 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
 import { BRAND_NAME } from "@/lib/brand";
-import { SALUD_CONFIG, VIDA_CONFIG, type FormData, type Step } from "@/lib/forms";
+import { SALUD_CONFIG, VIDA_CONFIG, type FormConfig, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 
 type FieldErrors = Partial<Record<string, string>>;
+
+// El modal del hero (ver HeroQuoteModal) resuelve el paso de intención y el
+// de código postal antes de llegar aquí, pasándolos como query params con
+// el mismo nombre que su `field` en la config. Si están, se precargan y se
+// salta directamente al primer paso pendiente.
+function prefillFromParams(config: FormConfig, params: URLSearchParams): FormData {
+  const prefill: FormData = {};
+  const first = config.steps[0];
+  if (first.type === "choice") {
+    const v = params.get(first.field);
+    if (v && first.options.some((o) => o.value === v)) prefill[first.field] = v;
+  }
+  const cp = params.get("cp");
+  if (cp && /^\d{5}$/.test(cp)) prefill.codigoPostal = cp;
+  return prefill;
+}
+function countPrefilledSteps(steps: Step[], data: FormData): number {
+  let i = 0;
+  for (; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.type === "choice" && typeof data[s.field] !== "undefined") continue;
+    if (s.type === "cp" && typeof data.codigoPostal !== "undefined") continue;
+    break;
+  }
+  return i;
+}
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
@@ -16,8 +42,14 @@ export function StepForm({ variant }: { variant: "salud" | "vida" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [data, setData] = useState<FormData>({ seguroActualPeriodo: "mes", seguroActualServicios: [] });
-  const [stepIndex, setStepIndex] = useState(0);
+  const initialData = useMemo<FormData>(() => ({
+    seguroActualPeriodo: "mes",
+    seguroActualServicios: [],
+    ...prefillFromParams(config, searchParams),
+  }), []); // solo al montar: el prefill viene del modal del hero, no cambia en vivo
+
+  const [data, setData] = useState<FormData>(initialData);
+  const [stepIndex, setStepIndex] = useState(() => countPrefilledSteps(config.steps, initialData));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
