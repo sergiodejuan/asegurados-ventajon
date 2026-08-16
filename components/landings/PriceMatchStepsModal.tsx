@@ -10,6 +10,7 @@ import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Check, ChevronDown, ChevronLeft, Close, Spinner } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { resizeImageFile, MAX_IMAGE_FILE_BYTES } from "@/components/admin/ImageField";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "@/components/EssentialConsent";
 
 // Modal a pantalla completa con wizard de 4 pasos para el flujo "igualación
 // de precio" (/precio-mejor-garantizado). Mismo patrón de pasos que el
@@ -55,8 +56,9 @@ type Form = {
   telefono: string;
   email: string;
   codigoPostal: typeof ZONA_OPTIONS[number] | "";
-  aceptaPrivacidad: boolean;
-  autorizaContacto: boolean;
+  // Un único check cubre privacidad + autorización de contacto — ver
+  // components/EssentialConsent.tsx.
+  aceptaEsencial: boolean;
   aceptaComercial: boolean;
 };
 
@@ -71,8 +73,7 @@ const INITIAL_FORM: Form = {
   telefono: "",
   email: "",
   codigoPostal: "",
-  aceptaPrivacidad: false,
-  autorizaContacto: false,
+  aceptaEsencial: false,
   aceptaComercial: false,
 };
 
@@ -158,8 +159,7 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
       if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
     }
     if (step === "envio") {
-      if (!form.aceptaPrivacidad) errs.aceptaPrivacidad = "Es necesario aceptar la política.";
-      if (!form.autorizaContacto) errs.autorizaContacto = "Es necesario para poder llamarte.";
+      if (!form.aceptaEsencial) errs.aceptaEsencial = "Es necesario aceptar la política.";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -211,8 +211,8 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
         telefono: normalizePhone(form.telefono),
         email: form.email.trim(),
         codigoPostal: form.codigoPostal,
-        aceptaPrivacidad: form.aceptaPrivacidad,
-        autorizaContacto: form.autorizaContacto,
+        aceptaPrivacidad: form.aceptaEsencial,
+        autorizaContacto: form.aceptaEsencial,
         aceptaComercial: form.aceptaComercial,
         consent,
         company: "",
@@ -448,31 +448,15 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
                     Confirma que aceptas nuestros términos y enviamos tu solicitud. Un asesor te contacta en menos de 24 horas laborables.
                   </p>
                   <div className="mt-6 flex flex-col gap-4">
-                    <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-                      <input type="checkbox" checked={form.aceptaPrivacidad} onChange={(e) => set("aceptaPrivacidad", e.target.checked)}
-                        className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-                      <span className="text-[14px] leading-relaxed">
-                        He leído y acepto la <Link href="/legal#privacidad" className="text-navy underline">Política de privacidad</Link>.
-                      </span>
-                    </label>
-                    {errors.aceptaPrivacidad && <p className="text-[13px] font-semibold text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-                    <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-                      <input type="checkbox" checked={form.autorizaContacto} onChange={(e) => set("autorizaContacto", e.target.checked)}
-                        className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-                      <span className="text-[14px] leading-relaxed">
-                        Autorizo a {BRAND_NAME} a contactarme (teléfono/WhatsApp/email) para gestionar esta solicitud.
-                      </span>
-                    </label>
-                    {errors.autorizaContacto && <p className="text-[13px] font-semibold text-brand-red">{errors.autorizaContacto}</p>}
-
-                    <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-                      <input type="checkbox" checked={form.aceptaComercial} onChange={(e) => set("aceptaComercial", e.target.checked)}
-                        className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-                      <span className="text-[14px] leading-relaxed">
-                        Acepto recibir ofertas comerciales relacionadas con seguros (opcional).
-                      </span>
-                    </label>
+                    <EssentialConsentCheckbox
+                      idPrefix="pm-modal" checked={form.aceptaEsencial}
+                      onChange={(v) => set("aceptaEsencial", v)}
+                      error={errors.aceptaEsencial}
+                    />
+                    <ComercialConsentCheckbox
+                      idPrefix="pm-modal" checked={form.aceptaComercial}
+                      onChange={(v) => set("aceptaComercial", v)}
+                    />
                   </div>
 
                   <TurnstileWidget onToken={setTurnstileToken} />

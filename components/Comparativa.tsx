@@ -7,6 +7,7 @@ import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { Check } from "./icons";
 import { PriceMatchForm } from "./PriceMatchForm";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import { normalizePhone } from "@/lib/schema";
@@ -114,9 +115,9 @@ export function Comparativa() {
   const [gateApellido1, setGateApellido1] = useState("");
   const [gateTelefono, setGateTelefono] = useState("");
   const [gateEmail, setGateEmail] = useState("");
-  const [gateAceptaPrivacidad, setGateAceptaPrivacidad] = useState(false);
-  const [gateAutorizaContacto, setGateAutorizaContacto] = useState(false);
-  const [gateAceptaDatosSalud, setGateAceptaDatosSalud] = useState(false);
+  // Un único check cubre privacidad + autorización de contacto + (si aplica)
+  // datos de salud — ver components/EssentialConsent.tsx.
+  const [gateAceptaEsencial, setGateAceptaEsencial] = useState(false);
   const [gateAceptaComercial, setGateAceptaComercial] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
   const [gateSubmitting, setGateSubmitting] = useState(false);
@@ -158,10 +159,12 @@ export function Comparativa() {
     }
     if (!/^[6-9]\d{8}$/.test(normalizePhone(gateTelefono))) { setGateError("Introduce un móvil español válido (9 dígitos)."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim())) { setGateError("Revisa tu correo electrónico."); return; }
-    if (!gateAceptaPrivacidad) { setGateError("Necesitamos que aceptes la política de privacidad."); return; }
-    if (!gateAutorizaContacto) { setGateError("Necesitamos tu autorización para contactarte."); return; }
-    if (isHealthLike && !gateAceptaDatosSalud) {
-      setGateError("Necesitamos tu consentimiento para tratar datos de salud (art. 9 RGPD)."); return;
+    if (!gateAceptaEsencial) {
+      setGateError(isHealthLike
+        ? "Necesitamos tu consentimiento para tratar tus datos de salud (art. 9 RGPD)."
+        : "Necesitamos que aceptes la política de privacidad."
+      );
+      return;
     }
 
     setGateSubmitting(true);
@@ -736,9 +739,7 @@ export function Comparativa() {
           apellido1={gateApellido1} onApellido1={setGateApellido1}
           telefono={gateTelefono} onTelefono={setGateTelefono}
           email={gateEmail} onEmail={setGateEmail}
-          aceptaPrivacidad={gateAceptaPrivacidad} onAceptaPrivacidad={setGateAceptaPrivacidad}
-          autorizaContacto={gateAutorizaContacto} onAutorizaContacto={setGateAutorizaContacto}
-          aceptaDatosSalud={gateAceptaDatosSalud} onAceptaDatosSalud={setGateAceptaDatosSalud}
+          aceptaEsencial={gateAceptaEsencial} onAceptaEsencial={setGateAceptaEsencial}
           aceptaComercial={gateAceptaComercial} onAceptaComercial={setGateAceptaComercial}
           error={gateError}
           submitting={gateSubmitting}
@@ -799,9 +800,7 @@ function ComparativaGate({
   producto, isHealthLike, mustGate,
   nombre, onNombre, apellido1, onApellido1,
   telefono, onTelefono, email, onEmail,
-  aceptaPrivacidad, onAceptaPrivacidad,
-  autorizaContacto, onAutorizaContacto,
-  aceptaDatosSalud, onAceptaDatosSalud,
+  aceptaEsencial, onAceptaEsencial,
   aceptaComercial, onAceptaComercial,
   error, submitting, onSubmit, onSkip,
 }: {
@@ -812,9 +811,7 @@ function ComparativaGate({
   apellido1: string; onApellido1: (v: string) => void;
   telefono: string; onTelefono: (v: string) => void;
   email: string; onEmail: (v: string) => void;
-  aceptaPrivacidad: boolean; onAceptaPrivacidad: (v: boolean) => void;
-  autorizaContacto: boolean; onAutorizaContacto: (v: boolean) => void;
-  aceptaDatosSalud: boolean; onAceptaDatosSalud: (v: boolean) => void;
+  aceptaEsencial: boolean; onAceptaEsencial: (v: boolean) => void;
   aceptaComercial: boolean; onAceptaComercial: (v: boolean) => void;
   error: string | null;
   submitting: boolean;
@@ -876,36 +873,13 @@ function ComparativaGate({
             {BRAND_NAME}, como responsable del tratamiento, usará tus datos para tarificar tu seguro y que un asesor te confirme el precio final.{" "}
             <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
           </p>
-          <label className="flex cursor-pointer items-start gap-3">
-            <input type="checkbox" checked={aceptaPrivacidad} onChange={(e) => onAceptaPrivacidad(e.target.checked)}
-              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-            <span className="text-[13px] leading-relaxed text-slate2">
-              He leído y acepto la <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-            </span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3">
-            <input type="checkbox" checked={autorizaContacto} onChange={(e) => onAutorizaContacto(e.target.checked)}
-              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-            <span className="text-[13px] leading-relaxed text-slate2">
-              Autorizo que {BRAND_NAME} me contacte por teléfono, WhatsApp o email para gestionar mi presupuesto.
-            </span>
-          </label>
-          {isHealthLike && (
-            <label className="flex cursor-pointer items-start gap-3">
-              <input type="checkbox" checked={aceptaDatosSalud} onChange={(e) => onAceptaDatosSalud(e.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-              <span className="text-[13px] leading-relaxed text-slate2">
-                Consiento el tratamiento de mis <strong className="text-navy">datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi tarifa.
-              </span>
-            </label>
-          )}
-          <label className="flex cursor-pointer items-start gap-3">
-            <input type="checkbox" checked={aceptaComercial} onChange={(e) => onAceptaComercial(e.target.checked)}
-              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-            <span className="text-[13px] leading-relaxed text-slate2">
-              Quiero recibir comunicaciones comerciales de {BRAND_NAME} (opcional).
-            </span>
-          </label>
+          <EssentialConsentCheckbox
+            idPrefix="comparativa-gate" datosSalud={isHealthLike}
+            checked={aceptaEsencial} onChange={onAceptaEsencial}
+          />
+          <ComercialConsentCheckbox
+            idPrefix="comparativa-gate" checked={aceptaComercial} onChange={onAceptaComercial}
+          />
 
           {error && <p role="alert" className="mt-1 rounded-[10px] bg-brand-red/10 px-4 py-2.5 text-[13px] font-medium text-brand-red-deep">{error}</p>}
 

@@ -3,7 +3,6 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
-import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, DECESOS_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
@@ -12,7 +11,7 @@ import { saveQuote, saveLeadDraft } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { ConsentNudgeModal } from "./ConsentNudgeModal";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { ExitIntentModal } from "./ExitIntentModal";
 import { TurnstileWidget } from "./TurnstileWidget";
 
@@ -38,7 +37,6 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
-  const [showConsentNudge, setShowConsentNudge] = useState(false);
   const [showExitIntent, setShowExitIntent] = useState(false);
   const [exitIntentArmed, setExitIntentArmed] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -167,6 +165,19 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
   }
 
+  // Un único check cubre privacidad + autorización de contacto (o, en
+  // salud/vida, privacidad + datos de salud) — ver components/EssentialConsent.tsx.
+  function toggleEsencial(checked: boolean) {
+    set({ aceptaEsencial: checked });
+    const at = checked ? new Date().toISOString() : undefined;
+    const isHealthLike = variant === "salud" || variant === "vida";
+    setConsentTimes((c) => ({
+      ...c,
+      privacidadAt: at,
+      ...(isHealthLike ? { datosSaludAt: at } : { contactoAt: at }),
+    }));
+  }
+
   /* ------------------------------ Validaciones ----------------------------- */
   function validateDob(): boolean {
     const e: FieldErrors = {};
@@ -216,6 +227,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     delete draftData.apellido2;
     delete draftData.telefono;
     delete draftData.email;
+    delete draftData.aceptaEsencial;
     delete draftData.aceptaPrivacidad;
     delete draftData.autorizaContacto;
     delete draftData.aceptaDatosSalud;
@@ -253,24 +265,23 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     if (variant === "salud" && (!String(data.apellido1 ?? "").trim() || String(data.apellido1).trim().length < 2)) e.apellido1 = "Dinos tu primer apellido.";
     if (!/^[6-9]\d{8}$/.test(normalizePhone(String(data.telefono ?? "")))) e.telefono = "Introduce un móvil español válido (9 dígitos).";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email ?? "").trim())) e.email = "Revisa tu correo electrónico.";
-    if (!data.aceptaPrivacidad) e.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
-    if (!data.autorizaContacto) e.autorizaContacto = "Necesitamos tu autorización para poder llamarte.";
-    // Plus5: art. 9 RGPD — obligatorio solo cuando el producto trata datos
-    // de salud (salud, vida). Para auto/decesos no aplica esa categoría.
-    if ((variant === "salud" || variant === "vida") && !data.aceptaDatosSalud) {
-      e.aceptaDatosSalud = "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD).";
+    // Plus5: art. 9 RGPD — obligatorio consentimiento explícito de datos de
+    // salud solo cuando el producto los trata (salud, vida). Para el resto,
+    // el check esencial cubre privacidad + autorización de contacto.
+    if (!data.aceptaEsencial) {
+      e.aceptaEsencial = (variant === "salud" || variant === "vida")
+        ? "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD)."
+        : "Necesitamos que aceptes la política de privacidad.";
     }
     if (Object.keys(e).length) {
       setErrors(e);
-      // Si es el único motivo por el que no se puede enviar, en vez de solo
-      // el error en rojo explicamos brevemente por qué conviene marcarlo
-      // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
-      if (Object.keys(e).length === 1 && e.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["nombre", "apellido1", "telefono", "email", "aceptaPrivacidad", "autorizaContacto", "aceptaDatosSalud"].find((k) => e[k]);
+      const first = ["nombre", "apellido1", "telefono", "email"].find((k) => e[k]);
       if (first) document.getElementById(`f-${first}`)?.focus();
+      else if (e.aceptaEsencial) document.getElementById("f-consiente-esencial")?.focus();
       return;
     }
 
+    const isHealthLike = variant === "salud" || variant === "vida";
     const payload = {
       ...data,
       fechaNacimiento: `${data.dd ?? ""}/${data.mm ?? ""}/${data.aaaa ?? ""}`,
@@ -278,6 +289,9 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       aseguradosAdicionales: ((data.aseguradosExtra as ExtraInsured[]) ?? [])
         .filter((a) => a.dd && a.mm && a.aaaa && a.sexo)
         .map((a) => ({ fechaNacimiento: `${a.dd}/${a.mm}/${a.aaaa}`, sexo: a.sexo })),
+      aceptaPrivacidad: true,
+      autorizaContacto: true,
+      ...(isHealthLike ? { aceptaDatosSalud: true } : {}),
       company: "",
       consent: consentTimes,
       utm: getAttribution(),
@@ -602,20 +616,15 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
               <Field id="f-telefono" label="Teléfono móvil" type="tel" inputMode="tel" value={String(data.telefono ?? "")} onChange={(v) => set({ telefono: v })} autoComplete="tel" error={errors.telefono} placeholder="600 000 000…" />
               <Field id="f-email" label="Correo electrónico" type="email" inputMode="email" value={String(data.email ?? "")} onChange={(v) => set({ email: v })} autoComplete="email" spellCheck={false} autoCapitalize="none" error={errors.email} placeholder="maria@correo.com…" />
               <div className="mt-5 flex flex-col gap-3">
-                <Consent id="f-aceptaPrivacidad" checked={!!data.aceptaPrivacidad} onChange={(v) => toggleConsent("privacidadAt", "aceptaPrivacidad", v)} error={errors.aceptaPrivacidad}>
-                  He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a> y las <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">condiciones de uso</a>.
-                </Consent>
-                <Consent id="f-autorizaContacto" checked={!!data.autorizaContacto} onChange={(v) => toggleConsent("contactoAt", "autorizaContacto", v)} error={errors.autorizaContacto}>
-                  Autorizo a {BRAND_NAME} a contactarme por teléfono o WhatsApp para ayudarme a elegir mi seguro.
-                </Consent>
-                {(variant === "salud" || variant === "vida") && (
-                  <Consent id="f-aceptaDatosSalud" checked={!!data.aceptaDatosSalud} onChange={(v) => toggleConsent("datosSaludAt", "aceptaDatosSalud", v)} error={errors.aceptaDatosSalud}>
-                    Consiento el tratamiento de mis <strong>datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi tarifa. Puedo retirar este consentimiento en cualquier momento.
-                  </Consent>
-                )}
-                <Consent id="f-aceptaComercial" checked={!!data.aceptaComercial} onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}>
-                  Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).
-                </Consent>
+                <EssentialConsentCheckbox
+                  idPrefix="f" datosSalud={variant === "salud" || variant === "vida"}
+                  checked={!!data.aceptaEsencial} onChange={toggleEsencial}
+                  error={errors.aceptaEsencial}
+                />
+                <ComercialConsentCheckbox
+                  idPrefix="f" checked={!!data.aceptaComercial}
+                  onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}
+                />
               </div>
               <TurnstileWidget onToken={setTurnstileToken} />
               {submitError && <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>}
@@ -688,16 +697,6 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           anillo de foco global (si no, se ve como una línea azul suelta). */}
       <div ref={topRef} tabIndex={-1} className="outline-none focus:ring-0 focus-visible:ring-0" style={{ boxShadow: "none" }} />
       {current && <div key={current.key}>{renderStep(current)}</div>}
-      <ConsentNudgeModal
-        open={showConsentNudge}
-        onClose={() => setShowConsentNudge(false)}
-        onAccept={() => {
-          set({ autorizaContacto: true });
-          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
-          setErrors({});
-          setShowConsentNudge(false);
-        }}
-      />
       <ExitIntentModal
         open={showExitIntent}
         onClose={() => setShowExitIntent(false)}
@@ -826,19 +825,6 @@ function Field({ id, label, value, onChange, error, type = "text", inputMode, au
         spellCheck={spellCheck} autoCapitalize={autoCapitalize} value={value} onChange={(e) => onChange(e.target.value)}
         aria-invalid={!!error} aria-describedby={error ? errId : undefined}
         className={`w-full rounded-card border bg-white px-4 py-3.5 text-[16px] text-ink placeholder:text-slate2/60 ${error ? "border-brand-red" : "border-hair"}`} />
-      <FieldError id={errId} msg={error} />
-    </div>
-  );
-}
-function Consent({ id, checked, onChange, error, children }: { id: string; checked: boolean; onChange: (v: boolean) => void; error?: string; children: React.ReactNode }) {
-  const errId = `${id}-err`;
-  return (
-    <div>
-      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
-        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-invalid={!!error} aria-describedby={error ? errId : undefined}
-          className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-        <span className="text-[13px] leading-relaxed text-slate2">{children}</span>
-      </label>
       <FieldError id={errId} msg={error} />
     </div>
   );

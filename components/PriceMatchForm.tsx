@@ -7,6 +7,7 @@ import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { TurnstileWidget } from "./TurnstileWidget";
 import { Spinner } from "./icons";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { resizeImageFile, MAX_IMAGE_FILE_BYTES } from "./admin/ImageField";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -61,8 +62,9 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [codigoPostal, setCodigoPostal] = useState<typeof ZONA_OPTIONS[number] | "">("");
-  const [priv, setPriv] = useState(false);
-  const [contacto, setContacto] = useState(false);
+  // Un único check cubre privacidad + autorización de contacto — ver
+  // components/EssentialConsent.tsx.
+  const [esencial, setEsencial] = useState(false);
   const [comercial, setComercial] = useState(false);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -86,6 +88,12 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
   }
 
+  function toggleEsencial(checked: boolean) {
+    setEsencial(checked);
+    const at = checked ? new Date().toISOString() : undefined;
+    setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
@@ -97,8 +105,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
     if (!/^[6-9]\d{8}$/.test(normalizePhone(telefono))) errs.telefono = "Introduce un móvil español válido.";
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errs.email = "Revisa tu correo electrónico.";
     if (!codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
-    if (!priv) errs.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
-    if (!contacto) errs.autorizaContacto = "Necesitamos tu autorización para poder llamarte.";
+    if (!esencial) errs.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
@@ -108,7 +115,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
         producto, companiaActual: companiaActual.trim(), precioActual: precioNum, periodicidad, capturaUrl,
         comentario: comentario.trim(),
         nombre: nombre.trim(), telefono: normalizePhone(telefono), email: email.trim(),
-        codigoPostal, aceptaPrivacidad: priv, autorizaContacto: contacto, aceptaComercial: comercial,
+        codigoPostal, aceptaPrivacidad: esencial, autorizaContacto: esencial, aceptaComercial: comercial,
         consent: consentTimes, company: "", utm: getAttribution(), turnstileToken, origen,
       };
       const res = await fetch("/api/lead/price-match", {
@@ -241,22 +248,14 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
 
       {/* Consentimientos */}
       <div className="flex flex-col gap-2 rounded-card border border-hair bg-mist/40 p-3">
-        <label className="flex items-start gap-2 text-[13px] leading-relaxed text-ink">
-          <input type="checkbox" checked={priv} onChange={(e) => toggleConsent("privacidadAt", e.target.checked, setPriv)} className="mt-1 h-4 w-4 shrink-0 accent-brand-red" />
-          <span>Acepto la <a href="/legal#privacidad" className="font-semibold underline">política de privacidad</a> para el tratamiento de mis datos.</span>
-        </label>
-        {errors.aceptaPrivacidad && <p role="alert" className="text-[12px] font-medium text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-        <label className="flex items-start gap-2 text-[13px] leading-relaxed text-ink">
-          <input type="checkbox" checked={contacto} onChange={(e) => toggleConsent("contactoAt", e.target.checked, setContacto)} className="mt-1 h-4 w-4 shrink-0 accent-brand-red" />
-          <span>Autorizo a Asegurados Ventajon a contactarme (llamada, WhatsApp o email) para atender esta solicitud.</span>
-        </label>
-        {errors.autorizaContacto && <p role="alert" className="text-[12px] font-medium text-brand-red">{errors.autorizaContacto}</p>}
-
-        <label className="flex items-start gap-2 text-[13px] leading-relaxed text-slate2">
-          <input type="checkbox" checked={comercial} onChange={(e) => toggleConsent("comercialAt", e.target.checked, setComercial)} className="mt-1 h-4 w-4 shrink-0 accent-brand-red" />
-          <span>(Opcional) Quiero recibir ofertas y novedades relacionadas con mis seguros.</span>
-        </label>
+        <EssentialConsentCheckbox
+          idPrefix="pm" size="sm" checked={esencial} onChange={toggleEsencial}
+          error={errors.aceptaPrivacidad}
+        />
+        <ComercialConsentCheckbox
+          idPrefix="pm" size="sm" checked={comercial}
+          onChange={(v) => toggleConsent("comercialAt", v, setComercial)}
+        />
       </div>
 
       <TurnstileWidget onToken={setTurnstileToken} />

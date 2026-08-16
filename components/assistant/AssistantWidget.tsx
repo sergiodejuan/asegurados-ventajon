@@ -9,7 +9,7 @@ import { getAttribution, withUtmParams } from "@/lib/attribution";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Close, IconByName, Spinner, ChevronLeft, ChevronRight, Phone } from "@/components/icons";
-import { ConsentNudgeModal } from "@/components/ConsentNudgeModal";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "@/components/EssentialConsent";
 import { getProductPage, quoteHref } from "@/lib/productPages";
 import {
   isAssistantAllowed,
@@ -820,14 +820,14 @@ function TicketConfirm({
   const [nombre, setNombre] = useState(presupuesto?.nombre ?? "");
   const [telefono, setTelefono] = useState(presupuesto?.telefono ?? "");
   const [codigoPostal, setCp] = useState(presupuesto?.codigoPostal ?? "");
-  const [priv, setPriv] = useState(false);
-  const [contacto, setContacto] = useState(false);
+  // Un único check cubre privacidad + autorización de contacto — ver
+  // components/EssentialConsent.tsx.
+  const [esencial, setEsencial] = useState(false);
   const [comercial, setComercial] = useState(false);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [showConsentNudge, setShowConsentNudge] = useState(false);
 
   const producto = presupuesto?.producto ?? "general";
   const detalleConsulta = summarizeTicket(topic, comment, presupuesto?.producto);
@@ -839,7 +839,7 @@ function TicketConfirm({
       nombre, telefono, codigoPostal, producto,
       detalleConsulta,
       presupuestoId: presupuesto?.id,
-      aceptaPrivacidad: priv, autorizaContacto: contacto, aceptaComercial: comercial,
+      aceptaPrivacidad: esencial, autorizaContacto: esencial, aceptaComercial: comercial,
       company: "", consent: consentTimes, utm: getAttribution(), origen: "asistente" as const,
     };
     const parsed = callRequestSchema.safeParse(payload);
@@ -848,9 +848,9 @@ function TicketConfirm({
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
-      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
-      if (first) document.getElementById(`a-${first}`)?.focus();
+      if (mapped.telefono) document.getElementById("a-telefono")?.focus();
+      else if (mapped.codigoPostal) document.getElementById("a-codigoPostal")?.focus();
+      else if (mapped.aceptaPrivacidad || mapped.autorizaContacto) document.getElementById("a-ticket-consiente-esencial")?.focus();
       return;
     }
     setErrors({});
@@ -928,32 +928,19 @@ function TicketConfirm({
       )}
 
       <div className="mt-4 flex flex-col gap-2.5">
-        <label htmlFor="a-aceptaPrivacidad" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-aceptaPrivacidad" type="checkbox" checked={priv}
-            onChange={(e) => { setPriv(e.target.checked); setConsentTimes((c) => ({ ...c, privacidadAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.aceptaPrivacidad} />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-          </span>
-        </label>
-        {errors.aceptaPrivacidad && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-        <label htmlFor="a-autorizaContacto" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-autorizaContacto" type="checkbox" checked={contacto}
-            onChange={(e) => { setContacto(e.target.checked); setConsentTimes((c) => ({ ...c, contactoAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.autorizaContacto} />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            Autorizo a {BRAND_NAME} a contactarme por teléfono o WhatsApp sobre esta consulta.
-          </span>
-        </label>
-        {errors.autorizaContacto && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.autorizaContacto}</p>}
-
-        <label htmlFor="a-aceptaComercial" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-aceptaComercial" type="checkbox" checked={comercial}
-            onChange={(e) => { setComercial(e.target.checked); setConsentTimes((c) => ({ ...c, comercialAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[12px] leading-relaxed text-slate2">Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).</span>
-        </label>
+        <EssentialConsentCheckbox
+          idPrefix="a-ticket" size="sm" checked={esencial}
+          onChange={(v) => {
+            setEsencial(v);
+            const at = v ? new Date().toISOString() : undefined;
+            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+          }}
+          error={errors.aceptaPrivacidad ?? errors.autorizaContacto}
+        />
+        <ComercialConsentCheckbox
+          idPrefix="a-ticket" size="sm" checked={comercial}
+          onChange={(v) => { setComercial(v); setConsentTimes((c) => ({ ...c, comercialAt: v ? new Date().toISOString() : undefined })); }}
+        />
       </div>
 
       {submitError && (
@@ -965,17 +952,6 @@ function TicketConfirm({
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar consulta"}
       </button>
-
-      <ConsentNudgeModal
-        open={showConsentNudge}
-        onClose={() => setShowConsentNudge(false)}
-        onAccept={() => {
-          setContacto(true);
-          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
-          setErrors({});
-          setShowConsentNudge(false);
-        }}
-      />
     </form>
   );
 }
@@ -986,14 +962,14 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [codigoPostal, setCp] = useState("");
-  const [priv, setPriv] = useState(false);
-  const [contacto, setContacto] = useState(false);
+  // Un único check cubre privacidad + autorización de contacto — ver
+  // components/EssentialConsent.tsx.
+  const [esencial, setEsencial] = useState(false);
   const [comercial, setComercial] = useState(false);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [showConsentNudge, setShowConsentNudge] = useState(false);
 
   const producto = intent === "llamada" ? (answers.producto ?? "salud") : intent;
   const detalleConsulta = intent !== "llamada" && Object.keys(answers).length
@@ -1006,7 +982,7 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
     const payload = {
       nombre, telefono, codigoPostal, producto,
       detalleConsulta,
-      aceptaPrivacidad: priv, autorizaContacto: contacto, aceptaComercial: comercial,
+      aceptaPrivacidad: esencial, autorizaContacto: esencial, aceptaComercial: comercial,
       company: "", consent: consentTimes, utm: getAttribution(), origen: "asistente" as const,
     };
     const parsed = callRequestSchema.safeParse(payload);
@@ -1015,9 +991,9 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
-      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
-      if (first) document.getElementById(`a-${first}`)?.focus();
+      if (mapped.telefono) document.getElementById("a-telefono")?.focus();
+      else if (mapped.codigoPostal) document.getElementById("a-codigoPostal")?.focus();
+      else if (mapped.aceptaPrivacidad || mapped.autorizaContacto) document.getElementById("a-capture-consiente-esencial")?.focus();
       return;
     }
     setErrors({});
@@ -1086,32 +1062,19 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
       </div>
 
       <div className="mt-4 flex flex-col gap-2.5">
-        <label htmlFor="a-aceptaPrivacidad" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-aceptaPrivacidad" type="checkbox" checked={priv}
-            onChange={(e) => { setPriv(e.target.checked); setConsentTimes((c) => ({ ...c, privacidadAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.aceptaPrivacidad} />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-          </span>
-        </label>
-        {errors.aceptaPrivacidad && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-        <label htmlFor="a-autorizaContacto" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-autorizaContacto" type="checkbox" checked={contacto}
-            onChange={(e) => { setContacto(e.target.checked); setConsentTimes((c) => ({ ...c, contactoAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.autorizaContacto} />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            Autorizo a {BRAND_NAME} a llamarme por teléfono o WhatsApp para ayudarme a elegir mi seguro.
-          </span>
-        </label>
-        {errors.autorizaContacto && <p role="alert" className="ml-7 text-[12px] font-medium text-brand-red">{errors.autorizaContacto}</p>}
-
-        <label htmlFor="a-aceptaComercial" className="flex cursor-pointer items-start gap-2.5">
-          <input id="a-aceptaComercial" type="checkbox" checked={comercial}
-            onChange={(e) => { setComercial(e.target.checked); setConsentTimes((c) => ({ ...c, comercialAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[12px] leading-relaxed text-slate2">Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).</span>
-        </label>
+        <EssentialConsentCheckbox
+          idPrefix="a-capture" size="sm" checked={esencial}
+          onChange={(v) => {
+            setEsencial(v);
+            const at = v ? new Date().toISOString() : undefined;
+            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+          }}
+          error={errors.aceptaPrivacidad ?? errors.autorizaContacto}
+        />
+        <ComercialConsentCheckbox
+          idPrefix="a-capture" size="sm" checked={comercial}
+          onChange={(v) => { setComercial(v); setConsentTimes((c) => ({ ...c, comercialAt: v ? new Date().toISOString() : undefined })); }}
+        />
       </div>
 
       {submitError && (
@@ -1123,17 +1086,6 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Enviar"}
       </button>
-
-      <ConsentNudgeModal
-        open={showConsentNudge}
-        onClose={() => setShowConsentNudge(false)}
-        onAccept={() => {
-          setContacto(true);
-          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
-          setErrors({});
-          setShowConsentNudge(false);
-        }}
-      />
     </form>
   );
 }
