@@ -7,6 +7,7 @@ import { type PaidLandingSaludConfig } from "@/lib/paidLandingSalud";
 import { IconByName, Phone, Check, Star, ChevronDown } from "@/components/icons";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { PaidReviewsCarousel } from "@/components/landings/PaidReviewsCarousel";
+import { PaidHeroQuoteModal } from "@/components/landings/PaidHeroQuoteModal";
 
 // Landing PAID de salud (/lp/salud). Réplica del layout de Línea Directa
 // Salud pero con paleta y voz de marca Asegurados Ventajon. Toda la copia,
@@ -171,12 +172,12 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                 >
                   {config.hero.ctaLlamarLabel}
                 </Link>
-                <Link
-                  href={TARIFICADOR_HREF} onClick={() => trackCta("hero_calcular")}
+                <PaidHeroQuoteModal
+                  onOpen={() => trackCta("hero_calcular")}
                   className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-pill bg-brand-red px-5 text-[15px] font-bold text-white shadow-soft hover:bg-brand-red-deep md:min-h-[56px] md:px-6 md:text-[16px]"
                 >
                   {config.hero.ctaCalcularLabel}
-                </Link>
+                </PaidHeroQuoteModal>
               </div>
             </div>
           </div>

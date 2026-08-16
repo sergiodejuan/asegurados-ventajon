@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
@@ -70,6 +70,21 @@ const INITIAL_FORM: Form = {
   aceptaComercial: false,
 };
 
+const INICIO_VALUES: Form["inicio"][] = ["cuanto_antes", "proximo_mes", "comparando"];
+
+// El modal del hero de /lp/salud (ver PaidHeroQuoteModal) resuelve el paso
+// "asegurados" (aislado, sin PII) y precarga "inicio" antes de llegar aquí.
+// "inicio" no salta el paso "salud" porque ahí comparte pantalla con fecha
+// de nacimiento/sexo/fumador, que sí hay que rellenar a mano.
+function prefillFromParams(params: URLSearchParams): Partial<Form> {
+  const prefill: Partial<Form> = {};
+  const asegurados = Number(params.get("asegurados"));
+  if (asegurados >= 1 && asegurados <= 5) prefill.numAsegurados = asegurados;
+  const inicio = params.get("inicio") as Form["inicio"] | null;
+  if (inicio && INICIO_VALUES.includes(inicio)) prefill.inicio = inicio;
+  return prefill;
+}
+
 function StepDot({ index, active, done }: { index: number; active: boolean; done: boolean }) {
   const base = "grid h-9 w-9 place-items-center rounded-full text-[13px] font-bold transition-colors";
   const styles = done
@@ -82,8 +97,10 @@ function StepDot({ index, active, done }: { index: number; active: boolean; done
 
 export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUrl: string }) {
   const router = useRouter();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [form, setForm] = useState<Form>(INITIAL_FORM);
+  const searchParams = useSearchParams();
+  const prefill = useMemo(() => prefillFromParams(searchParams), []); // solo al montar: prefill del modal del hero
+  const [stepIndex, setStepIndex] = useState(() => (prefill.numAsegurados !== undefined ? 1 : 0));
+  const [form, setForm] = useState<Form>(() => ({ ...INITIAL_FORM, ...prefill }));
   const [turnstileToken, setTurnstileToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
