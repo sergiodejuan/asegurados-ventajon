@@ -102,6 +102,48 @@ async function zrangeRev(key: string): Promise<string[]> {
   return (mem.z.get(key) ?? []).slice().sort((a, b) => b.s - a.s).map((e) => e.m);
 }
 
+// Lock distribuido básico (SET NX PX ...). Se usa para evitar que dos envíos
+// concurrentes del MISMO teléfono/email creen dos leads huérfanos o dejen
+// los índices idx:phone/idx:email en estado inconsistente (auditoría
+// consultora, race en upsertLead). Retorna un token que hay que pasar a
+// releaseLock para no soltar el lock de otro proceso.
+async function acquireLock(key: string, ttlMs = 5000): Promise<string | null> {
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  if (hasKV) {
+    const r = await redisClient();
+    const res = await r.set(key, token, { nx: true, px: ttlMs });
+    return res === "OK" ? token : null;
+  }
+  const existing = mem.data.get(key) as { token: string; expiresAt: number } | undefined;
+  if (existing && existing.expiresAt > Date.now()) return null;
+  mem.data.set(key, { token, expiresAt: Date.now() + ttlMs });
+  return token;
+}
+async function releaseLock(key: string, token: string): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    // Solo borra si el token coincide (evita soltar el lock de otro proceso
+    // si el nuestro caducó). Upstash Redis soporta eval con Lua.
+    const script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+    try { await r.eval(script, [key], [token]); } catch { await r.del(key).catch(() => {}); }
+    return;
+  }
+  const existing = mem.data.get(key) as { token: string; expiresAt: number } | undefined;
+  if (existing?.token === token) mem.data.delete(key);
+}
+async function withLock<T>(key: string, fn: () => Promise<T>, ttlMs = 5000, retries = 5): Promise<T> {
+  let token: string | null = null;
+  for (let i = 0; i < retries; i++) {
+    token = await acquireLock(key, ttlMs);
+    if (token) break;
+    // Espera exponencial ligera con jitter (50-150ms base).
+    await new Promise((r) => setTimeout(r, 50 + Math.random() * 100 + i * 100));
+  }
+  if (!token) throw new Error(`[lock] no se pudo adquirir ${key} tras ${retries} intentos`);
+  try { return await fn(); }
+  finally { await releaseLock(key, token).catch(() => {}); }
+}
+
 // Prueba de conexión real para el panel /admin/integraciones (API propia de
 // la web): un round-trip de escritura+lectura sobre el almacén que usan de
 // verdad todos los endpoints públicos, no solo comprobar que las variables
@@ -168,6 +210,21 @@ export async function upsertLead(
 ): Promise<{ id: string; deduped: boolean; submissionId: string }> {
   const phone = draft.telefono ? normalizePhone(draft.telefono) : "";
   const email = draft.email ? draft.email.trim().toLowerCase() : "";
+  // Lock por identidad (teléfono como primary, email como secundario): impide
+  // race condition entre envíos concurrentes del mismo usuario que crearía
+  // dos leads huérfanos y dejaría los índices phone/email inconsistentes
+  // (auditoría consultora, API6:2023 Unrestricted business logic).
+  const lockKey = `lock:upsertLead:${phone || email || "anon"}`;
+  return withLock(lockKey, () => upsertLeadCritical(draft, source, phone, email, consent));
+}
+
+async function upsertLeadCritical(
+  draft: LeadDraft,
+  source: string,
+  phone: string,
+  email: string,
+  consent?: ConsentRecord
+): Promise<{ id: string; deduped: boolean; submissionId: string }> {
   const now = new Date().toISOString();
   const score = Date.parse(now);
   const srcLabel = SOURCE_LABELS[source] ?? source;

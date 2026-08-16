@@ -9,19 +9,21 @@ export const AGENT_SESSION_COOKIE = "ventajon_agent_session";
 const AGENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 días
 
 function secret(): string {
-  const configured = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_TOKEN;
+  // Aislamiento estricto respecto de ADMIN_TOKEN (que se usa como
+  // credencial de acceso "master" en resolveIdentity): esta función firma
+  // las cookies de sesión de agente, y no debe compartir secreto con nada
+  // más. Compromiso o rotación de una no afecta a la otra (auditoría
+  // consultora Meta-A: acoplamiento = blast radius catastrófico).
+  const configured = process.env.ADMIN_SESSION_SECRET;
   if (configured) return configured;
-  // Mismo criterio que lib/clientSession.ts: fail-loud en producción para
-  // que ningún despliegue quede firmando cookies de agente con un secreto
-  // conocido públicamente (auditoría S-01). En dev, fallback para no
-  // bloquear el desarrollo local.
   if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "[agentAuth] Falta ADMIN_SESSION_SECRET (o al menos ADMIN_TOKEN) en producción. " +
-      "Configura una cadena larga aleatoria en Vercel → Environment Variables antes de reiniciar."
+      "[agentAuth] Falta ADMIN_SESSION_SECRET en producción. " +
+      "Configura una cadena larga aleatoria (32+ bytes base64) en Vercel → Environment Variables. " +
+      "No se acepta reusar ADMIN_TOKEN como fallback (aislamiento de dominios)."
     );
   }
-  return "ventajon-dev-secret-change-me";
+  return "ventajon-dev-agent-secret-change-me";
 }
 function sign(value: string): string {
   return crypto.createHmac("sha256", secret()).update(value).digest("base64url");

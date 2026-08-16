@@ -117,7 +117,10 @@ export async function POST(request: Request) {
 // mostrará un hash que no valida contra el endpoint /api/presupuesto/verify
 // (a futuro), permitiendo desmentir documentos que suplanten la marca.
 function pdfWatermark(body: PdfRequest, at: string): string {
-  const secret = process.env.PDF_WATERMARK_SECRET || process.env.ADMIN_TOKEN || "";
+  // Estricto: solo PDF_WATERMARK_SECRET. Nunca ADMIN_TOKEN — si algún día
+  // rotamos el master, no queremos invalidar la trazabilidad de PDFs pasados
+  // ni tampoco compartir superficie de compromiso (auditoría consultora Meta-A).
+  const secret = process.env.PDF_WATERMARK_SECRET || "";
   if (!secret) return "";
   const payload = `${body.producto}|${body.compania}|${body.quote?.id ?? ""}|${JSON.stringify(body.precio)}|${at}`;
   const h = crypto.createHmac("sha256", secret).update(payload).digest("hex");

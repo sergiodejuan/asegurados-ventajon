@@ -297,7 +297,11 @@ function CodeoscopicPanel({ presupuesto, onUpdated }: { presupuesto: Presupuesto
     if (!insuranceId) return;
     setRefreshing(true); setError(null);
     try {
-      const res = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuesto.id)}`);
+      // La sesión de admin viaja por cookie same-origin, así que fetch la
+      // envía sola. Sin cookie, /api/quote devuelve 401 y mostramos error.
+      const res = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuesto.id)}`, {
+        credentials: "same-origin",
+      });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.ok) { setError(body?.reason ?? "No se pudo refrescar."); return; }
       await onUpdated();
