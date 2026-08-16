@@ -239,7 +239,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
   }
 
   return (
-    <div className="min-h-screen bg-mist text-ink">
+    <div className="flex min-h-screen flex-col bg-mist text-ink">
       {/* Top bar minimal: logo (→ tarificador) + teléfono destacado */}
       <header className="border-b border-hair bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
@@ -258,7 +258,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
         </div>
       </header>
 
-      <main id="contenido" className="mx-auto max-w-6xl px-5 py-8 md:py-12">
+      <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 md:py-12">
         {/* Progress steps horizontales (móvil) / verticales sobre la columna principal (desktop) */}
         <ol aria-label="Pasos del tarificador" className="mb-8 flex items-center justify-center gap-3 md:gap-6">
           {STEPS.map((s, i) => (

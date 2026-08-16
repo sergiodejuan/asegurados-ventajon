@@ -20,6 +20,7 @@ type Props = { onSuccess?: () => void };
 
 export function PaidLlamadaForm({ onSuccess }: Props) {
   const router = useRouter();
+  const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [dia, setDia] = useState<string>(DIAS_LLAMADA[0]);
   const [turno, setTurno] = useState<string>(TURNOS_LLAMADA[0]);
@@ -39,7 +40,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nombre: "",
+          nombre,
           telefono,
           codigoPostal: "",
           producto: "salud",
@@ -57,8 +58,8 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; errors?: Record<string, string[]>; error?: string } | null;
       if (res.ok && body?.ok) {
-        saveCallResult({ diaLlamada: dia, turnoLlamada: turno, producto: "salud" });
-        saveClientProfile({ telefono, diaLlamada: dia, turnoLlamada: turno });
+        saveCallResult({ nombre, diaLlamada: dia, turnoLlamada: turno, producto: "salud" });
+        saveClientProfile({ nombre, telefono, diaLlamada: dia, turnoLlamada: turno });
         pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-salud-llamada" });
         if (onSuccess) onSuccess();
         else router.push("/gracias");
@@ -75,6 +76,18 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[14px] font-semibold text-ink">Tu nombre</span>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          required
+          placeholder="Ej: María"
+          autoComplete="given-name"
+          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+        />
+      </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[14px] font-semibold text-ink">Introduce tu número de teléfono</span>
         <input
@@ -127,7 +140,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
 
       <button
         type="submit"
-        disabled={submitting || !telefono.trim()}
+        disabled={submitting || !nombre.trim() || !telefono.trim()}
         aria-busy={submitting || undefined}
         className="mt-1 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[12px] bg-brand-red px-6 text-[16px] font-bold text-white transition-colors hover:bg-brand-red-deep disabled:bg-slate2/40"
       >

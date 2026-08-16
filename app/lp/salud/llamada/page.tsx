@@ -3,6 +3,20 @@ import Link from "next/link";
 import { PaidLlamadaForm } from "@/components/landings/PaidLlamadaForm";
 import { getPaidLandingSaludConfig, getTheme } from "@/lib/store";
 import { BRAND_NAME } from "@/lib/brand";
+import { ArrowRight, IconByName, Phone } from "@/components/icons";
+
+// Otros ramos que se ofrecen como cross-sell al final de esta página. Se
+// definen aquí (y no se reutiliza PRODUCT_PAGES entero) porque el destino de
+// cada uno es el tarificador/landing correcto para tráfico paid, no la
+// landing SEO genérica.
+type CrossSellItem = { href: string; icon: string; label: string; price?: string; accent?: boolean };
+
+const CROSS_SELL: CrossSellItem[] = [
+  { href: "/lp/salud/tarificador", icon: "shield", label: "Salud", price: "Desde 35 €/mes", accent: true },
+  { href: "/tarificador-auto", icon: "car", label: "Coche" },
+  { href: "/seguro-de-hogar", icon: "home", label: "Hogar" },
+  { href: "/tarificador-auto", icon: "car", label: "Moto" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +44,7 @@ export default async function LpSaludLlamadaPage() {
   const phoneHref = `tel:${phone.replace(/\s+/g, "")}`;
 
   return (
-    <div className="min-h-screen bg-mist text-ink">
+    <div className="flex min-h-screen flex-col bg-mist text-ink">
       {/* Top bar: logo (clicable → tarificador) + teléfono */}
       <header className="border-b border-hair bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
@@ -43,17 +57,17 @@ export default async function LpSaludLlamadaPage() {
             )}
           </Link>
           <a href={phoneHref} className="inline-flex items-center gap-2 text-[16px] font-bold text-emerald-600">
-            <span aria-hidden="true">📞</span>
+            <Phone width={18} height={18} aria-hidden="true" />
             <span className="tnums">{phone}</span>
           </a>
         </div>
       </header>
 
-      <main id="contenido" className="mx-auto max-w-6xl px-5 py-10 md:py-16">
+      <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 md:py-16">
         <div className="mx-auto max-w-xl rounded-[20px] bg-white p-6 shadow-soft md:p-10">
           <div className="flex items-start gap-4">
             <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red">
-              👤
+              <IconByName name="doc" width={20} height={20} />
             </span>
             <h1 className="text-[22px] font-extrabold leading-tight text-navy md:text-[26px]">
               Solicita tu presupuesto personalizado
@@ -69,28 +83,34 @@ export default async function LpSaludLlamadaPage() {
           <Link href="/legal#privacidad" className="text-navy underline">aquí</Link> donde se informa, entre otros aspectos, de cómo ejercitar los derechos de acceso, rectificación, supresión, limitación, oposición o portabilidad de datos.
         </p>
 
-        {/* Cross-sell: calcula tu seguro en 2 minutos + otros ramos */}
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 rounded-[16px] bg-white p-5 shadow-soft md:mt-14 md:flex-row md:gap-6 md:px-6 md:py-5">
-          <p className="shrink-0 text-center text-[14px] font-semibold text-navy md:text-left">
-            Calcula tu seguro<br className="hidden md:block" /> en 2 minutos
-          </p>
-          <Link
-            href="/lp/salud/tarificador"
-            className="inline-flex items-center gap-2 rounded-pill border border-emerald-500/40 bg-emerald-50 px-4 py-2 text-[13px] font-bold text-emerald-700 hover:bg-emerald-100"
-          >
-            <span aria-hidden="true">❤️</span>
-            <span>Salud</span>
-            <span className="text-[12px] font-semibold text-emerald-800/80">Desde 19,90 €/mes sin copago</span>
-          </Link>
-          <Link href="/tarificador-auto" className="inline-flex flex-col items-center rounded-[12px] border border-hair bg-white px-4 py-3 text-[12px] font-semibold text-navy hover:bg-mist">
-            <span aria-hidden="true">🚗</span>Coche
-          </Link>
-          <Link href="/seguro-de-hogar" className="inline-flex flex-col items-center rounded-[12px] border border-hair bg-white px-4 py-3 text-[12px] font-semibold text-navy hover:bg-mist">
-            <span aria-hidden="true">🏠</span>Hogar
-          </Link>
-          <Link href="/tarificador-auto" className="inline-flex flex-col items-center rounded-[12px] border border-hair bg-white px-4 py-3 text-[12px] font-semibold text-navy hover:bg-mist">
-            <span aria-hidden="true">🏍️</span>Moto
-          </Link>
+        {/* Cross-sell: calcula tu seguro en 1 minuto + otros ramos, en ancho
+            completo (mobile-first) para que sean fáciles de tocar en móvil. */}
+        <div className="mx-auto mt-10 max-w-xl rounded-[16px] bg-white p-5 shadow-soft md:mt-14 md:max-w-3xl md:p-6">
+          <p className="text-center text-[14px] font-semibold text-navy">Calcula tu seguro en 1 minuto</p>
+          <div className="mt-4 grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            {CROSS_SELL.map((item, i) => (
+              <Link
+                key={`${item.label}-${i}`}
+                href={item.href}
+                className={`flex w-full items-center gap-3 rounded-[12px] border px-4 py-3.5 transition-colors ${
+                  item.accent
+                    ? "border-emerald-500/40 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    : "border-hair bg-white text-navy hover:bg-mist"
+                }`}
+              >
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${item.accent ? "bg-emerald-100 text-emerald-700" : "bg-brand-red/10 text-brand-red"}`}>
+                  <IconByName name={item.icon} width={18} height={18} />
+                </span>
+                <span className="flex-1 text-left">
+                  <span className="block text-[14px] font-bold">{item.label}</span>
+                  {item.price && (
+                    <span className="block text-[12px] font-semibold text-emerald-800/80">{item.price}</span>
+                  )}
+                </span>
+                <ArrowRight width={16} height={16} className={item.accent ? "text-emerald-700" : "text-slate2"} />
+              </Link>
+            ))}
+          </div>
         </div>
       </main>
 
