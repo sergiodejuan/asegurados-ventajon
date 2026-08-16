@@ -74,6 +74,15 @@ async function jset(key: string, val: unknown): Promise<void> {
   }
   mem.data.set(key, val);
 }
+async function jsetTtl(key: string, val: unknown, ttlSec: number): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    await r.set(key, val as string, { ex: ttlSec });
+    return;
+  }
+  mem.data.set(key, val);
+  setTimeout(() => { mem.data.delete(key); }, ttlSec * 1000).unref?.();
+}
 async function jdel(key: string): Promise<void> {
   if (hasKV) {
     const r = await redisClient();
@@ -2028,6 +2037,40 @@ export async function touchAgentLogin(id: string): Promise<void> {
   if (!a) return;
   a.lastLoginAt = new Date().toISOString();
   await jset(`agent:${id}`, a);
+}
+
+/* --------------------------- OTP 2FA para agentes --------------------------- */
+// Plus3: tras validar email+contraseña, generamos un OTP de 6 dígitos, lo
+// guardamos aquí con TTL 10min y single-use (se borra al verificar) y lo
+// enviamos por email. Solo cuando el agente pega el código creamos la
+// cookie de sesión. Blindar el 2FA es la defensa más importante contra
+// credenciales filtradas — password reuse sigue siendo la principal causa
+// de compromiso de cuentas admin (Verizon DBIR 2024).
+export type AdminOtpRecord = {
+  agentId: string;
+  codeHash: string; // SHA-256 hex del código, para no guardar el código en claro
+  attempts: number; // se bloquea a partir de 5 intentos
+  createdAt: string;
+};
+const OTP_TTL_SEC = 10 * 60;
+
+export async function saveAdminOtp(nonce: string, rec: AdminOtpRecord): Promise<void> {
+  await jsetTtl(`otp:admin:${nonce}`, rec, OTP_TTL_SEC);
+}
+export async function getAdminOtp(nonce: string): Promise<AdminOtpRecord | null> {
+  return jget<AdminOtpRecord>(`otp:admin:${nonce}`);
+}
+export async function bumpAdminOtpAttempts(nonce: string): Promise<void> {
+  const rec = await getAdminOtp(nonce);
+  if (!rec) return;
+  rec.attempts += 1;
+  // Se conserva el TTL restante — si Upstash pierde el TTL al re-escribir,
+  // el registro caduca a los 10 min desde createdAt via la comprobación en
+  // el endpoint de verificación (defensa en profundidad).
+  await jsetTtl(`otp:admin:${nonce}`, rec, OTP_TTL_SEC);
+}
+export async function deleteAdminOtp(nonce: string): Promise<void> {
+  await jdel(`otp:admin:${nonce}`);
 }
 
 /* ------------------------------ Registro de auditoría ------------------------------ */

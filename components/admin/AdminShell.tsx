@@ -335,6 +335,12 @@ function LoginScreen({ onMasterToken, onAgentLoggedIn }: { onMasterToken: (token
   const [tokenInput, setTokenInput] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Estado del segundo paso 2FA (email OTP). Cuando login devuelve
+  // { otpRequired, nonce, emailHint } cambiamos a pantalla OTP; el user
+  // pega el código de 6 dígitos, /otp-verify crea la cookie de sesión.
+  const [otpNonce, setOtpNonce] = useState<string | null>(null);
+  const [otpEmailHint, setOtpEmailHint] = useState<string>("");
+  const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -349,11 +355,89 @@ function LoginScreen({ onMasterToken, onAgentLoggedIn }: { onMasterToken: (token
       });
       const body = await res.json();
       if (!res.ok || !body.ok) { setError(body.error ?? "No hemos podido iniciar sesión."); setSubmitting(false); return; }
+      if (body.otpRequired && typeof body.nonce === "string") {
+        setOtpNonce(body.nonce);
+        setOtpEmailHint(typeof body.emailHint === "string" ? body.emailHint : "");
+        setOtpCode("");
+        setSubmitting(false);
+        return;
+      }
       onAgentLoggedIn();
     } catch {
       setError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
       setSubmitting(false);
     }
+  }
+
+  async function submitOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!otpNonce) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/auth/otp-verify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nonce: otpNonce, code: otpCode }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setError(body.error ?? "No hemos podido verificar el código.");
+        setSubmitting(false);
+        // Si el nonce ha muerto (429/401 sin recuperación), volver al paso 1.
+        if (res.status === 429 || (res.status === 401 && /caducado|iniciar sesión/i.test(String(body.error ?? "")))) {
+          setOtpNonce(null); setOtpCode("");
+        }
+        return;
+      }
+      onAgentLoggedIn();
+    } catch {
+      setError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+      setSubmitting(false);
+    }
+  }
+
+  function cancelOtp() {
+    setOtpNonce(null); setOtpCode(""); setError(null);
+  }
+
+  // Pantalla intermedia: contraseña OK, pedimos código de 6 dígitos.
+  if (otpNonce) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-mist px-5">
+        <div className="w-full max-w-sm rounded-[24px] border border-hair bg-white p-6 shadow-card">
+          <p className="font-display text-[16px] font-extrabold text-navy" translate="no">{BRAND_NAME}</p>
+          <h1 className="mt-3 text-[22px] font-extrabold text-navy">Verificación en 2 pasos</h1>
+          <p className="mt-2 text-[13px] text-slate2">
+            Te hemos enviado un código de 6 dígitos a <span className="font-semibold text-navy">{otpEmailHint || "tu email"}</span>. Caduca en 10 minutos.
+          </p>
+          <form onSubmit={submitOtp} className="mt-4">
+            <label htmlFor="otp-code" className="sr-only">Código</label>
+            <input
+              id="otp-code" name="otp" type="text" inputMode="numeric" pattern="\d{6}"
+              autoComplete="one-time-code" maxLength={6} value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="w-full rounded-card border border-hair bg-white px-4 py-3 text-center font-mono text-[22px] tracking-[.4em]"
+              autoFocus
+            />
+            {error && <p role="alert" className="mt-2.5 text-[13px] font-medium text-brand-red">{error}</p>}
+            <button
+              type="submit" disabled={submitting || otpCode.length !== 6} aria-busy={submitting || undefined}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-card bg-navy px-5 py-3.5 text-[16px] font-semibold text-white disabled:bg-slate2/40"
+            >
+              {submitting && <Spinner />}
+              {submitting ? "Verificando…" : "Verificar"}
+            </button>
+            <button
+              type="button" onClick={cancelOtp}
+              className="mt-2 w-full rounded-card border border-hair bg-white px-5 py-2.5 text-[13px] font-semibold text-navy"
+            >
+              Volver a introducir email y contraseña
+            </button>
+          </form>
+        </div>
+      </main>
+    );
   }
 
   return (
