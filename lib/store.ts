@@ -1479,6 +1479,12 @@ export async function createManualPresupuesto(input: {
   precio: number | null;
   condiciones?: string;
   servicios?: string[];
+  // Presente cuando el agente consultó un precio real vía Codeoscopic antes
+  // de crear el presupuesto (ver app/api/admin/leads/[id]/codeoscopic-quote
+  // y components/admin/CreatePresupuestoModal.tsx) — se guarda igual que
+  // setPresupuestoCodeoscopicInsurance, para que el badge "Codeoscopic ✓"
+  // (app/admin/page.tsx PresupuestosPanel) se muestre también aquí.
+  codeoscopicInsuranceId?: string;
 }): Promise<Presupuesto | null> {
   const lead = await getLead(input.leadId);
   if (!lead) return null;
@@ -1491,10 +1497,12 @@ export async function createManualPresupuesto(input: {
     compania: input.compania, precio: input.precio,
     condiciones: input.condiciones, servicios: input.servicios, at: now,
   };
+  const data: Record<string, unknown> = { codigoPostal: lead.codigoPostal };
+  if (input.codeoscopicInsuranceId) data.codeoscopicInsuranceId = input.codeoscopicInsuranceId;
   const presupuesto: Presupuesto = {
     id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
     source: "admin-manual", producto: input.producto, status: "enviado",
-    data: { codigoPostal: lead.codigoPostal }, precioAprox: input.precio, notas: [], eleccion, closedBy: "",
+    data, precioAprox: input.precio, notas: [], eleccion, closedBy: "",
     nombre: lead.nombre, telefono: lead.telefono, email: lead.email,
   };
   await jset(`presupuesto:${id}`, presupuesto);

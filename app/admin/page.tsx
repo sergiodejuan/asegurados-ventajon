@@ -9,6 +9,7 @@ import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/admin
 import { StatTile, ViewToggle, FilterTab, FilterDropdown, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
 import { SendEmailModal } from "@/components/admin/SendEmailModal";
+import { CreatePresupuestoModal } from "@/components/admin/CreatePresupuestoModal";
 
 type Activity = { at: string; type: string; note: string; meta?: { agente?: string; channel?: string } };
 type ConsentRecord = {
@@ -423,7 +424,7 @@ function LeadsCrm() {
             </CollapsiblePanel>
 
             <CollapsiblePanel title="Presupuestos">
-              <PresupuestosPanel leadId={l.id} />
+              <PresupuestosPanel lead={{ id: l.id, nombre: l.nombre, telefono: l.telefono, email: l.email }} />
             </CollapsiblePanel>
 
             <CollapsiblePanel title="Llamadas">
@@ -685,24 +686,57 @@ type PresupuestoFull = {
   precioAprox: number | null; eleccion: PresupuestoEleccion; nombre: string; telefono: string; updatedAt: string;
 };
 
-function PresupuestosPanel({ leadId }: { leadId: string }) {
+function PresupuestosPanel({ lead }: { lead: { id: string; nombre: string; telefono: string; email: string } }) {
   const { token } = useAdminToken();
   const [items, setItems] = useState<PresupuestoFull[]>([]);
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [waTarget, setWaTarget] = useState<PresupuestoFull | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/admin/presupuestos?leadId=${leadId}`, { headers: { "x-admin-token": token } })
+  const load = useCallback(() => {
+    fetch(`/api/admin/presupuestos?leadId=${lead.id}`, { headers: { "x-admin-token": token } })
       .then((r) => r.json())
       .then((body) => { if (body.ok) { setItems(body.presupuestos); setStatusLabels(body.statusLabels); } })
       .finally(() => setLoaded(true));
-  }, [leadId, token]);
+  }, [lead.id, token]);
 
-  if (!loaded) return <p className="text-[13px] text-slate2">Cargando…</p>;
-  if (items.length === 0) return <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>;
+  useEffect(() => { load(); }, [load]);
 
+  return (
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button type="button" onClick={() => setCreating(true)}
+          className="rounded-pill border border-navy px-3 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white">
+          + Crear presupuesto
+        </button>
+      </div>
+      {!loaded ? (
+        <p className="text-[13px] text-slate2">Cargando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>
+      ) : (
+        <PresupuestosList items={items} statusLabels={statusLabels} expandedId={expandedId} setExpandedId={setExpandedId} waTarget={waTarget} setWaTarget={setWaTarget} />
+      )}
+      {creating && (
+        <CreatePresupuestoModal
+          lockedLead={lead}
+          onClose={() => setCreating(false)}
+          onCreated={() => { setCreating(false); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PresupuestosList({
+  items, statusLabels, expandedId, setExpandedId, waTarget, setWaTarget,
+}: {
+  items: PresupuestoFull[]; statusLabels: Record<string, string>;
+  expandedId: string | null; setExpandedId: (id: string | null) => void;
+  waTarget: PresupuestoFull | null; setWaTarget: (p: PresupuestoFull | null) => void;
+}) {
   return (
     <ol className="flex flex-col gap-2">
       {items.map((s) => {

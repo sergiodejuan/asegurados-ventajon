@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAdminToken } from "@/components/admin/AdminShell";
 import { Close } from "@/components/icons";
+import type { CodeoscopicQuoteSummary } from "@/lib/store";
 
 type LeadOption = { id: string; nombre: string; telefono: string; email: string };
 type ProductOption = {
@@ -10,11 +11,24 @@ type ProductOption = {
   condiciones: string; servicios: string[];
 };
 
-export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+const CODESCOPIC_POLL_MS = 3000;
+const CODESCOPIC_MAX_POLLS = 10; // ~30s de margen, igual criterio que la comparativa pública
+
+export function CreatePresupuestoModal({
+  onClose, onCreated, lockedLead,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+  // Cuando se abre desde la ficha de un lead concreto (ver PresupuestosPanel
+  // en app/admin/page.tsx): se omite el buscador/selector y el presupuesto
+  // queda vinculado a este lead directamente. Sin esta prop (uso desde el
+  // listado genérico /admin/presupuestos) se mantiene el buscador de siempre.
+  lockedLead?: LeadOption;
+}) {
   const { token } = useAdminToken();
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [leadQuery, setLeadQuery] = useState("");
-  const [leadId, setLeadId] = useState("");
+  const [leadId, setLeadId] = useState(lockedLead?.id ?? "");
   const [producto, setProducto] = useState<"salud" | "vida" | "auto" | "decesos">("salud");
   const [mode, setMode] = useState<"catalog" | "custom">("catalog");
   const [catalog, setCatalog] = useState<ProductOption[]>([]);
@@ -26,12 +40,21 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cotización real Codeoscopic (solo salud) — ver
+  // app/api/admin/leads/[id]/codeoscopic-quote.
+  const [cqStatus, setCqStatus] = useState<"idle" | "loading" | "polling" | "done" | "error">("idle");
+  const [cqError, setCqError] = useState<string | null>(null);
+  const [cqQuotes, setCqQuotes] = useState<CodeoscopicQuoteSummary[]>([]);
+  const [cqInsuranceId, setCqInsuranceId] = useState("");
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    if (lockedLead) return; // sin buscador, no hace falta el listado completo
     fetch("/api/admin/leads", { headers: { "x-admin-token": token } })
       .then((r) => r.json())
       .then((body) => { if (body.ok) setLeads(body.leads); })
       .catch(() => {});
-  }, [token]);
+  }, [token, lockedLead]);
 
   useEffect(() => {
     fetch(`/api/admin/products?producto=${producto}`, { headers: { "x-admin-token": token } })
@@ -39,6 +62,8 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
       .then((body) => { if (body.ok) { setCatalog(body.products); setProductId(""); } })
       .catch(() => {});
   }, [producto, token]);
+
+  useEffect(() => () => { if (pollTimer.current) clearTimeout(pollTimer.current); }, []);
 
   const filteredLeads = useMemo(() => {
     const q = leadQuery.trim().toLowerCase();
@@ -57,6 +82,58 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, mode]);
 
+  function pollQuote(insuranceId: string, attempt: number) {
+    fetch(`/api/quote/${encodeURIComponent(insuranceId)}`, { headers: { "x-admin-token": token } })
+      .then((r) => r.json())
+      .then((body) => {
+        if (!body.ok) { setCqStatus("error"); setCqError("No se pudo consultar la cotización."); return; }
+        setCqQuotes(body.summary.quotes ?? []);
+        if (body.summary.done || attempt >= CODESCOPIC_MAX_POLLS) {
+          setCqStatus("done");
+          return;
+        }
+        setCqStatus("polling");
+        pollTimer.current = setTimeout(() => pollQuote(insuranceId, attempt + 1), CODESCOPIC_POLL_MS);
+      })
+      .catch(() => { setCqStatus("error"); setCqError("Error de conexión al consultar la cotización."); });
+  }
+
+  async function consultarCodeoscopic() {
+    if (!leadId) return;
+    setCqStatus("loading");
+    setCqError(null);
+    setCqQuotes([]);
+    setCqInsuranceId("");
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-quote`, {
+        method: "POST", headers: { "x-admin-token": token },
+      });
+      const body = await res.json();
+      if (!body.ok) {
+        setCqStatus("error");
+        setCqError(
+          body.reason === "not_configured" ? "Codeoscopic no está configurado."
+          : body.reason === "codeoscopic_error" ? "Codeoscopic no ha podido responder ahora mismo."
+          : body.reason || body.error || "No se pudo consultar Codeoscopic."
+        );
+        return;
+      }
+      setCqInsuranceId(body.insuranceId);
+      setCqQuotes(body.summary.quotes ?? []);
+      if (body.summary.done) setCqStatus("done");
+      else { setCqStatus("polling"); pollTimer.current = setTimeout(() => pollQuote(body.insuranceId, 1), CODESCOPIC_POLL_MS); }
+    } catch {
+      setCqStatus("error");
+      setCqError("Error de conexión al consultar Codeoscopic.");
+    }
+  }
+
+  function pickCodeoscopicQuote(q: CodeoscopicQuoteSummary) {
+    setMode("custom");
+    setCompania(q.compania);
+    if (q.premium != null) setPrecio(String(q.premium));
+  }
+
   async function submit() {
     setError(null);
     if (!leadId) { setError("Elige un lead."); return; }
@@ -71,6 +148,7 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
           precio: precio.trim() ? Number(precio) : undefined,
           condiciones: condiciones.trim(),
           servicios: servicios.split("\n").map((s) => s.trim()).filter(Boolean),
+          codeoscopicInsuranceId: cqInsuranceId || undefined,
         }),
       });
       const body = await res.json();
@@ -90,22 +168,29 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
           </button>
         </div>
 
-        <label className="mt-4 block">
-          <span className="mb-1.5 block text-[12px] font-semibold text-ink">Lead</span>
-          <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Buscar por nombre, teléfono o email…"
-            className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]" />
-          <select value={leadId} onChange={(e) => setLeadId(e.target.value)}
-            className="mt-2 w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]">
-            <option value="">— Selecciona un lead —</option>
-            {filteredLeads.map((l) => (
-              <option key={l.id} value={l.id}>{l.nombre || "Sin nombre"} · {l.telefono}</option>
-            ))}
-          </select>
-        </label>
+        {lockedLead ? (
+          <p className="mt-4 text-[13px] text-slate2">
+            Para <span className="font-semibold text-ink">{lockedLead.nombre || "este lead"}</span>
+            {lockedLead.telefono ? ` · ${lockedLead.telefono}` : ""}
+          </p>
+        ) : (
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-[12px] font-semibold text-ink">Lead</span>
+            <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Buscar por nombre, teléfono o email…"
+              className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]" />
+            <select value={leadId} onChange={(e) => setLeadId(e.target.value)}
+              className="mt-2 w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]">
+              <option value="">— Selecciona un lead —</option>
+              {filteredLeads.map((l) => (
+                <option key={l.id} value={l.id}>{l.nombre || "Sin nombre"} · {l.telefono}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="mt-4 flex gap-2">
           {(["salud", "vida", "auto", "decesos"] as const).map((p) => (
-            <button key={p} type="button" onClick={() => setProducto(p)}
+            <button key={p} type="button" onClick={() => { setProducto(p); setCqStatus("idle"); }}
               className={`rounded-pill px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors ${producto === p ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
               Seguro de {p}
             </button>
@@ -134,6 +219,40 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
               ))}
             </select>
           </label>
+        )}
+
+        {producto === "salud" && leadId && (
+          <div className="mt-3 rounded-card border border-hair bg-mist/50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[12px] font-semibold text-ink">Precio real (Codeoscopic)</span>
+              <button
+                type="button" onClick={consultarCodeoscopic}
+                disabled={cqStatus === "loading" || cqStatus === "polling"}
+                className="rounded-pill border border-navy px-3 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cqStatus === "loading" ? "Consultando…" : cqStatus === "polling" ? "Esperando aseguradoras…" : "Consultar precio real"}
+              </button>
+            </div>
+            {cqError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqError}</p>}
+            {cqQuotes.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {cqQuotes.map((q) => (
+                  <li key={q.id}>
+                    <button type="button" onClick={() => pickCodeoscopicQuote(q)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-hair bg-white px-3 py-2 text-left text-[13px] transition-colors hover:bg-mist">
+                      <span className="min-w-0 truncate text-ink">
+                        {q.compania}{q.modalidad ? ` · ${q.modalidad}` : ""}
+                        {q.estimate && <span className="ml-1 text-[11px] text-slate2">(estimado)</span>}
+                      </span>
+                      <span className="shrink-0 tnums font-semibold text-navy">
+                        {q.premium != null ? `${q.premium.toFixed(2)} €/mes` : "…"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         <div className="mt-3 flex flex-col gap-3">
