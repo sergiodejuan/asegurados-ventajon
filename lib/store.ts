@@ -1539,6 +1539,108 @@ export async function getReferralByLeadId(leadId: string): Promise<ReferralDoc |
   return code ? getReferralByCode(code) : null;
 }
 
+// Lado contrario a getReferralByLeadId: dado un lead que pudo haber
+// entrado como AMIGO (referido) desde /r/{code} — el código viaja en
+// lead.utm.ref (ver lib/store.ts updatePresupuesto y app/api/lead/route.ts)
+// —, resuelve el ReferralDoc de quien lo trajo y su propia entrada de
+// convertido (estado, fechas, bonos). null si el lead no vino por
+// referido o el código ya no existe. Usado en la ficha de /admin para
+// mostrar "Referido por…" — ver app/api/admin/leads/[id]/route.ts.
+export async function getReferralAsReferido(
+  leadId: string
+): Promise<{ doc: ReferralDoc; convertido: ReferralConvertido } | null> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  const code = lead?.utm?.ref;
+  if (!code) return null;
+  const doc = await getReferralByCode(code);
+  if (!doc) return null;
+  const convertido = doc.convertidos.find((c) => c.leadId === leadId);
+  return convertido ? { doc, convertido } : null;
+}
+
+// Agregado para el dashboard de /admin/informes/referidos: recorre todos
+// los códigos existentes (volumen esperado en cientos, no miles — barato
+// de traer entero) y resume el embudo + importes estimados. Los importes
+// son una ESTIMACIÓN local (nº de bonos pagados × el importe vigente hoy en
+// la config del programa) — no sustituyen la contabilidad real de
+// Tremendous, que puede llevar importes distintos si el incentivo cambió
+// entre medias; para el estado exacto de una order concreta hay que mirar
+// su tremendousOrderId (ver GET /api/admin/referral/[code]).
+export type ReferralSummary = {
+  totalReferidores: number;
+  totalConvertidos: number;
+  porEstado: Record<ReferralConvertido["status"], number>;
+  bonosReferidoPagados: number;
+  bonosReferidorPagados: number;
+  montoPagadoEstimado: number;
+  montoPendienteReferidorEstimado: number;
+  conErrorPago: number;
+  topReferidores: {
+    code: string; referidorLeadId: string; referidorNombre: string;
+    totalConvertidos: number; contratados: number; pagados: number;
+  }[];
+  atencion: {
+    code: string; leadId: string; nombre: string; status: ReferralConvertido["status"];
+    ultimoErrorPago: string; lado: "referido" | "referidor";
+  }[];
+};
+
+export async function getReferralSummary(): Promise<ReferralSummary> {
+  const cfg = await getReferralLandingConfig();
+  const codes = await listAllReferralCodes();
+  const docs = (await Promise.all(codes.map((c) => getReferralByCode(c)))).filter((d): d is ReferralDoc => !!d);
+
+  const porEstado: ReferralSummary["porEstado"] = { cotizado: 0, "opt-in": 0, contratado: 0, pagado: 0, cancelado: 0 };
+  let totalConvertidos = 0, bonosReferidoPagados = 0, bonosReferidorPagados = 0, conErrorPago = 0;
+  const atencion: ReferralSummary["atencion"] = [];
+  const topReferidores: ReferralSummary["topReferidores"] = [];
+
+  for (const doc of docs) {
+    let contratados = 0, pagados = 0;
+    for (const c of doc.convertidos) {
+      totalConvertidos++;
+      porEstado[c.status] = (porEstado[c.status] ?? 0) + 1;
+      if (c.pagadoReferidoAt) bonosReferidoPagados++;
+      if (c.pagadoReferidorAt) bonosReferidorPagados++;
+      if (c.status === "contratado" || c.status === "pagado") contratados++;
+      if (c.status === "pagado") pagados++;
+      if (c.ultimoErrorPago && !c.pagadoReferidoAt && !c.pagadoReferidorAt) {
+        conErrorPago++;
+        // El mensaje siempre empieza por "referido: " o "referidor: " (ver
+        // lib/referralPayouts.ts) — de ahí se deduce qué lado reintentar sin
+        // tener que adivinarlo en el cliente.
+        const lado: "referido" | "referidor" = c.ultimoErrorPago.startsWith("referidor:") ? "referidor" : "referido";
+        atencion.push({ code: doc.code, leadId: c.leadId, nombre: c.nombre, status: c.status, ultimoErrorPago: c.ultimoErrorPago, lado });
+      }
+    }
+    topReferidores.push({
+      code: doc.code, referidorLeadId: doc.referidorLeadId, referidorNombre: doc.referidorNombre,
+      totalConvertidos: doc.convertidos.length, contratados, pagados,
+    });
+  }
+  topReferidores.sort((a, b) => b.totalConvertidos - a.totalConvertidos);
+
+  // Pendiente de pago al referidor: ya contratado pero aún sin abonar (ni en
+  // periodo de gracia ni ya procesable) — dinero comprometido a futuro.
+  const pendientesReferidor = docs.reduce(
+    (acc, doc) => acc + doc.convertidos.filter((c) => c.status === "contratado" && !c.pagadoReferidorAt).length,
+    0
+  );
+
+  return {
+    totalReferidores: docs.length,
+    totalConvertidos,
+    porEstado,
+    bonosReferidoPagados,
+    bonosReferidorPagados,
+    montoPagadoEstimado: bonosReferidoPagados * cfg.incentivo.montoReferido + bonosReferidorPagados * cfg.incentivo.montoReferidor,
+    montoPendienteReferidorEstimado: pendientesReferidor * cfg.incentivo.montoReferidor,
+    conErrorPago,
+    topReferidores: topReferidores.slice(0, 10),
+    atencion: atencion.slice(0, 20),
+  };
+}
+
 // Añade un nuevo convertido al documento del código, con lock para evitar
 // pérdida de escrituras concurrentes cuando dos amigos entran a la vez con
 // el mismo código y ambos cotizan casi simultáneamente.

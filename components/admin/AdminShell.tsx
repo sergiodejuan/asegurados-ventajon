@@ -83,6 +83,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     children: [
       { href: "/admin/informes", label: "Informes", key: "informes", modulo: "informes" },
       { href: "/admin/utm", label: "UTM", key: "utm", modulo: "informes" },
+      { href: "/admin/informes/referidos", label: "Referidos", key: "informes-referidos", modulo: "informes" },
     ],
   },
   {
@@ -114,7 +115,7 @@ function groupKeyForActive(active: string): string | null {
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "productos" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"

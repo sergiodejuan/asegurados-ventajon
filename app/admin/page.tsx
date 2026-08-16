@@ -50,6 +50,23 @@ type Lead = {
   submissions: LeadSubmission[];
   emails: EmailLog[];
   anonymizedAt: string;
+  // Programa referidos — ver app/api/admin/leads/[id]/route.ts. Solo lo
+  // rellena la ficha individual (openLead), no el listado; opcionales para
+  // no tener que tocar también GET /api/admin/leads. Ninguno de los dos es
+  // exclusivo del otro: un cliente puede haber llegado como amigo de
+  // alguien Y a la vez tener ya su propio código para referir.
+  referidoDe?: ReferidoDeInfo | null;
+  comoReferidor?: ComoReferidorInfo | null;
+};
+
+type ReferidoDeInfo = {
+  referidorLeadId: string; referidorNombre: string; code: string;
+  status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
+  cotizadoAt: string; optInAt: string; contratadoAt: string;
+  pagadoReferidoAt: string; pagadoReferidorAt: string; ultimoErrorPago: string;
+};
+type ComoReferidorInfo = {
+  code: string; bloqueado: boolean; totalConvertidos: number; contratados: number; pagados: number;
 };
 
 const EMAIL_STATUS_COLORS: Record<EmailLog["status"], string> = {
@@ -67,6 +84,17 @@ const STATUS_COLORS: Record<string, string> = {
   presupuestado: "bg-amber-100 text-amber-700",
   ganado: "bg-emerald-100 text-emerald-700",
   perdido: "bg-slate-200 text-slate-600",
+};
+
+const REFERIDO_STATUS_LABELS: Record<NonNullable<Lead["referidoDe"]>["status"], string> = {
+  cotizado: "Cotizado", "opt-in": "Opt-in confirmado", contratado: "Contratado", pagado: "Pagado", cancelado: "Cancelado",
+};
+const REFERIDO_STATUS_COLORS: Record<NonNullable<Lead["referidoDe"]>["status"], string> = {
+  cotizado: "bg-slate-200 text-slate-600",
+  "opt-in": "bg-navy/10 text-navy",
+  contratado: "bg-amber-100 text-amber-700",
+  pagado: "bg-emerald-100 text-emerald-700",
+  cancelado: "bg-brand-red/10 text-brand-red-deep",
 };
 
 const USO_LABELS: Record<string, string> = {
@@ -146,8 +174,9 @@ function LeadsCrm() {
       const res = await fetch(`/api/admin/leads/${id}`, { headers: { "x-admin-token": token } });
       const body = await res.json();
       if (res.ok && body.ok) {
-        setSelected(body.lead);
-        setLeads((prev) => prev.map((l) => (l.id === body.lead.id ? body.lead : l)));
+        const full: Lead = { ...body.lead, referidoDe: body.referidoDe, comoReferidor: body.comoReferidor };
+        setSelected(full);
+        setLeads((prev) => prev.map((l) => (l.id === full.id ? full : l)));
         return;
       }
     } catch { /* si falla, se cae al fallback de abajo */ }
@@ -307,6 +336,54 @@ function LeadsCrm() {
                     {l.utm?.term && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_term</dt><dd className="text-right font-medium text-ink">{l.utm.term}</dd></div>}
                     {l.utm?.referrer && <div className="flex items-baseline justify-between gap-3"><dt className="shrink-0 text-slate2">Referrer</dt><dd className="truncate text-right font-medium text-ink" title={l.utm.referrer}>{l.utm.referrer}</dd></div>}
                   </dl>
+                </div>
+              )}
+
+              {(l.referidoDe || l.comoReferidor) && (
+                <div className="mt-5 border-t border-hair pt-4">
+                  <p className="text-[12px] font-semibold text-ink">Programa referidos</p>
+                  {l.referidoDe && (
+                    <div className="mt-1.5 text-[12px] leading-relaxed text-slate2">
+                      <p>
+                        Referido por{" "}
+                        <button type="button" onClick={() => openLead(l.referidoDe!.referidorLeadId)} className="font-semibold text-navy underline">
+                          {l.referidoDe.referidorNombre || "otro cliente"}
+                        </button>
+                        {" "}
+                        <span className={`ml-1 rounded-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${REFERIDO_STATUS_COLORS[l.referidoDe.status]}`}>
+                          {REFERIDO_STATUS_LABELS[l.referidoDe.status]}
+                        </span>
+                      </p>
+                      <p className="mt-1">
+                        Su bono (amigo): {l.referidoDe.pagadoReferidoAt
+                          ? <b className="text-emerald-700">pagado {fmt(l.referidoDe.pagadoReferidoAt)}</b>
+                          : l.referidoDe.ultimoErrorPago
+                          ? <b className="text-brand-red-deep" title={l.referidoDe.ultimoErrorPago}>error de pago</b>
+                          : <b className="text-amber-700">pendiente</b>}
+                      </p>
+                      <p>
+                        Bono del referidor: {l.referidoDe.pagadoReferidorAt
+                          ? <b className="text-emerald-700">pagado {fmt(l.referidoDe.pagadoReferidorAt)}</b>
+                          : l.referidoDe.contratadoAt
+                          ? <b className="text-amber-700">en periodo de gracia (contratado {fmt(l.referidoDe.contratadoAt)})</b>
+                          : <b className="text-slate2">aún no aplica (falta contratar)</b>}
+                      </p>
+                    </div>
+                  )}
+                  {l.comoReferidor && (
+                    <div className={l.referidoDe ? "mt-3 border-t border-hair pt-3" : "mt-1.5"}>
+                      <p className="text-[12px] leading-relaxed text-slate2">
+                        Tiene su propio código <b className="tnums text-ink">{l.comoReferidor.code}</b>
+                        {l.comoReferidor.bloqueado && <span className="ml-1.5 rounded-pill bg-brand-red/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand-red-deep">Bloqueado</span>}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-slate2">
+                        {l.comoReferidor.totalConvertidos} amigo{l.comoReferidor.totalConvertidos === 1 ? "" : "s"} · {l.comoReferidor.contratados} contratado{l.comoReferidor.contratados === 1 ? "" : "s"} · {l.comoReferidor.pagados} pagado{l.comoReferidor.pagados === 1 ? "" : "s"}
+                      </p>
+                      <a href="/admin/informes/referidos" className="mt-1 inline-block text-[12px] font-semibold text-navy underline">
+                        Ver en el dashboard de referidos →
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 

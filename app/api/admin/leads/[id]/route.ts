@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getLead, updateLead, listProducts, assignLead, createAuditLog } from "@/lib/store";
+import { getLead, updateLead, listProducts, assignLead, createAuditLog, getReferralAsReferido, getReferralByLeadId } from "@/lib/store";
 import { STATUSES, type Status, type LeadSubmission } from "@/lib/crm";
 import { requireModule } from "@/lib/agentAuth";
 import { saludPrice, vidaPrice } from "@/lib/quote";
@@ -57,10 +57,43 @@ export async function GET(
   if (!auth.ok) return auth.response;
   const lead = await getLead(params.id);
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
-  const submissions = await Promise.all(
-    (lead.submissions ?? []).map(async (s) => ({ ...s, precioAprox: await estimatePrice(s) }))
-  );
-  return NextResponse.json({ ok: true, lead: { ...lead, submissions } });
+  const [submissions, referidoInfo, referidorDoc] = await Promise.all([
+    Promise.all((lead.submissions ?? []).map(async (s) => ({ ...s, precioAprox: await estimatePrice(s) }))),
+    getReferralAsReferido(lead.id),
+    getReferralByLeadId(lead.id),
+  ]);
+  return NextResponse.json({
+    ok: true,
+    lead: { ...lead, submissions },
+    // Programa referidos: si este lead entró como amigo de alguien
+    // (referidoDe) y/o si él mismo ha generado su propio código para
+    // referir a otros (comoReferidor) — ver PresupuestosPanel-equivalente
+    // en la ficha de /admin. Ninguno de los dos es sensible (no expone
+    // importes de terceros, solo el nombre/código del propio programa).
+    referidoDe: referidoInfo
+      ? {
+          referidorLeadId: referidoInfo.doc.referidorLeadId,
+          referidorNombre: referidoInfo.doc.referidorNombre,
+          code: referidoInfo.doc.code,
+          status: referidoInfo.convertido.status,
+          cotizadoAt: referidoInfo.convertido.cotizadoAt,
+          optInAt: referidoInfo.convertido.optInAt ?? "",
+          contratadoAt: referidoInfo.convertido.contratadoAt ?? "",
+          pagadoReferidoAt: referidoInfo.convertido.pagadoReferidoAt ?? "",
+          pagadoReferidorAt: referidoInfo.convertido.pagadoReferidorAt ?? "",
+          ultimoErrorPago: referidoInfo.convertido.ultimoErrorPago ?? "",
+        }
+      : null,
+    comoReferidor: referidorDoc
+      ? {
+          code: referidorDoc.code,
+          bloqueado: referidorDoc.bloqueado,
+          totalConvertidos: referidorDoc.convertidos.length,
+          contratados: referidorDoc.convertidos.filter((c) => c.status === "contratado" || c.status === "pagado").length,
+          pagados: referidorDoc.convertidos.filter((c) => c.status === "pagado").length,
+        }
+      : null,
+  });
 }
 
 export async function PATCH(
