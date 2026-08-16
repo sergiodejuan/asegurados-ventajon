@@ -38,6 +38,7 @@ const consentClient = z
     privacidadAt: z.string().optional(),
     contactoAt: z.string().optional(),
     comercialAt: z.string().optional(),
+    datosSaludAt: z.string().optional(),
   })
   .partial()
   .optional();
@@ -47,6 +48,14 @@ const consentPrivacidad = z.literal(true, {
 });
 const consentContacto = z.literal(true, {
   errorMap: () => ({ message: "Necesitamos tu autorización para poder llamarte." }),
+});
+// Plus5 · Art. 9 RGPD (categorías especiales — datos de salud). Se pide
+// como consentimiento explícito, separado del consentimiento genérico de
+// privacidad, en TODO formulario que trate datos de salud (salud, vida —
+// tabaquismo/motivo son datos de salud a efectos legales). AEPD exige
+// consentimiento inequívoco y separado para estas categorías.
+const consentDatosSalud = z.literal(true, {
+  errorMap: () => ({ message: "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD)." }),
 });
 
 const honeypot = z.string().max(0).optional().default("");
@@ -122,11 +131,13 @@ export const leadSchema = z.object({
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
-  // Preparado para la futura integración con Codescopic: documento de
-  // identidad, código postal real (además de la "zona" ya existente) y si
-  // fuma, que su payload pide del titular y de cada asegurado.
-  documentoTipo: documentoTipoField,
-  documento: documentoField,
+  // Plus5 (auditoría consultora): documento de identidad (DNI/NIE) NO se
+  // pide en el tarificador — se solicita en el flujo post-elección, cuando
+  // el cliente ya ha visto precios y quiere avanzar a contratación. Aquí
+  // se aceptan opcionalmente por compatibilidad con integraciones antiguas
+  // (Codeoscopic prefiere tenerlo pero funciona sin).
+  documentoTipo: documentoTipoField.optional(),
+  documento: documentoField.optional(),
   codigoPostalReal: codigoPostalRealField,
   fumador: z.boolean(),
   aseguradosAdicionales: z.array(aseguradoAdicionalSchema).max(8).optional().default([]),
@@ -140,6 +151,7 @@ export const leadSchema = z.object({
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
+  aceptaDatosSalud: consentDatosSalud, // Art. 9 RGPD — obligatorio en salud
   aceptaComercial: z.boolean().default(false),
   consent: consentClient,
   company: honeypot,
@@ -164,6 +176,7 @@ export const vidaSchema = z.object({
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
+  aceptaDatosSalud: consentDatosSalud, // Art. 9 RGPD — obligatorio en vida (fumador/motivo son datos de salud)
   aceptaComercial: z.boolean().default(false),
   consent: consentClient,
   company: honeypot,

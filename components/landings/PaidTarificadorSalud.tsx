@@ -42,11 +42,12 @@ type Form = {
   apellido2: string;
   telefono: string;
   email: string;
-  documentoTipo: "Dni" | "Nie";
-  documento: string;
+  // Plus5: DNI/NIE se retira del tarificador — se pide en el flujo
+  // post-elección, cuando el cliente confirma la contratación.
   codigoPostalReal: string;
   aceptaPrivacidad: boolean;
   autorizaContacto: boolean;
+  aceptaDatosSalud: boolean; // Art. 9 RGPD (categorías especiales — salud)
   aceptaComercial: boolean;
 };
 
@@ -63,11 +64,10 @@ const INITIAL_FORM: Form = {
   apellido2: "",
   telefono: "",
   email: "",
-  documentoTipo: "Dni",
-  documento: "",
   codigoPostalReal: "",
   aceptaPrivacidad: false,
   autorizaContacto: false,
+  aceptaDatosSalud: false,
   aceptaComercial: false,
 };
 
@@ -136,12 +136,11 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errs.email = "Revisa tu correo.";
       if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
       if (!/^\d{5}$/.test(form.codigoPostalReal)) errs.codigoPostalReal = "5 dígitos.";
-      const doc = form.documento.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
-      if (!/^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(doc)) errs.documento = "Revisa el DNI/NIE.";
     }
     if (step === "envio") {
       if (!form.aceptaPrivacidad) errs.aceptaPrivacidad = "Es necesario aceptar la política.";
       if (!form.autorizaContacto) errs.autorizaContacto = "Es necesario para poder llamarte.";
+      if (!form.aceptaDatosSalud) errs.aceptaDatosSalud = "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD).";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -174,8 +173,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
         numAsegurados: form.numAsegurados,
         fechaNacimiento: form.fechaNacimiento,
         sexo: form.sexo,
-        documentoTipo: form.documentoTipo,
-        documento: form.documento,
+        // DNI/NIE se pide en el flujo post-elección, no aquí.
         codigoPostalReal: form.codigoPostalReal,
         fumador: !!form.fumador,
         aseguradosAdicionales: [],
@@ -188,10 +186,11 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
         email: form.email,
         aceptaPrivacidad: form.aceptaPrivacidad,
         autorizaContacto: form.autorizaContacto,
+        aceptaDatosSalud: form.aceptaDatosSalud,
         aceptaComercial: form.aceptaComercial,
         company: "",
         consent: {
-          privacidadAt: now, contactoAt: now,
+          privacidadAt: now, contactoAt: now, datosSaludAt: now,
           ...(form.aceptaComercial ? { comercialAt: now } : {}),
         },
         utm: getAttribution(),
@@ -512,22 +511,6 @@ function DatosStep({ form, set, errors }: {
           <input inputMode="numeric" value={form.codigoPostalReal} onChange={(e) => set("codigoPostalReal", e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="00000" autoComplete="postal-code"
             className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums focus:border-navy focus:outline-none" />
         </Field>
-        <Field label="Documento" error={errors.documento}>
-          <div className="grid grid-cols-[100px_1fr] gap-2">
-            <div className="relative">
-              <select value={form.documentoTipo} onChange={(e) => set("documentoTipo", e.target.value as Form["documentoTipo"])}
-                className="w-full appearance-none rounded-[12px] border border-hair bg-white px-3 py-3.5 pr-8 text-[16px] focus:border-navy focus:outline-none">
-                <option value="Dni">DNI</option>
-                <option value="Nie">NIE</option>
-              </select>
-              <span aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate2">
-                <ChevronDown width={14} height={14} />
-              </span>
-            </div>
-            <input value={form.documento} onChange={(e) => set("documento", e.target.value.toUpperCase())} placeholder="12345678A"
-              className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums focus:border-navy focus:outline-none" />
-          </div>
-        </Field>
       </div>
     </div>
   );
@@ -573,6 +556,18 @@ function EnvioStep({
           </span>
         </label>
         {errors.autorizaContacto && <p className="text-[13px] font-semibold text-brand-red">{errors.autorizaContacto}</p>}
+
+        {/* Art. 9 RGPD — consentimiento específico y separado para datos de
+            salud (fumador, antecedentes, cobertura). Sin él la aseguradora
+            no puede tarificar; el AEPD exige que sea explícito e informado. */}
+        <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
+          <input type="checkbox" checked={form.aceptaDatosSalud} onChange={(e) => set("aceptaDatosSalud", e.target.checked)}
+            className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
+          <span className="text-[14px] leading-relaxed">
+            Consiento el tratamiento de mis <strong>datos de salud</strong> (art. 9.2.a RGPD) para calcular mi tarifa y compararla entre aseguradoras. Puedo retirar este consentimiento en cualquier momento.
+          </span>
+        </label>
+        {errors.aceptaDatosSalud && <p className="text-[13px] font-semibold text-brand-red">{errors.aceptaDatosSalud}</p>}
 
         <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
           <input type="checkbox" checked={form.aceptaComercial} onChange={(e) => set("aceptaComercial", e.target.checked)}

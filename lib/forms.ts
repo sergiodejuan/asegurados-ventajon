@@ -80,10 +80,14 @@ export const SALUD_CONFIG: FormConfig = {
     { type: "choice", key: "zona", field: "codigoPostal", phase: 0, title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "numbergrid", key: "asegurados", field: "numAsegurados", phase: 0, title: "¿Cuántas personas queréis aseguraros?", helper: "Cuéntalas incluyéndote a ti." },
     { type: "dobsex", key: "titular", phase: 1, title: "Datos de la persona titular", helper: "Solo la titular; a las demás las añadimos después." },
+    // Plus5 (auditoría consultora): retirado el paso "identificacion" (DNI/NIE).
+    // Se pide después de que el cliente elija su compañía en la comparativa —
+    // principio de minimización RGPD art. 5.1.c: no recabar datos que aún no
+    // hacen falta. Solo dejamos el código postal, que sí influye en tarifa.
     {
       type: "identificacion", key: "identificacion", phase: 1,
-      title: "Identifícate para preparar tu contrato",
-      helper: "Lo necesitamos para tramitar tu póliza cuando la confirmes. No pedimos tu dirección, solo el código postal.",
+      title: "¿En qué código postal vives?",
+      helper: "Nos ayuda a ajustar tu comparativa a tu zona. No pedimos tu dirección.",
     },
     { type: "yesno", key: "fumador", field: "fumador", phase: 1, title: "¿Fuma la persona titular?", helper: "Es un dato clave para calcular tu seguro de salud." },
     {

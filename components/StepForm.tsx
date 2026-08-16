@@ -144,7 +144,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     set({ aseguradosExtra: arr });
   }
 
-  function toggleConsent(key: "privacidadAt" | "contactoAt" | "comercialAt", field: string, checked: boolean) {
+  function toggleConsent(key: "privacidadAt" | "contactoAt" | "comercialAt" | "datosSaludAt", field: string, checked: boolean) {
     set({ [field]: checked });
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
   }
@@ -166,9 +166,8 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
 
   function validateIdentificacion(): boolean {
     const e: FieldErrors = {};
-    if (!data.documentoTipo) e.documentoTipo = "Selecciona el tipo de documento.";
-    const doc = String(data.documento ?? "").trim().toUpperCase();
-    if (!/^\d{8}[A-Z]$/.test(doc) && !/^[XYZ]\d{7}[A-Z]$/.test(doc)) e.documento = "Revisa el DNI o NIE (formato no válido).";
+    // Plus5: DNI/NIE ya no se pide en el tarificador — se recoge en el flujo
+    // post-elección. Solo validamos el código postal, que sí influye en tarifa.
     if (!/^\d{5}$/.test(String(data.codigoPostalReal ?? ""))) e.codigoPostalReal = "El código postal debe tener 5 dígitos.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -183,13 +182,18 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email ?? "").trim())) e.email = "Revisa tu correo electrónico.";
     if (!data.aceptaPrivacidad) e.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
     if (!data.autorizaContacto) e.autorizaContacto = "Necesitamos tu autorización para poder llamarte.";
+    // Plus5: art. 9 RGPD — obligatorio solo cuando el producto trata datos
+    // de salud (salud, vida). Para auto/decesos no aplica esa categoría.
+    if ((variant === "salud" || variant === "vida") && !data.aceptaDatosSalud) {
+      e.aceptaDatosSalud = "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD).";
+    }
     if (Object.keys(e).length) {
       setErrors(e);
       // Si es el único motivo por el que no se puede enviar, en vez de solo
       // el error en rojo explicamos brevemente por qué conviene marcarlo
       // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
       if (Object.keys(e).length === 1 && e.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["nombre", "apellido1", "telefono", "email", "aceptaPrivacidad", "autorizaContacto"].find((k) => e[k]);
+      const first = ["nombre", "apellido1", "telefono", "email", "aceptaPrivacidad", "autorizaContacto", "aceptaDatosSalud"].find((k) => e[k]);
       if (first) document.getElementById(`f-${first}`)?.focus();
       return;
     }
@@ -376,24 +380,9 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
         return (
           <Shell title={step.title} helper={step.helper}>
             <form onSubmit={(ev) => { ev.preventDefault(); if (validateIdentificacion()) next(); }}>
-              <fieldset>
-                <legend className="mb-2 text-[14px] font-semibold text-ink">Tipo de documento</legend>
-                <div className="flex gap-3">
-                  {(["Dni", "Nie"] as const).map((t) => (
-                    <button key={t} type="button" aria-pressed={data.documentoTipo === t} onClick={() => set({ documentoTipo: t })}
-                      className={`flex-1 rounded-card border px-4 py-3.5 text-[15px] font-semibold uppercase transition-colors ${data.documentoTipo === t ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <FieldError id="err-documentoTipo" msg={errors.documentoTipo} />
-              </fieldset>
-              <div className="mt-4">
-                <Field id="f-documento" label="Número de documento" value={String(data.documento ?? "")}
-                  onChange={(v) => set({ documento: v.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 9) })}
-                  autoComplete="off" error={errors.documento} placeholder="12345678A…" />
-              </div>
-              <div className="mt-4">
+              {/* Plus5: DNI/NIE se pide en el flujo post-elección (contratación),
+                  no en el tarificador — minimización RGPD. */}
+              <div>
                 <Field id="f-codigoPostalReal" label="Código postal" type="text" inputMode="numeric" value={String(data.codigoPostalReal ?? "")}
                   onChange={(v) => set({ codigoPostalReal: v.replace(/\D/g, "").slice(0, 5) })}
                   autoComplete="postal-code" error={errors.codigoPostalReal} placeholder="35001…" />
@@ -546,6 +535,11 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
                 <Consent id="f-autorizaContacto" checked={!!data.autorizaContacto} onChange={(v) => toggleConsent("contactoAt", "autorizaContacto", v)} error={errors.autorizaContacto}>
                   Autorizo a {BRAND_NAME} a contactarme por teléfono o WhatsApp para ayudarme a elegir mi seguro.
                 </Consent>
+                {(variant === "salud" || variant === "vida") && (
+                  <Consent id="f-aceptaDatosSalud" checked={!!data.aceptaDatosSalud} onChange={(v) => toggleConsent("datosSaludAt", "aceptaDatosSalud", v)} error={errors.aceptaDatosSalud}>
+                    Consiento el tratamiento de mis <strong>datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi tarifa. Puedo retirar este consentimiento en cualquier momento.
+                  </Consent>
+                )}
                 <Consent id="f-aceptaComercial" checked={!!data.aceptaComercial} onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}>
                   Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).
                 </Consent>
