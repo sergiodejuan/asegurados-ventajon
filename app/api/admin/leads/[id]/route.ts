@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getLead, updateLead, listProducts, assignLead, createAuditLog } from "@/lib/store";
 import { STATUSES, type Status, type LeadSubmission } from "@/lib/crm";
 import { requireModule } from "@/lib/agentAuth";
 import { saludPrice, vidaPrice } from "@/lib/quote";
+
+// Schema estricto: rechaza cualquier campo no listado para bloquear
+// mass-assignment de campos internos como submissions, createdAt, priceMatch,
+// consentimientos u otros bloques sensibles.
+const leadPatchSchema = z
+  .object({
+    status: z.string().max(60).optional(),
+    nextStep: z.string().max(2000).optional(),
+    note: z.string().max(4000).optional(),
+    contact: z
+      .object({
+        channel: z.string().max(30).optional(),
+        note: z.string().max(2000).optional(),
+      })
+      .strict()
+      .optional(),
+    agenteAsignadoId: z.string().max(80).optional(),
+    agenteAsignadoNombre: z.string().max(120).optional(),
+  })
+  .strict();
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,15 +70,17 @@ export async function PATCH(
   const auth = await requireModule(request, "leads");
   if (!auth.ok) return auth.response;
 
-  let body: {
-    status?: string; nextStep?: string; note?: string; contact?: { channel?: string; note?: string };
-    agenteAsignadoId?: string; agenteAsignadoNombre?: string;
-  };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 });
   }
+  const parsed = leadPatchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Campos no válidos." }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const status =
     body.status && (STATUSES as readonly string[]).includes(body.status)
