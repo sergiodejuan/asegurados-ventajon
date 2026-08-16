@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { callRequestSchema } from "@/lib/schema";
-import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
+import { DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { loadQuote, saveCallResult, type QuoteProfile } from "@/lib/quote";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Spinner } from "./icons";
-import { ConsentNudgeModal } from "./ConsentNudgeModal";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { CallSlotPicker, type CallSlot } from "./CallSlotPicker";
 import { TurnstileWidget } from "./TurnstileWidget";
 
@@ -39,14 +39,14 @@ export function CallRequestForm({
   const [slot, setSlot] = useState<CallSlot | null>(null);
   const [genericProducto, setGenericProducto] = useState<string>("salud");
   const [clientFirstName, setClientFirstName] = useState<string | undefined>(undefined);
-  const [priv, setPriv] = useState(false);
-  const [contacto, setContacto] = useState(false);
+  // Un único check cubre privacidad + autorización de contacto — ver
+  // components/EssentialConsent.tsx.
+  const [esencial, setEsencial] = useState(false);
   const [comercial, setComercial] = useState(false);
   const [consentTimes, setConsentTimes] = useState<{ privacidadAt?: string; contactoAt?: string; comercialAt?: string }>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [showConsentNudge, setShowConsentNudge] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
 
   const hasProductoParam = searchParams.has("producto");
@@ -118,8 +118,8 @@ export function CallRequestForm({
       compania,
       precioElegido,
       diaLlamada, turnoLlamada: slot?.turno ?? turnoLlamada, fechaProgramada: slot?.fecha ?? "",
-      aceptaPrivacidad: priv,
-      autorizaContacto: contacto,
+      aceptaPrivacidad: esencial,
+      autorizaContacto: esencial,
       aceptaComercial: comercial,
       company: "",
       consent: consentTimes,
@@ -131,12 +131,9 @@ export function CallRequestForm({
       const mapped: FieldErrors = {};
       for (const [k, v] of Object.entries(fe)) if (v && v[0]) mapped[k] = v[0];
       setErrors(mapped);
-      // Si es el único motivo por el que no se puede enviar, en vez de solo
-      // el error en rojo explicamos brevemente por qué conviene marcarlo
-      // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
-      if (Object.keys(mapped).length === 1 && mapped.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["telefono", "codigoPostal", "aceptaPrivacidad", "autorizaContacto"].find((k) => mapped[k]);
-      if (first) document.getElementById(`c-${first}`)?.focus();
+      if (mapped.telefono) document.getElementById("c-telefono")?.focus();
+      else if (mapped.codigoPostal) document.getElementById("c-codigoPostal")?.focus();
+      else if (mapped.aceptaPrivacidad || mapped.autorizaContacto) document.getElementById("c-consiente-esencial")?.focus();
       return;
     }
     setErrors({});
@@ -312,32 +309,19 @@ export function CallRequestForm({
       </div>
 
       <div className="mt-5 flex flex-col gap-3">
-        <label htmlFor="c-aceptaPrivacidad" className="flex cursor-pointer items-start gap-3">
-          <input id="c-aceptaPrivacidad" type="checkbox" checked={priv} onChange={(e) => { setPriv(e.target.checked); setConsentTimes((c) => ({ ...c, privacidadAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.aceptaPrivacidad} />
-          <span className="text-[13px] leading-relaxed text-slate2">
-            He leído y acepto la{" "}
-            <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-          </span>
-        </label>
-        {errors.aceptaPrivacidad && <p role="alert" className="ml-8 text-[13px] font-medium text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-        <label htmlFor="c-autorizaContacto" className="flex cursor-pointer items-start gap-3">
-          <input id="c-autorizaContacto" type="checkbox" checked={contacto} onChange={(e) => { setContacto(e.target.checked); setConsentTimes((c) => ({ ...c, contactoAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" aria-invalid={!!errors.autorizaContacto} />
-          <span className="text-[13px] leading-relaxed text-slate2">
-            Autorizo a {BRAND_NAME} a llamarme por teléfono o WhatsApp para ayudarme a elegir mi seguro.
-          </span>
-        </label>
-        {errors.autorizaContacto && <p role="alert" className="ml-8 text-[13px] font-medium text-brand-red">{errors.autorizaContacto}</p>}
-
-        <label htmlFor="c-aceptaComercial" className="flex cursor-pointer items-start gap-3">
-          <input id="c-aceptaComercial" type="checkbox" checked={comercial} onChange={(e) => { setComercial(e.target.checked); setConsentTimes((c) => ({ ...c, comercialAt: e.target.checked ? new Date().toISOString() : undefined })); }}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[13px] leading-relaxed text-slate2">
-            Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).
-          </span>
-        </label>
+        <EssentialConsentCheckbox
+          idPrefix="c" checked={esencial}
+          onChange={(v) => {
+            setEsencial(v);
+            const at = v ? new Date().toISOString() : undefined;
+            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+          }}
+          error={errors.aceptaPrivacidad ?? errors.autorizaContacto}
+        />
+        <ComercialConsentCheckbox
+          idPrefix="c" checked={comercial}
+          onChange={(v) => { setComercial(v); setConsentTimes((c) => ({ ...c, comercialAt: v ? new Date().toISOString() : undefined })); }}
+        />
       </div>
 
       <TurnstileWidget onToken={setTurnstileToken} />
@@ -356,17 +340,6 @@ export function CallRequestForm({
         {submitting && <Spinner />}
         {submitting ? "Enviando…" : "Que me llamen gratis"}
       </button>
-
-      <ConsentNudgeModal
-        open={showConsentNudge}
-        onClose={() => setShowConsentNudge(false)}
-        onAccept={() => {
-          setContacto(true);
-          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
-          setErrors({});
-          setShowConsentNudge(false);
-        }}
-      />
     </form>
   );
 }
