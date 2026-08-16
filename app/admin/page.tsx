@@ -158,7 +158,7 @@ function LeadsCrm() {
     const res = await fetch(`/api/admin/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ ...payload, agente: agent }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (res.ok && body.ok) {

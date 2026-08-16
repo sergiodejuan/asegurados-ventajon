@@ -69,13 +69,17 @@ function PresupuestoDetail() {
   useEffect(() => { load(); }, [load]);
 
   async function patch(payload: Record<string, unknown>) {
+    // No enviamos `agente` desde el cliente — el server lo resuelve por la
+    // sesión (requireModule → agentNombre). El schema PATCH admin rechaza
+    // cualquier campo que no sea status|note (mass-assignment defense).
     const res = await fetch(`/api/admin/presupuestos/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ ...payload, agente: agent }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (res.ok && body.ok) setPresupuesto(body.presupuesto);
+    else console.error("[presupuesto] PATCH error", body);
   }
 
   async function downloadPdf() {
