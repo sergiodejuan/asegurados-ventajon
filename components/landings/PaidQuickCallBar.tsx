@@ -150,7 +150,12 @@ export function PaidQuickCallBar({
 
       {variant === "section" && (
         <div className="mt-3">
-          <PaidLlamadaLegalNotice idPrefix="quickcall-section" aceptaComercial={aceptaComercial} onChangeAceptaComercial={setAceptaComercial} />
+          <PaidLlamadaLegalNotice
+            simple
+            idPrefix="quickcall-section"
+            aceptaComercial={aceptaComercial}
+            onChangeAceptaComercial={setAceptaComercial}
+          />
         </div>
       )}
 
