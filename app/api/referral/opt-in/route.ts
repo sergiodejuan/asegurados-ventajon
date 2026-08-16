@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyReferralOptInToken } from "@/lib/referralTokens";
 import { updateReferralConvertidoStatus } from "@/lib/store";
+import { payReferidoBonus } from "@/lib/referralPayouts";
 import { rateLimitFail } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -31,11 +32,19 @@ async function handle(request: Request, token: string | undefined | null) {
     status: "opt-in",
     optInAt: new Date().toISOString(),
   });
+  void updated;
+
+  // Pago automático del bono al amigo vía Tremendous. Best-effort: si falla
+  // (Tremendous caído, saldo insuficiente, etc.), dejamos el status en
+  // "opt-in" con retryCount++ y el cron/admin puede reintentar. Nunca
+  // bloquea la redirección al usuario — para él el opt-in ya fue exitoso.
+  payReferidoBonus(verified.code, verified.leadId).catch((err) => {
+    console.error("[referral opt-in] payReferidoBonus error", err);
+  });
 
   // Redirect a página con feedback. Aunque el updated venga null (código
   // borrado, lead removido), consideramos el opt-in "hecho" para no dar
   // pistas a bots — la página de gracias es la misma.
-  void updated;
   return NextResponse.redirect(new URL("/referidos/opt-in?ok=1", request.url), 302);
 }
 

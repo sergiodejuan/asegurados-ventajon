@@ -1418,12 +1418,28 @@ export type ReferralConvertido = {
   nombre: string; // solo para mostrar al referidor en su dashboard
   producto: string;
   presupuestoId: string;
+  // Máquina de estados del convertido:
+  //   cotizado   → llegó y completó comparativa (bono referido pendiente)
+  //   opt-in     → confirmó email (bono referido pagable/pagado)
+  //   contratado → el asesor cerró póliza (arranca el reloj T+30d)
+  //   pagado     → referidor cobró su bono
+  //   cancelado  → póliza cancelada en periodo de gracia; no se paga a nadie
   status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
   cotizadoAt: string;
   optInAt?: string;
   contratadoAt?: string;
   pagadoReferidorAt?: string;
   pagadoReferidoAt?: string;
+  // Tracking de los envíos vía Tremendous — permite auditar en el panel
+  // sin volver a llamar a la API, y sirve de idempotencia por si algún
+  // reintento accidental crea otra order con el mismo external_id.
+  tremendousOrderIdReferido?: string;
+  tremendousOrderIdReferidor?: string;
+  // Reintentos de pago tras fallo transitorio (red/429/5xx). El cron
+  // desiste tras N intentos y deja el bono para revisión manual.
+  retryCountReferido?: number;
+  retryCountReferidor?: number;
+  ultimoErrorPago?: string;
 };
 
 export type ReferralDoc = {
@@ -1485,9 +1501,33 @@ export async function getOrCreateReferralCode(
     await jset(`referral:code:${candidate}`, doc);
     await jset(`idx:refcode:${candidate}`, referidorLeadId);
     await jset(`referral:byLead:${referidorLeadId}`, candidate);
+    // Índice global — permite al cron iterar todos los códigos sin SCAN
+    // (Upstash no lo expone directamente). Score = timestamp de creación
+    // para orden estable.
+    await zadd("referral:codes:index", Date.now(), candidate);
     return doc;
   }
   throw new Error("[referral] no se pudo generar código único tras 8 intentos");
+}
+
+// Lista todos los códigos existentes (más recientes primero). Sin
+// paginación de momento — a los volúmenes esperados (unos cientos/mes)
+// vale con un único fetch. Si se dispara, migrar a paginación cursor.
+export async function listAllReferralCodes(): Promise<string[]> {
+  return zrangeRev("referral:codes:index");
+}
+
+// Bloquea/desbloquea un código desde admin — bloqueado corta el pago
+// de bonos futuros y hace que /r/[code] redirija a /referidos. Los
+// bonos ya devengados NO se revierten.
+export async function setReferralBlocked(code: string, bloqueado: boolean): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    doc.bloqueado = bloqueado;
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
 }
 
 export async function getReferralByCode(code: string): Promise<ReferralDoc | null> {
@@ -2050,6 +2090,25 @@ export async function updatePresupuesto(
     notifyText = "¡Enhorabuena por tu nuevo seguro! ¿Nos cuentas qué tal la experiencia?";
     notifyUrl = `/valoracion/${p.id}`;
     await createClientNotification({ leadId: p.leadId, llamadaId: "", texto: notifyText, url: notifyUrl });
+
+    // Programa referidos: si este lead entró por un código de referido,
+    // marcamos el convertido como "contratado" en el ReferralDoc — arranca
+    // el reloj T+N días que dispara el pago al referidor por el cron. El
+    // código vive en lead.utm.ref (primer toque, se conserva 30d). No
+    // fallamos si algo no cuadra: es un hook best-effort.
+    try {
+      const lead = await jget<Lead>(`lead:${p.leadId}`);
+      const rawUtm = (lead?.utm ?? {}) as Record<string, unknown>;
+      const code = typeof rawUtm.ref === "string" ? rawUtm.ref : "";
+      if (code) {
+        await updateReferralConvertidoStatus(code, p.leadId, {
+          status: "contratado",
+          contratadoAt: now,
+        });
+      }
+    } catch (err) {
+      console.error("[updatePresupuesto] referral hook error", err);
+    }
   }
 
   return { presupuesto: p, notifyText, notifyUrl };
