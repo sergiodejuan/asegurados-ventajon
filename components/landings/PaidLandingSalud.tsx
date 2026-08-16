@@ -8,6 +8,7 @@ import { IconByName, Phone, Check, Star, ChevronDown } from "@/components/icons"
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { PaidReviewsCarousel } from "@/components/landings/PaidReviewsCarousel";
 import { PaidHeroQuoteModal } from "@/components/landings/PaidHeroQuoteModal";
+import { PaidLlamadaModal } from "@/components/landings/PaidLlamadaModal";
 
 // Landing PAID de salud (/lp/salud). Réplica del layout de Línea Directa
 // Salud pero con paleta y voz de marca Asegurados Ventajon. Toda la copia,
@@ -26,7 +27,6 @@ import { PaidHeroQuoteModal } from "@/components/landings/PaidHeroQuoteModal";
 //   /lp/salud/llamada    — formulario "que me llamen" minimalista
 
 const TARIFICADOR_HREF = "/lp/salud/tarificador";
-const LLAMADA_HREF = "/lp/salud/llamada";
 
 function highlightH1(h1: string, highlight: string) {
   if (!highlight) return <span>{h1}</span>;
@@ -84,12 +84,12 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
 
           {/* Desktop: CTA verde + teléfono. Móvil: solo un botón redondo verde de teléfono (más compacto que texto). */}
           <div className="hidden items-center gap-3 md:flex">
-            <Link
-              href={LLAMADA_HREF} onClick={() => trackCta("nav_llamada")}
+            <PaidLlamadaModal
+              onOpen={() => trackCta("nav_llamada")}
               className="inline-flex items-center gap-2 rounded-pill bg-emerald-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-emerald-700"
             >
               <Phone width={16} height={16} aria-hidden="true" /> Llamadme gratis
-            </Link>
+            </PaidLlamadaModal>
             <a
               href={phoneHref} onClick={() => trackCta("phone_top")}
               className="inline-flex items-center gap-2 text-[15px] font-bold text-emerald-700"
@@ -116,11 +116,10 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <div className="grid gap-6 md:grid-cols-2 md:items-center md:gap-12">
             <div className="order-2 md:order-1">
               {config.hero.imageUrl ? (
-                <Link
-                  href={TARIFICADOR_HREF}
-                  onClick={() => trackCta("hero_image")}
-                  aria-label="Calcular seguro de salud"
-                  className="block overflow-hidden rounded-[20px] focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:rounded-[24px]"
+                <PaidHeroQuoteModal
+                  onOpen={() => trackCta("hero_image")}
+                  ariaLabel="Calcular seguro de salud"
+                  className="block w-full overflow-hidden rounded-[20px] focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:rounded-[24px]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -132,16 +131,15 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                     loading="eager"
                     fetchPriority="high"
                   />
-                </Link>
+                </PaidHeroQuoteModal>
               ) : (
-                <Link
-                  href={TARIFICADOR_HREF}
-                  onClick={() => trackCta("hero_image")}
-                  aria-label="Calcular seguro de salud"
+                <PaidHeroQuoteModal
+                  onOpen={() => trackCta("hero_image")}
+                  ariaLabel="Calcular seguro de salud"
                   className="grid aspect-[4/3] w-full place-items-center rounded-[20px] bg-gradient-to-br from-navy to-navy-deep text-white md:rounded-[24px]"
                 >
                   <IconByName name="life" width={64} height={64} aria-hidden="true" />
-                </Link>
+                </PaidHeroQuoteModal>
               )}
             </div>
 
@@ -166,12 +164,12 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                 </div>
               )}
               <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-stretch sm:gap-3 md:mt-8">
-                <Link
-                  href={LLAMADA_HREF} onClick={() => trackCta("hero_llamar")}
+                <PaidLlamadaModal
+                  onOpen={() => trackCta("hero_llamar")}
                   className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-5 text-[15px] font-bold text-emerald-700 hover:bg-emerald-50 md:min-h-[56px] md:px-6 md:text-[16px]"
                 >
                   {config.hero.ctaLlamarLabel}
-                </Link>
+                </PaidLlamadaModal>
                 <PaidHeroQuoteModal
                   onOpen={() => trackCta("hero_calcular")}
                   className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-pill bg-brand-red px-5 text-[15px] font-bold text-white shadow-soft hover:bg-brand-red-deep md:min-h-[56px] md:px-6 md:text-[16px]"
@@ -197,9 +195,9 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
             <ul className="mt-8 grid grid-cols-3 items-center justify-items-center gap-3 md:mt-10 md:grid-cols-6 md:gap-8">
               {config.porQueElegir.partners.map((p, i) => (
                 <li key={`${p.name}-${i}`} className="flex h-14 w-full items-center justify-center md:h-16">
-                  <Link
-                    href={TARIFICADOR_HREF} onClick={() => trackCta("partner", p.name)}
-                    aria-label={`Calcular seguro con ${p.name}`}
+                  <PaidHeroQuoteModal
+                    onOpen={() => trackCta("partner", p.name)}
+                    ariaLabel={`Calcular seguro con ${p.name}`}
                     className="grid h-full w-full place-items-center rounded-[10px] p-2 hover:bg-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy"
                   >
                     {p.imageUrl ? (
@@ -212,20 +210,20 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                     ) : (
                       <span className="text-center text-[11px] font-semibold text-slate2 md:text-[12px]">{p.name}</span>
                     )}
-                  </Link>
+                  </PaidHeroQuoteModal>
                 </li>
               ))}
             </ul>
           )}
           <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:justify-center sm:gap-3 md:mt-10">
-            <Link href={TARIFICADOR_HREF} onClick={() => trackCta("porque_calcular")}
+            <PaidHeroQuoteModal onOpen={() => trackCta("porque_calcular")}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-brand-red px-6 text-[15px] font-bold text-white sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaCalcularLabel}
-            </Link>
-            <Link href={LLAMADA_HREF} onClick={() => trackCta("porque_llamar")}
+            </PaidHeroQuoteModal>
+            <PaidLlamadaModal onOpen={() => trackCta("porque_llamar")}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-6 text-[15px] font-bold text-emerald-700 sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaLlamarLabel}
-            </Link>
+            </PaidLlamadaModal>
           </div>
         </section>
 
@@ -235,15 +233,15 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <ul className="mx-auto mt-8 grid max-w-4xl gap-3 md:mt-10 md:grid-cols-2 md:gap-4">
             {config.beneficios.items.map((b, i) => (
               <li key={i}>
-                <Link
-                  href={TARIFICADOR_HREF} onClick={() => trackCta("beneficio", String(i))}
-                  className="flex h-full items-start gap-3 rounded-[14px] border border-hair bg-white p-4 shadow-soft transition-shadow hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:gap-4 md:rounded-[16px] md:p-5"
+                <PaidHeroQuoteModal
+                  onOpen={() => trackCta("beneficio", String(i))}
+                  className="flex h-full w-full items-start gap-3 rounded-[14px] border border-hair bg-white p-4 text-left shadow-soft transition-shadow hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:gap-4 md:rounded-[16px] md:p-5"
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red md:h-11 md:w-11">
                     <IconByName name={b.icon || "shield"} width={20} height={20} aria-hidden="true" />
                   </span>
                   <p className="text-[14px] leading-relaxed text-ink md:text-[16px]">{b.text}</p>
-                </Link>
+                </PaidHeroQuoteModal>
               </li>
             ))}
           </ul>
@@ -270,14 +268,14 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                 </div>
               )}
               <div className="mx-auto mt-5 flex max-w-md flex-col gap-2.5 sm:flex-row sm:gap-3 md:mt-6">
-                <Link href={LLAMADA_HREF} onClick={() => trackCta("banner_llamar")}
+                <PaidLlamadaModal onOpen={() => trackCta("banner_llamar")}
                   className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-pill border-2 border-white bg-white/10 px-5 text-[14px] font-bold text-white hover:bg-white/20 md:min-h-[52px] md:px-6 md:text-[15px]">
                   {config.hero.ctaLlamarLabel}
-                </Link>
-                <Link href={TARIFICADOR_HREF} onClick={() => trackCta("banner_calcular")}
+                </PaidLlamadaModal>
+                <PaidHeroQuoteModal onOpen={() => trackCta("banner_calcular")}
                   className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-pill bg-white px-5 text-[14px] font-bold text-brand-red hover:bg-white/90 md:min-h-[52px] md:px-6 md:text-[15px]">
                   {config.hero.ctaCalcularLabel}
-                </Link>
+                </PaidHeroQuoteModal>
               </div>
             </div>
           </div>
@@ -294,18 +292,19 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <ul className="mt-8 grid gap-4 md:mt-10 md:grid-cols-3 md:gap-5">
             {config.productos.items.map((p) => {
               const hasBg = !!p.imageUrl;
-              const targetHref = p.ctaAction === "calcular" ? TARIFICADOR_HREF : LLAMADA_HREF;
+              const ProductModal = p.ctaAction === "calcular" ? PaidHeroQuoteModal : PaidLlamadaModal;
+              const cardClassName = `flex h-full min-h-[320px] w-full flex-col overflow-hidden rounded-[20px] text-left transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:min-h-[420px] md:rounded-[24px] ${hasBg ? "text-white" : "border border-hair bg-white shadow-soft"}`;
+              const cardStyle = hasBg ? {
+                backgroundImage: `linear-gradient(180deg, rgba(13,21,58,0.25) 0%, rgba(13,21,58,0.65) 55%, rgba(13,21,58,0.92) 100%), url("${p.imageUrl}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              } : undefined;
               return (
                 <li key={p.id}>
-                  <Link
-                    href={targetHref}
-                    onClick={() => trackCta("producto", p.id)}
-                    className={`flex h-full min-h-[320px] flex-col overflow-hidden rounded-[20px] transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:min-h-[420px] md:rounded-[24px] ${hasBg ? "text-white" : "border border-hair bg-white shadow-soft"}`}
-                    style={hasBg ? {
-                      backgroundImage: `linear-gradient(180deg, rgba(13,21,58,0.25) 0%, rgba(13,21,58,0.65) 55%, rgba(13,21,58,0.92) 100%), url("${p.imageUrl}")`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    } : undefined}
+                  <ProductModal
+                    onOpen={() => trackCta("producto", p.id)}
+                    className={cardClassName}
+                    style={cardStyle}
                   >
                     <div className="mt-auto flex flex-col p-5 md:p-6">
                       <h3 className={`text-[20px] font-extrabold md:text-[24px] ${hasBg ? "text-white" : "text-navy"}`}>{p.title}</h3>
@@ -316,7 +315,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                         {p.ctaLabel}
                       </span>
                     </div>
-                  </Link>
+                  </ProductModal>
                 </li>
               );
             })}
@@ -328,10 +327,10 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <div className="rounded-[20px] bg-white p-5 shadow-soft md:p-10">
             <div className="flex flex-col items-center gap-4 text-center">
               <h2 className="text-[20px] font-extrabold text-navy md:text-[28px]">{config.contrataTelefono.title}</h2>
-              <Link href={LLAMADA_HREF} onClick={() => trackCta("contrata_llamar")}
+              <PaidLlamadaModal onOpen={() => trackCta("contrata_llamar")}
                 className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-emerald-600 px-6 text-[14px] font-bold text-white hover:bg-emerald-700 md:min-h-[52px] md:px-8 md:text-[15px]">
                 {config.contrataTelefono.ctaLabel}
-              </Link>
+              </PaidLlamadaModal>
               <p className="text-[14px] text-slate2 md:text-[15px]">
                 o llama al{" "}
                 <a href={phoneHref} onClick={() => trackCta("phone_middle")} className="font-bold tnums text-navy underline">
@@ -399,14 +398,14 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
             </div>
           )}
           <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:justify-center sm:gap-3 md:mt-10">
-            <Link href={TARIFICADOR_HREF} onClick={() => trackCta("comparativa_calcular")}
+            <PaidHeroQuoteModal onOpen={() => trackCta("comparativa_calcular")}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-brand-red px-6 text-[15px] font-bold text-white sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaCalcularLabel}
-            </Link>
-            <Link href={LLAMADA_HREF} onClick={() => trackCta("comparativa_llamar")}
+            </PaidHeroQuoteModal>
+            <PaidLlamadaModal onOpen={() => trackCta("comparativa_llamar")}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-6 text-[15px] font-bold text-emerald-700 sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaLlamarLabel}
-            </Link>
+            </PaidLlamadaModal>
           </div>
         </section>
 
@@ -475,18 +474,18 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           </a>
 
           <div className="flex flex-1 items-center gap-2 md:flex-none md:gap-3">
-            <Link
-              href={LLAMADA_HREF} onClick={() => trackCta("bottom_llamar")}
+            <PaidLlamadaModal
+              onOpen={() => trackCta("bottom_llamar")}
               className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill border-2 border-white bg-transparent px-2 text-[13px] font-bold text-white hover:bg-white/10 md:flex-none md:min-h-[48px] md:px-6 md:text-[14px]"
             >
               {config.hero.ctaLlamarLabel}
-            </Link>
-            <Link
-              href={TARIFICADOR_HREF} onClick={() => trackCta("bottom_calcular")}
+            </PaidLlamadaModal>
+            <PaidHeroQuoteModal
+              onOpen={() => trackCta("bottom_calcular")}
               className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill bg-white px-2 text-[13px] font-bold text-brand-red hover:bg-white/90 md:flex-none md:min-h-[48px] md:px-6 md:text-[14px]"
             >
               {config.hero.ctaCalcularLabel}
-            </Link>
+            </PaidHeroQuoteModal>
           </div>
         </div>
       </div>
