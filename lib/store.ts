@@ -131,6 +131,24 @@ async function releaseLock(key: string, token: string): Promise<void> {
   const existing = mem.data.get(key) as { token: string; expiresAt: number } | undefined;
   if (existing?.token === token) mem.data.delete(key);
 }
+// Idempotency claim: SET NX PX. Retorna true si esta llamada fue la primera
+// en registrar la clave (procesamos), false si otra ya la tenía (rechazamos
+// como duplicado). No hay que liberar — la clave caduca sola con el TTL.
+// Se usa para deduplicar webhooks Retell/Bland/Manychat en la ventana de
+// firma (~5 min); una réplica accidental o intencional del mismo payload
+// no doblará el efecto lateral (auditoría consultora, P0.9).
+export async function claimOnce(key: string, ttlMs = 15 * 60 * 1000): Promise<boolean> {
+  if (hasKV) {
+    const r = await redisClient();
+    const res = await r.set(key, "1", { nx: true, px: ttlMs });
+    return res === "OK";
+  }
+  const existing = mem.data.get(key) as { expiresAt: number } | undefined;
+  if (existing && existing.expiresAt > Date.now()) return false;
+  mem.data.set(key, { expiresAt: Date.now() + ttlMs });
+  return true;
+}
+
 async function withLock<T>(key: string, fn: () => Promise<T>, ttlMs = 5000, retries = 5): Promise<T> {
   let token: string | null = null;
   for (let i = 0; i < retries; i++) {

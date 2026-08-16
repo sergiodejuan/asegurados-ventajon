@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { updateLead } from "@/lib/store";
+import { updateLead, claimOnce } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +48,17 @@ export async function POST(request: Request) {
   let body: BlandEvent;
   try { body = JSON.parse(raw); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  // Idempotencia: Bland puede reintentar el mismo evento si nuestra respuesta
+  // falla o tarda; deduplicamos por call_id + status para no doblar la entrada
+  // de actividad en la ficha del lead. Ventana 15 min > ventana de firma.
+  const callId = body.call_id ?? "";
+  const kind = body.status ?? (body.completed ? "completed" : "unknown");
+  if (callId) {
+    const idemKey = `idem:bland:${kind}:${callId}`;
+    const first = await claimOnce(idemKey, 15 * 60 * 1000).catch(() => true);
+    if (!first) return NextResponse.json({ ok: true, duplicate: true });
+  }
 
   const leadId = body.metadata?.leadId;
   if (typeof leadId === "string") {

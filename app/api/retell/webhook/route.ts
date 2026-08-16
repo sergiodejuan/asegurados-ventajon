@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { updateLead } from "@/lib/store";
+import { updateLead, claimOnce } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +50,18 @@ export async function POST(request: Request) {
   let body: RetellEvent;
   try { body = JSON.parse(raw); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  // Idempotencia: si Retell reintenta el mismo evento (call_id + event) por
+  // fallo transitorio o alguien reenvía la petición dentro de la ventana de
+  // firma (5 min), aceptamos con 200 pero NO ejecutamos updateLead de nuevo
+  // para no duplicar la entrada de actividad en la ficha del lead.
+  const callId = body.call?.call_id ?? "";
+  const eventKind = body.event ?? "";
+  if (callId && eventKind) {
+    const idemKey = `idem:retell:${eventKind}:${callId}`;
+    const first = await claimOnce(idemKey, 15 * 60 * 1000).catch(() => true);
+    if (!first) return NextResponse.json({ ok: true, duplicate: true });
+  }
 
   // Se registra solo en "call_analyzed" (evento final, con resumen) para no
   // duplicar la entrada de actividad con "call_ended".
