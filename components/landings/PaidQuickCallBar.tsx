@@ -30,12 +30,14 @@ import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 // en su navbar. En variant="section" sí hay sitio de sobra, así que se
 // muestra siempre visible debajo de la barra.
 export function PaidQuickCallBar({
-  phone, variant = "navbar", label, ctaLabel = "Llamadme gratis",
+  phone, variant = "navbar", label, ctaLabel = "Llamadme gratis", producto = "salud", landingSlug,
 }: {
   phone: string;
   variant?: "navbar" | "section";
   label?: string;
   ctaLabel?: string;
+  producto?: string;
+  landingSlug?: string;
 }) {
   const [telefono, setTelefono] = useState("");
   const [aceptaComercial, setAceptaComercial] = useState(false);
@@ -60,18 +62,19 @@ export function PaidQuickCallBar({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nombre: "", telefono, codigoPostal: "", producto: "salud",
+          nombre: "", telefono, codigoPostal: "", producto,
           aceptaPrivacidad: true, autorizaContacto: true, aceptaComercial,
           company: "",
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
           turnstileToken,
-          origen: "lp-salud",
+          origen: "lp",
+          landingSlug,
         }),
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; errors?: Record<string, string[]> } | null;
       if (res.ok && body?.ok) {
-        pushDataLayerEvent("generate_lead", { producto: "salud", form: `lp-salud-quickcall-${variant}` });
+        pushDataLayerEvent("generate_lead", { producto, form: `lp-quickcall-${variant}` });
         setSent(true);
         setNoticeOpen(false);
         return;

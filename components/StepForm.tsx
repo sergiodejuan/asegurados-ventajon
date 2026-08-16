@@ -24,7 +24,7 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto" | "decesos"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" }) {
+export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto" | "decesos"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" | "lp" }) {
   const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : variant === "decesos" ? DECESOS_CONFIG : SALUD_CONFIG;
   const router = useRouter();
 
@@ -219,6 +219,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       utm: getAttribution(),
       turnstileToken,
       ...(origen ? { origen } : {}),
+      ...(getAttribution().landingSlug ? { landingSlug: getAttribution().landingSlug } : {}),
     };
     // Quitar campos que se rellenan en el modal-gate para evitar arrastrar
     // ceros o strings vacíos que la validación final rechazaría.

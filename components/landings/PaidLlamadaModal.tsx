@@ -6,15 +6,15 @@ import { HeroModalTrigger } from "./HeroModalTrigger";
 import { PaidLlamadaForm, type PaidLlamadaSuccess } from "./PaidLlamadaForm";
 import { PaidLlamadaGracias } from "./PaidLlamadaGracias";
 
-// Versión modal de "Te llamamos gratis" para cualquier CTA "llamar" de
-// /lp/salud: en vez de navegar a /lp/salud/llamada, abre el mismo
+// Versión modal de "Te llamamos gratis" para cualquier CTA "llamar" de una
+// landing paid: en vez de navegar a /lp/[slug]/llamada, abre el mismo
 // formulario (PaidLlamadaForm, con su propia validación y envío) en un
 // modal sobre la página actual. Al enviar con éxito, en vez de navegar a
 // /gracias (como en el resto de la web), el mismo modal cambia a un
 // "¡Gracias!" propio de esta landing con la preferencia de día/hora que
-// el usuario eligió — así nunca lo sacamos de /lp/salud.
+// el usuario eligió — así nunca lo sacamos de la landing.
 export function PaidLlamadaModal({
-  className, style, ariaLabel, children, onOpen, phone,
+  className, style, ariaLabel, children, onOpen, phone, producto, landingSlug,
 }: {
   className?: string;
   style?: CSSProperties;
@@ -22,6 +22,8 @@ export function PaidLlamadaModal({
   children: React.ReactNode;
   onOpen?: () => void;
   phone: string;
+  producto?: string;
+  landingSlug?: string;
 }) {
   const [result, setResult] = useState<PaidLlamadaSuccess | null>(null);
 
@@ -31,7 +33,7 @@ export function PaidLlamadaModal({
       style={style}
       ariaLabel={ariaLabel}
       onOpen={onOpen}
-      titleId="lp-salud-llamada-modal-title"
+      titleId="paid-llamada-modal-title"
       renderModal={(close) => {
         function closeAndReset() {
           setResult(null);
@@ -41,7 +43,7 @@ export function PaidLlamadaModal({
           <>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h2 id="lp-salud-llamada-modal-title" className="text-[20px] font-extrabold leading-snug text-navy">
+                <h2 id="paid-llamada-modal-title" className="text-[20px] font-extrabold leading-snug text-navy">
                   {result ? "¡Gracias!" : "Te llamamos gratis"}
                 </h2>
                 {!result && (
@@ -62,7 +64,7 @@ export function PaidLlamadaModal({
             {result ? (
               <PaidLlamadaGracias telefono={result.telefono} dia={result.dia} turno={result.turno} phone={phone} onClose={closeAndReset} />
             ) : (
-              <PaidLlamadaForm onSuccess={setResult} />
+              <PaidLlamadaForm onSuccess={setResult} producto={producto} landingSlug={landingSlug} />
             )}
           </>
         );

@@ -24,6 +24,10 @@ export type Attribution = {
   term?: string;
   referrer?: string;
   landingPage?: string;
+  // Slug de la landing paid (/lp/[slug]) de origen, cuando el visitante llega
+  // vía el redirect de /lp/[slug]/tarificador hacia el tarificador de página
+  // completa del ramo correspondiente (?lp=<slug>, junto al resto de utm_*).
+  landingSlug?: string;
   capturedAt?: string;
 };
 
@@ -52,6 +56,7 @@ export function captureAttribution(pathname: string, search: string): void {
       campaign: params.get("utm_campaign") ?? existing?.campaign,
       content: params.get("utm_content") ?? existing?.content,
       term: params.get("utm_term") ?? existing?.term,
+      landingSlug: params.get("lp") ?? existing?.landingSlug,
       referrer: existing?.referrer ?? (document.referrer || undefined),
       landingPage: existing?.landingPage ?? (pathname + search),
       capturedAt: existing?.capturedAt ?? new Date().toISOString(),

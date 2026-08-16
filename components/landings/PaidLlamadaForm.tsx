@@ -11,11 +11,11 @@ import { Spinner, ChevronDown } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
-// Formulario minimalista de "que me llamen" solo para /lp/salud/llamada.
-// Sigue la referencia de Línea Directa: teléfono + día + hora + botón, con
-// aviso legal debajo. Envío al mismo endpoint que el resto, marcado como
-// origen "lp-salud" — el CRM lo trata con la etiqueta propia
-// "Quiero que me llamen (landing paid)".
+// Formulario minimalista de "que me llamen" para /lp/[slug]/llamada. Sigue
+// la referencia de Línea Directa: teléfono + día + hora + botón, con aviso
+// legal debajo. Envío al mismo endpoint que el resto, marcado como origen
+// "lp" + el slug de la landing concreta — el CRM lo trata con la etiqueta
+// propia "Quiero que me llamen (landing paid)".
 //
 // Si se pasa onSuccess, el llamador decide qué hacer con el resultado (p.ej.
 // mostrar un "gracias" propio dentro de la misma landing, con la preferencia
@@ -23,9 +23,9 @@ import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 // defecto de siempre: navegar a /gracias.
 
 export type PaidLlamadaSuccess = { telefono: string; dia: string; turno: string };
-type Props = { onSuccess?: (result: PaidLlamadaSuccess) => void };
+type Props = { onSuccess?: (result: PaidLlamadaSuccess) => void; producto?: string; landingSlug?: string };
 
-export function PaidLlamadaForm({ onSuccess }: Props) {
+export function PaidLlamadaForm({ onSuccess, producto = "salud", landingSlug }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -51,7 +51,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
           nombre,
           telefono,
           codigoPostal: "",
-          producto: "salud",
+          producto,
           diaLlamada: dia,
           turnoLlamada: turno,
           aceptaPrivacidad: true,
@@ -61,14 +61,15 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
           turnstileToken,
-          origen: "lp-salud",
+          origen: "lp",
+          landingSlug,
         }),
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; errors?: Record<string, string[]>; error?: string } | null;
       if (res.ok && body?.ok) {
-        saveCallResult({ nombre, diaLlamada: dia, turnoLlamada: turno, producto: "salud" });
+        saveCallResult({ nombre, diaLlamada: dia, turnoLlamada: turno, producto });
         saveClientProfile({ nombre, telefono, diaLlamada: dia, turnoLlamada: turno });
-        pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-salud-llamada" });
+        pushDataLayerEvent("generate_lead", { producto, form: "lp-llamada" });
         if (onSuccess) onSuccess({ telefono, dia, turno });
         else router.push("/gracias");
         return;

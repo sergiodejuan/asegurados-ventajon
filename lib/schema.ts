@@ -61,10 +61,21 @@ const consentDatosSalud = z.literal(true, {
 const honeypot = z.string().max(0).optional().default("");
 
 // De dónde viene el envío dentro de la propia web: formulario normal de la
-// página, el widget asistente flotante, o el tarificador embebido en una
-// landing de captación SEO — para poder distinguirlo en el origen del lead
-// sin tocar la atribución de marketing real (utm).
-const origenField = z.enum(["web", "asistente", "seo-landing", "lp-salud"]).optional().default("web");
+// página, el widget asistente flotante, el tarificador embebido en una
+// landing de captación SEO, o una landing paid de /lp/[slug] — para poder
+// distinguirlo en el origen del lead sin tocar la atribución de marketing
+// real (utm). "lp-salud" se mantiene por compatibilidad con clientes ya
+// cacheados en el momento del despliegue de /lp/[slug]; "lp" es el valor
+// genérico nuevo, válido para cualquier landing (el slug concreto viaja
+// aparte en landingSlug).
+const origenField = z.enum(["web", "asistente", "seo-landing", "lp-salud", "lp"]).optional().default("web");
+
+// Slug de la landing paid (/lp/[slug]) de la que vino el envío, si aplica.
+// Texto libre, sin validar contra la colección real de landings: una
+// landing borrada o renombrada después de que alguien cargó la página no
+// debe tumbar el envío de un lead ya en curso — el peor caso es un slug
+// huérfano en analítica, inofensivo.
+const landingSlugField = z.string().trim().toLowerCase().max(80).optional().default("");
 
 const dobField = z
   .string()
@@ -157,6 +168,7 @@ export const leadSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type LeadInput = z.input<typeof leadSchema>;
@@ -182,6 +194,7 @@ export const vidaSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type VidaInput = z.input<typeof vidaSchema>;
@@ -211,6 +224,7 @@ export const decesosSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type DecesosInput = z.input<typeof decesosSchema>;
@@ -241,6 +255,7 @@ export const autoSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type AutoInput = z.input<typeof autoSchema>;
@@ -274,6 +289,7 @@ export const callRequestSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type CallRequestInput = z.input<typeof callRequestSchema>;

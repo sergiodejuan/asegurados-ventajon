@@ -78,7 +78,7 @@ function StepDot({ index, active, done }: { index: number; active: boolean; done
   return <span className={`${base} ${styles}`}>{done ? <Check width={14} height={14} /> : index + 1}</span>;
 }
 
-export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUrl: string }) {
+export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; logoUrl: string; slug: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefill = useMemo(() => prefillFromParams(searchParams), []); // solo al montar: prefill del modal del hero
@@ -156,7 +156,8 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
         apellido2: "",
         company: "",
         utm: getAttribution(),
-        origen: "lp-salud" as const,
+        origen: "lp" as const,
+        landingSlug: slug,
         turnstileToken,
       } satisfies Record<string, unknown>;
       saveLeadDraft({ producto: "salud", endpoint: "/api/lead", data: draftData });
@@ -172,7 +173,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
         id: "",
         createdAt: now,
       });
-      pushDataLayerEvent("generate_lead_step", { producto: "salud", form: "lp-salud-tarificador" });
+      pushDataLayerEvent("generate_lead_step", { producto: "salud", form: "lp-tarificador" });
       router.push("/comparativa?producto=salud&draft=1");
     } catch {
       setSubmitError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
@@ -186,7 +187,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
       {/* Top bar minimal: logo (→ tarificador) + teléfono destacado */}
       <header className="border-b border-hair bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
-          <Link href="/lp/salud/tarificador" aria-label={`${BRAND_NAME} — calcular seguro`} className="inline-flex items-center">
+          <Link href={`/lp/${slug}/tarificador`} aria-label={`${BRAND_NAME} — calcular seguro`} className="inline-flex items-center">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt={BRAND_NAME} className="h-10 w-auto max-w-[180px] object-contain" />
@@ -271,7 +272,7 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
                 )}
               </div>
               <h2 className="mt-5 text-[18px] font-extrabold text-navy">Te llamamos gratis</h2>
-              <SidebarLlamadaForm />
+              <SidebarLlamadaForm slug={slug} />
               <p className="mt-4 text-center text-[13px] text-slate2">O contacta en el</p>
               <a href={phoneHref} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-[12px] border border-brand-red/40 px-4 py-3 text-[16px] font-bold text-brand-red">
                 <Phone width={18} height={18} />
@@ -526,7 +527,7 @@ function ZonaStep({ form, set, errors }: {
    Sidebar — form independiente "Te llamamos gratis"
 ============================================================ */
 
-function SidebarLlamadaForm() {
+function SidebarLlamadaForm({ slug }: { slug: string }) {
   const router = useRouter();
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -557,14 +558,15 @@ function SidebarLlamadaForm() {
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
           turnstileToken,
-          origen: "lp-salud",
+          origen: "lp",
+          landingSlug: slug,
         }),
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; errors?: Record<string, string[]>; error?: string } | null;
       if (res.ok && body?.ok) {
         saveCallResult({ nombre, diaLlamada: dia, turnoLlamada: turno, producto: "salud" });
         saveClientProfile({ nombre, telefono, diaLlamada: dia, turnoLlamada: turno });
-        pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-salud-tarificador-sidebar" });
+        pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-tarificador-sidebar" });
         router.push("/gracias");
         return;
       }

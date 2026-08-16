@@ -17,7 +17,7 @@ import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDr
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
-import { DEFAULT_PAID_LANDING_SALUD, type PaidLandingSaludConfig } from "./paidLandingSalud";
+import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto } from "./landings";
 import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
@@ -228,6 +228,9 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   if (draft.utm && Object.keys(draft.utm).length && !Object.keys(lead.utm).length) {
     lead.utm = draft.utm as Record<string, string | undefined>;
   }
+  // Atribución de landing: igual que utm, gana el primer valor no vacío —
+  // no se sobrescribe en envíos posteriores del mismo lead.
+  if (draft.landingSlug && !lead.landingSlug) lead.landingSlug = draft.landingSlug;
 }
 
 export async function upsertLead(
@@ -318,6 +321,7 @@ async function upsertLeadCritical(
     aceptaPrivacidad: !!draft.aceptaPrivacidad, autorizaContacto: !!draft.autorizaContacto, aceptaComercial: !!draft.aceptaComercial,
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
+    landingSlug: draft.landingSlug ?? "",
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
     submissions: [],
     emails: [],
@@ -1002,74 +1006,186 @@ export async function saveCampaignConfig(patch: Partial<CampaignConfig>): Promis
   return next;
 }
 
-/* ---------------------- Landing de paid (/lp/salud) ------------------------ */
-// Editable desde /admin/campanas/lp-salud. Reemplaza campos vacíos por los
-// defaults para no romper la landing si se guarda una config parcial.
+/* ------------------------- Landings PAID (/lp/[slug]) ----------------------- */
+// Editable desde /admin/campanas/landings. Sustituye a la antigua landing
+// única de /lp/salud (documento singleton en "landing:lp-salud") por una
+// colección — mismo patrón que promociones/testimonios: un array JSON
+// completo bajo una única clave, leído/escrito entero en cada operación.
 
-const LP_SALUD_KEY = "landing:lp-salud";
+const LANDINGS_KEY = "landings:all";
+// Clave legacy de la landing única anterior a esta colección — se lee solo
+// una vez, para migrar su contenido si la colección nueva está vacía. No se
+// borra: queda como copia de seguridad recuperable en Redis sin más coste.
+const LEGACY_LP_SALUD_KEY = "landing:lp-salud";
 
-export async function getPaidLandingSaludConfig(): Promise<PaidLandingSaludConfig> {
-  const stored = await jget<PaidLandingSaludConfig>(LP_SALUD_KEY);
-  if (!stored) return DEFAULT_PAID_LANDING_SALUD;
-  // Merge poco profundo por sección; los arrays (partners, beneficios,
-  // productos, comparativa.rows) sí se reemplazan enteros — así el admin
-  // puede vaciarlos si quiere. Los sub-objetos se mergean para no perder
-  // campos nuevos añadidos al tipo tras un despliegue.
-  return {
-    ...DEFAULT_PAID_LANDING_SALUD,
-    ...stored,
-    hideAssistant: typeof stored.hideAssistant === "boolean" ? stored.hideAssistant : DEFAULT_PAID_LANDING_SALUD.hideAssistant,
-    hero: { ...DEFAULT_PAID_LANDING_SALUD.hero, ...(stored.hero ?? {}) },
-    porQueElegir: {
-      ...DEFAULT_PAID_LANDING_SALUD.porQueElegir,
-      ...(stored.porQueElegir ?? {}),
-      partners: Array.isArray(stored.porQueElegir?.partners) ? stored.porQueElegir!.partners : DEFAULT_PAID_LANDING_SALUD.porQueElegir.partners,
-    },
-    beneficios: {
-      ...DEFAULT_PAID_LANDING_SALUD.beneficios,
-      ...(stored.beneficios ?? {}),
-      items: Array.isArray(stored.beneficios?.items) ? stored.beneficios!.items : DEFAULT_PAID_LANDING_SALUD.beneficios.items,
-    },
-    bannerIntermedio: { ...DEFAULT_PAID_LANDING_SALUD.bannerIntermedio, ...(stored.bannerIntermedio ?? {}) },
-    productos: {
-      ...DEFAULT_PAID_LANDING_SALUD.productos,
-      ...(stored.productos ?? {}),
-      items: Array.isArray(stored.productos?.items) ? stored.productos!.items : DEFAULT_PAID_LANDING_SALUD.productos.items,
-    },
-    contrataTelefono: { ...DEFAULT_PAID_LANDING_SALUD.contrataTelefono, ...(stored.contrataTelefono ?? {}) },
-    comparativa: {
-      ...DEFAULT_PAID_LANDING_SALUD.comparativa,
-      ...(stored.comparativa ?? {}),
-      columns: Array.isArray(stored.comparativa?.columns) ? stored.comparativa!.columns : DEFAULT_PAID_LANDING_SALUD.comparativa.columns,
-      rows: Array.isArray(stored.comparativa?.rows) ? stored.comparativa!.rows : DEFAULT_PAID_LANDING_SALUD.comparativa.rows,
-    },
-    rating: { ...DEFAULT_PAID_LANDING_SALUD.rating, ...(stored.rating ?? {}) },
-    resenas: {
-      ...DEFAULT_PAID_LANDING_SALUD.resenas,
-      ...(stored.resenas ?? {}),
-      items: Array.isArray(stored.resenas?.items) && stored.resenas!.items.length > 0
-        ? stored.resenas!.items
-        : DEFAULT_PAID_LANDING_SALUD.resenas.items,
-    },
-    footer: {
-      ...DEFAULT_PAID_LANDING_SALUD.footer,
-      ...(stored.footer ?? {}),
-      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_PAID_LANDING_SALUD.footer.enlaces,
-    },
-    utm: { ...DEFAULT_PAID_LANDING_SALUD.utm, ...(stored.utm ?? {}) },
-  };
+async function readLandings(): Promise<Landing[]> {
+  const stored = await jget<Landing[]>(LANDINGS_KEY);
+  if (stored && stored.length) return stored;
+
+  // Primer arranque tras el despliegue de la colección: si había una config
+  // guardada bajo el documento singleton antiguo, se adapta a un Landing con
+  // slug "salud" para no perder la copia ya editada por el equipo de paid;
+  // si no había nada, se siembra con la copia por defecto de siempre.
+  const legacy = await jget<Omit<Landing, "id" | "slug" | "status" | "producto" | "createdAt">>(LEGACY_LP_SALUD_KEY);
+  const seeded: Landing[] = [
+    legacy
+      ? {
+          ...DEFAULT_LANDING_SALUD,
+          ...legacy,
+          id: "seed-salud", slug: "salud", status: "publicado", producto: "salud",
+          createdAt: legacy.updatedAt || DEFAULT_LANDING_SALUD.createdAt,
+        }
+      : DEFAULT_LANDING_SALUD,
+  ];
+  await jset(LANDINGS_KEY, seeded);
+  return seeded;
 }
 
-export async function savePaidLandingSaludConfig(next: PaidLandingSaludConfig): Promise<PaidLandingSaludConfig> {
-  const stamped: PaidLandingSaludConfig = { ...next, updatedAt: new Date().toISOString() };
-  await jset(LP_SALUD_KEY, stamped);
-  return stamped;
+export async function listLandings(opts?: { onlyPublished?: boolean; producto?: LandingProducto }): Promise<Landing[]> {
+  let all = await readLandings();
+  if (opts?.onlyPublished) all = all.filter((l) => l.status === "publicado");
+  if (opts?.producto) all = all.filter((l) => l.producto === opts.producto);
+  return [...all].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+export async function getLanding(id: string): Promise<Landing | null> {
+  const all = await readLandings();
+  return all.find((l) => l.id === id) ?? null;
+}
+
+export async function getLandingBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Landing | null> {
+  const all = await readLandings();
+  const landing = all.find((l) => l.slug === slug) ?? null;
+  if (landing && opts?.onlyPublished && landing.status !== "publicado") return null;
+  return landing;
+}
+
+// true si el slug ya está en uso por OTRA landing (excludeId = la que se está editando).
+export async function landingSlugTaken(slug: string, excludeId?: string): Promise<boolean> {
+  const all = await readLandings();
+  return all.some((l) => l.slug === slug && l.id !== excludeId);
+}
+
+export async function createLanding(draft: LandingDraft): Promise<Landing> {
+  const all = await readLandings();
+  const now = new Date().toISOString();
+  const landing: Landing = {
+    ...DEFAULT_LANDING_SALUD,
+    ...draft,
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: draft.slug ?? "",
+    status: draft.status ?? "borrador",
+    producto: draft.producto ?? "salud",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(landing);
+  await jset(LANDINGS_KEY, all);
+  return landing;
+}
+
+export async function updateLanding(id: string, patch: LandingDraft): Promise<Landing | null> {
+  const all = await readLandings();
+  const idx = all.findIndex((l) => l.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(LANDINGS_KEY, all);
+  return all[idx];
+}
+
+export async function deleteLanding(id: string): Promise<boolean> {
+  const all = await readLandings();
+  const next = all.filter((l) => l.id !== id);
+  if (next.length === all.length) return false;
+  await jset(LANDINGS_KEY, next);
+  return true;
+}
+
+// Copia una landing existente bajo un slug nuevo, como borrador — el punto
+// de partida para "por ramo o público objetivo" sin reescribir todo a mano.
+export async function duplicateLanding(id: string, newSlug: string): Promise<Landing | null> {
+  const source = await getLanding(id);
+  if (!source) return null;
+  const all = await readLandings();
+  const now = new Date().toISOString();
+  const copy: Landing = {
+    ...source,
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: newSlug,
+    status: "borrador",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(copy);
+  await jset(LANDINGS_KEY, all);
+  return copy;
+}
+
+/* ------------------- Contadores del dashboard de landings ------------------ */
+// Vistas y clics de CTA por landing y día, para el mini-dashboard de
+// comparación (/admin/campanas/landings/comparar). Bucket diario, no log por
+// evento — suficiente para tendencia histórica sin crecer sin límite.
+// A diferencia del resto del store (documentos JSON completos vía jget/jset),
+// aquí usamos comandos atómicos nativos de Redis (HINCRBY/HGETALL): es un
+// contador puro, no hace falta el lock de más arriba.
+
+async function hincrby(key: string, field: string, by = 1): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    await r.hincrby(key, field, by);
+    return;
+  }
+  const rec = (mem.data.get(key) as Record<string, number> | undefined) ?? {};
+  rec[field] = (rec[field] ?? 0) + by;
+  mem.data.set(key, rec);
+}
+async function hgetall(key: string): Promise<Record<string, number>> {
+  if (hasKV) {
+    const r = await redisClient();
+    return ((await r.hgetall(key)) as Record<string, number> | null) ?? {};
+  }
+  return (mem.data.get(key) as Record<string, number> | undefined) ?? {};
+}
+
+function beaconKey(slug: string, day: string): string {
+  return `beacon:${slug}:${day}`;
+}
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+// Rango de días yyyy-mm-dd inclusive, en orden — usado para leer el
+// desglose de un periodo día a día sin necesitar un índice aparte.
+function dayRange(fromDay: string, toDay: string): string[] {
+  const days: string[] = [];
+  let d = new Date(`${fromDay}T00:00:00Z`);
+  const end = new Date(`${toDay}T00:00:00Z`);
+  while (d <= end && days.length < 366) {
+    days.push(d.toISOString().slice(0, 10));
+    d = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return days;
+}
+
+export type LandingEventKind = "view" | "cta_calcular" | "cta_llamar";
+
+export async function trackLandingEvent(slug: string, kind: LandingEventKind, day = todayStr()): Promise<void> {
+  await hincrby(beaconKey(slug, day), kind, 1);
+}
+
+// { [yyyy-mm-dd]: { view: N, cta_calcular: N, cta_llamar: N } } para el rango pedido.
+export async function getLandingCounters(slug: string, fromDay: string, toDay: string): Promise<Record<string, Record<string, number>>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const day of dayRange(fromDay, toDay)) {
+    out[day] = await hgetall(beaconKey(slug, day));
+  }
+  return out;
 }
 
 /* ---------------- Landing "igualación de precio" ---------------- */
-// Editable desde /admin/campanas/precio-mejor. Mismo criterio de merge que
-// paidLandingSalud: mantiene defaults por sub-sección para no romper la
-// landing si se guarda una config parcial.
+// Editable desde /admin/campanas/precio-mejor. Singleton (a diferencia de
+// las landings de /lp/[slug], que son una colección — ver más abajo):
+// mantiene defaults por sub-sección para no romper la landing si se guarda
+// una config parcial.
 
 const PRICE_MATCH_KEY = "landing:price-match";
 

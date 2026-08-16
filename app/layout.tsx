@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { BRAND_NAME, SITE_URL } from "@/lib/brand";
-import { getTheme, getPaidLandingSaludConfig, getPriceMatchLandingConfig } from "@/lib/store";
+import { getTheme, listLandings, getPriceMatchLandingConfig } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
@@ -69,16 +69,17 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Cargamos las tres configs en paralelo. Las dos landings se leen aquí
-  // para saber si su flag hideAssistant está activado — si sí, añadimos su
-  // ruta a la lista de rutas donde el widget flotante no debe aparecer.
-  const [theme, lpSalud, priceMatch] = await Promise.all([
+  // Cargamos las configs en paralelo. Las landings paid (ahora una colección,
+  // no un único doc) se leen aquí para saber cuáles tienen hideAssistant
+  // activado — si sí, añadimos su ruta a la lista de rutas donde el widget
+  // flotante no debe aparecer.
+  const [theme, landings, priceMatch] = await Promise.all([
     getTheme(),
-    getPaidLandingSaludConfig().catch(() => null),
+    listLandings().catch(() => []),
     getPriceMatchLandingConfig().catch(() => null),
   ]);
   const assistantExtraExcluded: string[] = [];
-  if (lpSalud?.hideAssistant) assistantExtraExcluded.push("/lp/salud");
+  for (const l of landings) if (l.hideAssistant) assistantExtraExcluded.push(`/lp/${l.slug}`);
   if (priceMatch?.hideAssistant) assistantExtraExcluded.push("/precio-mejor-garantizado");
 
   const displayFont = findFont(DISPLAY_FONT_OPTIONS, theme.displayFont);

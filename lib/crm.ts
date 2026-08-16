@@ -157,6 +157,11 @@ export type Lead = {
   consents: ConsentRecord[];
   // Atribución
   utm: Record<string, string | undefined>;
+  // Slug de la landing paid (/lp/[slug]) de la que vino el lead, si aplica —
+  // igual que utm, texto libre no validado, se rellena una sola vez (ver
+  // fillEmpty en lib/store.ts) y sirve para el dashboard de comparación de
+  // landings ("" = no vino de una landing paid).
+  landingSlug: string;
   activity: Activity[];
   // Histórico de tarificaciones / presupuestos (uno por envío de formulario).
   submissions: LeadSubmission[];

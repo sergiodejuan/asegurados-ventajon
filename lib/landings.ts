@@ -1,16 +1,21 @@
-// Configuración de la landing de captación PAID de salud (/lp/salud).
-// Réplica del layout de la landing de Línea Directa Salud, adaptada a la
-// marca Asegurados Ventajon. Toda su copia, imágenes, precios y filas de la
-// comparativa se editan desde /admin/campanas/lp-salud sin desplegar.
+// Landings PAID (/lp/[slug]). Sustituye a la antigua landing única
+// /lp/salud: ahora son N registros editables desde /admin/campanas/landings,
+// cada uno con su propio slug, ramo, SEO y contenido — pensado para poder
+// duplicar la landing de salud y lanzar variantes por ramo o por público
+// objetivo sin desplegar código, y compararlas entre sí.
 //
-// A diferencia de las landings SEO (lib/seoLandingPages.ts), esta va con
-// robots noindex/nofollow: se sirve solo a tráfico de campañas de Paid Ads
-// para no canibalizar el posicionamiento orgánico de /seguro-de-salud.
+// El shape del contenido (hero/porQueElegir/beneficios/bannerIntermedio/
+// productos/contrataTelefono/comparativa/rating/resenas/footer/utm) es
+// idéntico, campo a campo, al de la antigua PaidLandingSaludConfig — solo se
+// le añaden id/slug/status/producto/createdAt al principio.
 
-export type PaidLandingProduct = {
+export type LandingProducto = "salud" | "vida" | "auto" | "decesos" | "hogar";
+export type LandingStatus = "borrador" | "publicado";
+
+export type LandingProduct = {
   // Identificador estable — se usa como key del CTA de cada tarjeta y como
   // valor de utm_content al saltar al tarificador (para saber qué tarjeta
-  // pulsó el usuario).
+  // pulsó el usuario). Solo tiene sentido en landings de producto "salud".
   id: string;
   title: string;
   priceLabel: string; // "Desde" | "Por"
@@ -19,57 +24,58 @@ export type PaidLandingProduct = {
   ctaLabel: string; // "Calcula tu seguro" | "Te llamamos gratis"
   ctaAction: "calcular" | "llamar";
   // Imagen de fondo de la tarjeta (opcional). Cuando existe, se pinta como
-  // background con overlay oscuro y todo el texto en blanco — estilo de la
-  // referencia de Línea Directa. Sin imagen, se muestra card blanca clásica.
+  // background con overlay oscuro y todo el texto en blanco.
   imageUrl: string;
 };
 
-export type PaidLandingComparativaRow = {
+export type LandingComparativaRow = {
   label: string;
   // Un booleano por columna, en el mismo orden que `columns`. Longitudes
   // distintas se manejan como "no incluido" para columnas faltantes.
   incluidoEn: boolean[];
 };
 
-export type PaidLandingPartner = {
+export type LandingPartner = {
   name: string;
   // Data URI o URL externa. Se acepta cualquier cadena, la UI valida.
   imageUrl: string;
 };
 
-export type PaidLandingBenefit = {
+export type LandingBenefit = {
   // Nombre de icono del set de components/icons.tsx (usa el mismo mapping
   // que exit-intents e IconByName). "" = sin icono.
   icon: string;
   text: string;
 };
 
-export type PaidLandingSaludConfig = {
+export type Landing = {
+  id: string;
+  slug: string;
+  status: LandingStatus;
+  // Determina a qué tarificador apunta el CTA "Calcular precio": "salud"
+  // mantiene el wizard embebido (modal, mínima fricción); el resto enlaza al
+  // tarificador de página completa ya existente del site principal (o, en
+  // el caso de "hogar", a "quiero que me llamen", al no existir tarificador
+  // propio de esa rama).
+  producto: LandingProducto;
+
   // Metadata para la etiqueta <title> y descripción SEO — aunque va con
   // noindex, algunos partners de anuncios sí muestran el title cuando el
   // usuario hace preview del enlace en WhatsApp / redes.
   metaTitle: string;
   metaDescription: string;
 
-  // Ocultar el widget flotante del asistente en esta landing. Por defecto
-  // false porque en la mayoría de campañas queremos mostrar el mayor número
-  // de vías de contacto; se puede desactivar desde admin para landings donde
-  // se quiera un funnel visualmente más limpio (más CRO, menos distracción).
+  // Ocultar el widget flotante del asistente en esta landing.
   hideAssistant: boolean;
 
   // Teléfono comercial de la campaña (aparece en las sticky bars y en el
-  // bloque "Contrata por teléfono"). Debe ser el número al que el equipo
-  // reciba las llamadas de esta landing concreta — si es distinto del
-  // general, se puede medir por separado.
+  // bloque "Contrata por teléfono").
   phone: string;
 
   hero: {
     kicker: string;
     h1: string;
-    // Fragmento del H1 que se resalta en rojo (case-insensitive). Todo lo
-    // demás del H1 se pinta en navy. Por defecto "Seguro de Salud" para
-    // que "El Seguro de Salud para que tu salud no espere" quede como en
-    // la referencia de Línea Directa: la parte de producto en color marca.
+    // Fragmento del H1 que se resalta en rojo (case-insensitive).
     h1Highlight: string;
     priceHighlight: string;
     socialProof: string;
@@ -81,12 +87,12 @@ export type PaidLandingSaludConfig = {
   porQueElegir: {
     title: string;
     subtitle: string;
-    partners: PaidLandingPartner[];
+    partners: LandingPartner[];
   };
 
   beneficios: {
     title: string;
-    items: PaidLandingBenefit[];
+    items: LandingBenefit[];
   };
 
   bannerIntermedio: {
@@ -95,10 +101,13 @@ export type PaidLandingSaludConfig = {
     imageUrl: string;
   };
 
+  // Solo se usa cuando producto === "salud" (es la única rama con un
+  // tarificador propio embebido con varias modalidades); para el resto de
+  // ramas esta sección se oculta en el render público.
   productos: {
     title: string;
     intro: string;
-    items: PaidLandingProduct[];
+    items: LandingProduct[];
   };
 
   contrataTelefono: {
@@ -109,8 +118,8 @@ export type PaidLandingSaludConfig = {
   comparativa: {
     title: string;
     subtitle: string;
-    columns: string[]; // ej: ["Salud Especialistas", "Salud Completo"]
-    rows: PaidLandingComparativaRow[];
+    columns: string[];
+    rows: LandingComparativaRow[];
     // Filas que se muestran de entrada; el resto se ocultan tras "Ver más".
     // 0 = mostrar todas de inicio.
     initialVisibleRows: number;
@@ -123,14 +132,11 @@ export type PaidLandingSaludConfig = {
     numValoraciones: string; // "70.207 valoraciones"
   };
 
-  // Carrusel autoscroll infinito de reseñas de clientes, justo encima de la
-  // tarjeta de rating. Se pintan 3 a la vez en desktop y una en móvil; el
-  // resto van pasando en loop sin fin (ver PaidReviewsCarousel).
   resenas: {
     title: string;
     items: {
       autor: string;
-      lugar: string; // p.ej. "Las Palmas" — humaniza al firmante
+      lugar: string;
       estrellas: number; // 1-5
       texto: string;
     }[];
@@ -143,20 +149,79 @@ export type PaidLandingSaludConfig = {
     notaLegal: string;
   };
 
-  // Atribución auto-inyectada en los CTA "Calcula tu seguro". El link al
-  // tarificador se compone como
-  //   /tarificador?utm_source=UTM_SOURCE&utm_medium=UTM_MEDIUM&utm_campaign=UTM_CAMPAIGN&utm_content=<productId>
-  // Ese UTM lo captura lib/attribution.ts y viaja con el lead al CRM.
+  // Atribución auto-inyectada en los CTA "Calcula tu seguro". Ver
+  // buildTarificadorHref más abajo.
   utm: {
     source: string;
     medium: string;
     campaign: string;
   };
 
+  createdAt: string;
   updatedAt: string;
 };
 
-export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
+export type LandingDraft = Partial<Omit<Landing, "id" | "createdAt" | "updatedAt">>;
+
+// Slugs que no se pueden usar como slug de landing porque chocan con rutas
+// propias del admin (el sentinela "nueva" del editor, el dashboard de
+// comparación) o del propio namespace /lp/api si algún día existiera.
+// "salud" NO está en esta lista: es un slug normal, como cualquier otro.
+export const RESERVED_LANDING_SLUGS = ["nueva", "comparar", "api"];
+
+export function slugifyLandingTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(new RegExp("[" + String.fromCharCode(0x0300) + "-" + String.fromCharCode(0x036f) + "]", "g"), "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+}
+
+export const PRODUCTO_TARIFICADOR_HREF: Record<Exclude<LandingProducto, "salud">, string> = {
+  vida: "/tarificador-vida",
+  auto: "/tarificador-auto",
+  decesos: "/tarificador-decesos",
+  // Sin tarificador propio: el CTA "Calcular precio" de una landing de
+  // hogar lleva directamente al flujo genérico de "que me llamen".
+  hogar: "/quiero-que-me-llamen",
+};
+
+// URL del tarificador con la UTM (+ slug de la landing, para atribución) de
+// esta landing auto-inyectada. Para producto !== "salud" apunta al
+// tarificador de página completa ya existente del site (o a "quiero que me
+// llamen" para hogar); para "salud" se usa el wizard embebido propio
+// (ver app/lp/[slug]/tarificador/page.tsx), que no pasa por esta función.
+export function buildTarificadorHref(landing: Pick<Landing, "producto" | "slug" | "utm">, productId?: string): string {
+  const base = landing.producto === "salud" ? "/tarificador" : PRODUCTO_TARIFICADOR_HREF[landing.producto];
+  const params = new URLSearchParams({
+    utm_source: landing.utm.source,
+    utm_medium: landing.utm.medium,
+    utm_campaign: landing.utm.campaign,
+    lp: landing.slug,
+  });
+  if (productId) params.set("utm_content", productId);
+  return `${base}?${params.toString()}`;
+}
+
+const DEFAULT_HERO: Landing["hero"] = {
+  kicker: "",
+  h1: "El Seguro de Salud para que tu salud no espere",
+  h1Highlight: "Seguro de Salud",
+  priceHighlight: "Desde 19,90 €/mes y sin copagos",
+  socialProof: "Más de 350.000 personas ya comparan con nosotros",
+  imageUrl: "",
+  ctaCalcularLabel: "Calcula tu seguro",
+  ctaLlamarLabel: "Te llamamos gratis",
+};
+
+export const DEFAULT_LANDING_SALUD: Landing = {
+  id: "seed-salud",
+  slug: "salud",
+  status: "publicado",
+  producto: "salud",
+
   metaTitle: "Seguro de Salud para que tu salud no espere — Asegurados Ventajon",
   metaDescription:
     "Compara y elige tu Seguro de Salud desde 19,90 €/mes y sin copagos. Más de 1.000 centros y hospitales, 50.000 especialistas en toda España.",
@@ -165,16 +230,7 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
 
   phone: "919 151 151",
 
-  hero: {
-    kicker: "",
-    h1: "El Seguro de Salud para que tu salud no espere",
-    h1Highlight: "Seguro de Salud",
-    priceHighlight: "Desde 19,90 €/mes y sin copagos",
-    socialProof: "Más de 350.000 personas ya comparan con nosotros",
-    imageUrl: "",
-    ctaCalcularLabel: "Calcula tu seguro",
-    ctaLlamarLabel: "Te llamamos gratis",
-  },
+  hero: DEFAULT_HERO,
 
   porQueElegir: {
     title: "¿Por qué elegir el Seguro de Salud de Asegurados Ventajon?",
@@ -353,18 +409,69 @@ export const DEFAULT_PAID_LANDING_SALUD: PaidLandingSaludConfig = {
     campaign: "lp-salud",
   },
 
+  createdAt: "",
   updatedAt: "",
 };
 
-// URL del tarificador con la UTM auto-inyectada. Reutilizable desde el
-// componente público y desde el editor (para mostrar la URL final que verá
-// el usuario al pulsar cualquier CTA "Calcula tu seguro").
-export function buildTarificadorHref(config: PaidLandingSaludConfig, productId?: string): string {
-  const params = new URLSearchParams({
-    utm_source: config.utm.source,
-    utm_medium: config.utm.medium,
-    utm_campaign: config.utm.campaign,
-  });
-  if (productId) params.set("utm_content", productId);
-  return `/tarificador?${params.toString()}`;
+export const PRODUCTOS_VALIDOS: LandingProducto[] = ["salud", "vida", "auto", "decesos", "hogar"];
+
+// Cotas duras sobre las estructuras que se serializan al KV (arrays con
+// máximos, longitudes de dataURL) para que un formulario mal escrito no
+// rompa el store ni deje una landing imposible de renderizar. Compartida
+// entre POST (crear) y PATCH (actualizar) en app/api/admin/landings/*.
+const MAX_IMAGE_LENGTH = 900_000;
+const MAX_PARTNERS = 20;
+const MAX_BENEFICIOS = 20;
+const MAX_PRODUCTOS = 6;
+const MAX_COMPARATIVA_COLUMNS = 6;
+const MAX_COMPARATIVA_ROWS = 40;
+
+export function validateLandingContent(body: LandingDraft): string | null {
+  const partners = Array.isArray(body.porQueElegir?.partners) ? body.porQueElegir.partners : [];
+  if (partners.length > MAX_PARTNERS) return `Máximo ${MAX_PARTNERS} logos de partners.`;
+  for (const p of partners) {
+    if (typeof p.imageUrl === "string" && p.imageUrl.length > MAX_IMAGE_LENGTH) return `El logo de "${p.name}" es demasiado grande.`;
+  }
+
+  const beneficios = Array.isArray(body.beneficios?.items) ? body.beneficios.items : [];
+  if (beneficios.length > MAX_BENEFICIOS) return `Máximo ${MAX_BENEFICIOS} beneficios.`;
+
+  const productos = Array.isArray(body.productos?.items) ? body.productos.items : [];
+  if (productos.length > MAX_PRODUCTOS) return `Máximo ${MAX_PRODUCTOS} tipos de producto.`;
+
+  const columns = Array.isArray(body.comparativa?.columns) ? body.comparativa.columns : [];
+  if (columns.length > MAX_COMPARATIVA_COLUMNS) return `Máximo ${MAX_COMPARATIVA_COLUMNS} columnas en la comparativa.`;
+  const rows = Array.isArray(body.comparativa?.rows) ? body.comparativa.rows : [];
+  if (rows.length > MAX_COMPARATIVA_ROWS) return `Máximo ${MAX_COMPARATIVA_ROWS} filas en la comparativa.`;
+
+  const imageFields = [body.hero?.imageUrl, body.bannerIntermedio?.imageUrl];
+  for (const url of imageFields) {
+    if (typeof url === "string" && url.length > MAX_IMAGE_LENGTH) return "Una de las imágenes principales es demasiado grande.";
+  }
+  return null;
+}
+
+// Plantilla usada por el admin al crear una landing nueva de un ramo
+// distinto a salud: mismo shape con copy neutro/genérico y sin tarjetas de
+// producto (no aplican fuera de salud).
+export function blankLandingFor(producto: LandingProducto): LandingDraft {
+  return {
+    producto,
+    status: "borrador",
+    metaTitle: "",
+    metaDescription: "",
+    hideAssistant: false,
+    phone: DEFAULT_LANDING_SALUD.phone,
+    hero: { ...DEFAULT_HERO, h1: "", h1Highlight: "", priceHighlight: "", socialProof: "", imageUrl: "" },
+    porQueElegir: { title: "", subtitle: "", partners: [] },
+    beneficios: { title: "", items: [] },
+    bannerIntermedio: { title: "", subtitle: "", imageUrl: "" },
+    productos: { title: "", intro: "", items: [] },
+    contrataTelefono: { title: "Contrata por teléfono", ctaLabel: "Llamadme gratis" },
+    comparativa: { title: "", subtitle: "", columns: [], rows: [], initialVisibleRows: 0, verMasLabel: "Ver más", verMenosLabel: "Ver menos" },
+    rating: { valor: "", numValoraciones: "" },
+    resenas: { title: "Lo que dicen nuestros clientes", items: [] },
+    footer: { ...DEFAULT_LANDING_SALUD.footer },
+    utm: { source: "paid_ads", medium: "landing", campaign: "" },
+  };
 }

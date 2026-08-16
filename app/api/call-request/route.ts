@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   // viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
   const source = promotionSourceFromUtm(d.utm) ??
     (d.origen === "asistente" ? "quiero-que-me-llamen-widget"
-    : d.origen === "lp-salud" ? "quiero-que-me-llamen-lp"
+    : d.origen === "lp-salud" || d.origen === "lp" ? "quiero-que-me-llamen-lp"
     : "quiero-que-me-llamen");
 
   const consent = buildConsent(request, source, "/quiero-que-me-llamen",
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal, producto: d.producto,
       diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada, presupuestoId: d.presupuestoId,
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
-      utm: d.utm,
+      utm: d.utm, landingSlug: d.landingSlug,
     },
     source,
     consent

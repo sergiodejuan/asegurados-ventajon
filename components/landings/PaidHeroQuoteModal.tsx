@@ -11,21 +11,24 @@ const INICIO_OPTIONS = [
   { value: "comparando", label: "Solo comparando" },
 ] as const;
 
-// Arranca el tarificador de /lp/salud desde cualquier CTA "calcular" de la
-// landing. El wizard real (PaidTarificadorSalud) tiene su primer paso
-// ("asegurados") como pregunta aislada sin PII, así que es el candidato
-// natural para resolverse aquí; "inicio" viaja junto porque es igual de
-// ligero, aunque en el wizard completo comparte pantalla con fecha de
-// nacimiento/sexo/fumador (por eso solo se precarga, no salta ese paso
-// entero).
+// Arranca el tarificador embebido de una landing de salud (/lp/[slug]/
+// tarificador) desde cualquier CTA "calcular". El wizard real
+// (PaidTarificadorSalud) tiene su primer paso ("asegurados") como pregunta
+// aislada sin PII, así que es el candidato natural para resolverse aquí;
+// "inicio" viaja junto porque es igual de ligero, aunque en el wizard
+// completo comparte pantalla con fecha de nacimiento/sexo/fumador (por eso
+// solo se precarga, no salta ese paso entero). Solo se usa para landings de
+// producto "salud" — el resto de ramas enlazan directo al tarificador de
+// página completa correspondiente (ver CalcularCta en PaidLanding.tsx).
 export function PaidHeroQuoteModal({
-  className, style, ariaLabel, children, onOpen,
+  className, style, ariaLabel, children, onOpen, tarificadorHref,
 }: {
   className?: string;
   style?: CSSProperties;
   ariaLabel?: string;
   children: React.ReactNode;
   onOpen?: () => void;
+  tarificadorHref: string;
 }) {
   const [asegurados, setAsegurados] = useState<number>();
   const [inicio, setInicio] = useState<string>();
@@ -34,7 +37,7 @@ export function PaidHeroQuoteModal({
 
   function submit() {
     if (!asegurados || !inicio) return;
-    router.push(`/lp/salud/tarificador?asegurados=${asegurados}&inicio=${inicio}`);
+    router.push(`${tarificadorHref}?asegurados=${asegurados}&inicio=${inicio}`);
   }
 
   return (
@@ -43,12 +46,12 @@ export function PaidHeroQuoteModal({
       style={style}
       ariaLabel={ariaLabel}
       onOpen={onOpen}
-      titleId="lp-salud-hero-modal-title"
+      titleId="paid-hero-modal-title"
       renderModal={(close) => (
         <>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2 id="lp-salud-hero-modal-title" className="text-[20px] font-extrabold leading-snug text-navy">
+              <h2 id="paid-hero-modal-title" className="text-[20px] font-extrabold leading-snug text-navy">
                 Calcula tu precio en 1 minuto
               </h2>
               <p className="mt-1 text-[14px] leading-relaxed text-slate2">

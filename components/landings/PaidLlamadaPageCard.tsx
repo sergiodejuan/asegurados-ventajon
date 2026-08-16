@@ -6,13 +6,20 @@ import { Check, IconByName } from "@/components/icons";
 import { PaidLlamadaForm, type PaidLlamadaSuccess } from "./PaidLlamadaForm";
 import { PaidLlamadaGracias } from "./PaidLlamadaGracias";
 
-// Tarjeta interactiva de /lp/salud/llamada: igual que en el resto de la
+// Tarjeta interactiva de /lp/[slug]/llamada: igual que en el resto de la
 // landing, al enviar el formulario no navega a /gracias — se sustituye por
-// un "¡Gracias!" con la preferencia de día/hora, sin salir de /lp/salud. Al
-// pulsar "Volver a {marca}" aquí sí navega (a /lp/salud): a diferencia de
+// un "¡Gracias!" con la preferencia de día/hora, sin salir de la landing. Al
+// pulsar "Volver a {marca}" aquí sí navega (a /lp/[slug]): a diferencia de
 // los modales, esta es una página dedicada, así que "volver" significa
 // salir de ella hacia la landing, no vaciar el formulario para repetirlo.
-export function PaidLlamadaPageCard({ phone }: { phone: string }) {
+export function PaidLlamadaPageCard({
+  phone, backHref, producto, landingSlug,
+}: {
+  phone: string;
+  backHref: string;
+  producto?: string;
+  landingSlug?: string;
+}) {
   const router = useRouter();
   const [result, setResult] = useState<PaidLlamadaSuccess | null>(null);
 
@@ -28,9 +35,9 @@ export function PaidLlamadaPageCard({ phone }: { phone: string }) {
       </div>
       <div className="mt-6">
         {result ? (
-          <PaidLlamadaGracias telefono={result.telefono} dia={result.dia} turno={result.turno} phone={phone} onClose={() => router.push("/lp/salud")} />
+          <PaidLlamadaGracias telefono={result.telefono} dia={result.dia} turno={result.turno} phone={phone} onClose={() => router.push(backHref)} />
         ) : (
-          <PaidLlamadaForm onSuccess={setResult} />
+          <PaidLlamadaForm onSuccess={setResult} producto={producto} landingSlug={landingSlug} />
         )}
       </div>
     </div>

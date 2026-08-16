@@ -40,7 +40,9 @@ export async function POST(request: Request) {
   // la página normal: se distingue en el source para poder medirlo aparte.
   // Si viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
   const source = promotionSourceFromUtm(d.utm) ??
-    (d.origen === "asistente" ? "tarificador-decesos-widget" : "tarificador-decesos");
+    (d.origen === "asistente" ? "tarificador-decesos-widget"
+    : d.origen === "lp" ? "tarificador-decesos-lp"
+    : "tarificador-decesos");
 
   const consent = buildConsent(request, source, "/tarificador-decesos",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
       seguroActualPeriodo: d.seguroActualPeriodo, seguroActualServicios: d.seguroActualServicios,
       producto: "decesos",
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
-      utm: d.utm,
+      utm: d.utm, landingSlug: d.landingSlug,
     },
     source,
     consent

@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     promotionSourceFromUtm(d.utm) ??
     (d.origen === "asistente" ? "tarificador-salud-widget"
     : d.origen === "seo-landing" ? "tarificador-salud-seo"
-    : d.origen === "lp-salud" ? "tarificador-salud-lp"
+    : d.origen === "lp-salud" || d.origen === "lp" ? "tarificador-salud-lp"
     : "tarificador-salud");
 
   // La página exacta de origen viaja en el Referer del navegador — útil para
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       seguroActualImporte: d.seguroActualImporte, seguroActualPeriodo: d.seguroActualPeriodo,
       seguroActualServicios: d.seguroActualServicios, producto: "salud",
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
-      utm: d.utm,
+      utm: d.utm, landingSlug: d.landingSlug,
     },
     source,
     consent
