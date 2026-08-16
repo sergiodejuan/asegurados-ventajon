@@ -38,6 +38,12 @@ export type QuoteProfile = {
 };
 
 const STORAGE_KEY = "ventajon:quote";
+// Draft de payload de tarificación pendiente de completar con datos de
+// contacto + consentimientos. Se guarda en sessionStorage cuando el
+// tarificador termina los pasos técnicos, y la comparativa lo consume al
+// completar el gate de contacto — en ese momento se crea el lead REAL en
+// el backend. Antes esta captura estaba duplicada (tarificador + comparativa).
+const DRAFT_KEY = "ventajon:leadDraft";
 
 export function saveQuote(q: QuoteProfile) {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(q)); } catch { /* sessionStorage no disponible */ }
@@ -58,6 +64,29 @@ export function updateQuote(patch: Partial<QuoteProfile>): QuoteProfile | null {
   const next = { ...current, ...patch };
   saveQuote(next);
   return next;
+}
+
+export type LeadDraftPayload = {
+  producto: "salud" | "vida" | "auto" | "decesos";
+  endpoint: string; // p. ej. "/api/lead" o "/api/vida"
+  data: Record<string, unknown>; // payload SIN nombre/telefono/email/consents
+};
+
+export function saveLeadDraft(draft: LeadDraftPayload) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
+}
+
+export function loadLeadDraft(): LeadDraftPayload | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as LeadDraftPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLeadDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
 export function quoteNumber(id: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
@@ -14,7 +14,10 @@ import type { Product } from "@/lib/catalog";
 import {
   loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
+  loadLeadDraft, clearLeadDraft,
 } from "@/lib/quote";
+import { saveClientProfile, addClientQuote } from "@/lib/clientArea";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 
 function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -61,10 +64,15 @@ type RealQuote = {
 type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
 
 export function Comparativa() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
   const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
-  const presupuestoIdParam = searchParams.get("pid") ?? "";
+  // presupuestoId es dinámico: viene del URL si el lead ya existe (auto/
+  // decesos, o navegación con pid antiguo), o se rellena al desbloquear el
+  // gate en salud/vida (que es cuando se crea el lead REAL en el backend).
+  const initialPid = searchParams.get("pid") ?? "";
+  const [presupuestoId, setPresupuestoId] = useState(initialPid);
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -93,19 +101,33 @@ export function Comparativa() {
   const [priceMatchOpen, setPriceMatchOpen] = useState(false);
   const pollingRef = useRef<{ stop: boolean }>({ stop: false });
 
-  // Comparativa bloqueada tras un velo (blur) hasta que el usuario confirma
-  // sus datos de contacto y consentimientos — ver ComparativaGate más abajo.
-  // Se precarga con lo que ya sepamos (normalmente ya viene del tarificador),
-  // así que para la mayoría es solo "revisar y confirmar", no volver a
-  // escribir todo desde cero.
+  // Comparativa bloqueada tras un blur pesado + modal fullscreen hasta que
+  // el usuario confirma contacto y consentimientos. Dos modos:
+  //  · "gate-obligatorio" (nuevo flujo salud/vida): no hay pid, hay un
+  //    draft de tarificación en sessionStorage. Al enviar el modal, se
+  //    crea el lead REAL en backend con todos los datos combinados.
+  //  · "gate-legacy" (auto/decesos, o link antiguo con pid): el lead ya
+  //    existe; el modal solo pide los datos que puedan faltar y refresca
+  //    el contacto vía /api/client/update-contact.
   const [unlocked, setUnlocked] = useState(false);
   const [gateNombre, setGateNombre] = useState("");
+  const [gateApellido1, setGateApellido1] = useState("");
   const [gateTelefono, setGateTelefono] = useState("");
   const [gateEmail, setGateEmail] = useState("");
   const [gateAceptaPrivacidad, setGateAceptaPrivacidad] = useState(false);
+  const [gateAutorizaContacto, setGateAutorizaContacto] = useState(false);
+  const [gateAceptaDatosSalud, setGateAceptaDatosSalud] = useState(false);
   const [gateAceptaComercial, setGateAceptaComercial] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
   const [gateSubmitting, setGateSubmitting] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+  // Producto es salud/vida: el consentimiento art. 9 RGPD es obligatorio.
+  const isHealthLike = producto === "salud" || producto === "vida";
+  // Modal obligatorio (no cerrable) cuando estamos creando el lead ahora
+  // desde el modal — es decir, cuando hay draft pendiente. Cuando el lead
+  // ya existe (pid en URL), el modal actúa como refresco opcional pero se
+  // puede cerrar con "Ver sin completar" como antes.
+  const mustGate = hasDraft;
 
   useEffect(() => {
     const q = loadQuote();
@@ -121,39 +143,119 @@ export function Comparativa() {
       setGateTelefono(q.telefono ?? "");
       setGateEmail(q.email ?? "");
     }
+    // Detectar draft pendiente — significa que venimos del tarificador y
+    // aún no se ha creado el lead (flujo salud/vida unificado 2026-08).
+    const draft = loadLeadDraft();
+    if (draft) setHasDraft(true);
   }, []);
 
   async function unlockComparativa(e: React.FormEvent) {
     e.preventDefault();
     setGateError(null);
     if (!gateNombre.trim() || gateNombre.trim().length < 2) { setGateError("Dinos tu nombre."); return; }
+    if (producto === "salud" && (!gateApellido1.trim() || gateApellido1.trim().length < 2)) {
+      setGateError("Dinos tu primer apellido."); return;
+    }
     if (!/^[6-9]\d{8}$/.test(normalizePhone(gateTelefono))) { setGateError("Introduce un móvil español válido (9 dígitos)."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim())) { setGateError("Revisa tu correo electrónico."); return; }
     if (!gateAceptaPrivacidad) { setGateError("Necesitamos que aceptes la política de privacidad."); return; }
+    if (!gateAutorizaContacto) { setGateError("Necesitamos tu autorización para contactarte."); return; }
+    if (isHealthLike && !gateAceptaDatosSalud) {
+      setGateError("Necesitamos tu consentimiento para tratar datos de salud (art. 9 RGPD)."); return;
+    }
 
     setGateSubmitting(true);
+    const nowIso = new Date().toISOString();
     try {
-      await fetch("/api/client/update-contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lookupPhone: quote?.telefono,
-          lookupEmail: quote?.email,
-          patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: gateAceptaComercial },
-        }),
-      });
-    } catch { /* mejor esfuerzo: si falla, igualmente desbloqueamos localmente */ }
-    finally { setGateSubmitting(false); }
-
-    const next = updateQuote({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
-    if (next) setQuote(next);
+      const draft = loadLeadDraft();
+      if (draft) {
+        // Nuevo flujo: creamos el lead REAL con datos combinados. El
+        // backend ya valida strict con los schemas Zod correspondientes.
+        const consent = {
+          privacidadAt: nowIso,
+          contactoAt: nowIso,
+          ...(isHealthLike ? { datosSaludAt: nowIso } : {}),
+          ...(gateAceptaComercial ? { comercialAt: nowIso } : {}),
+        };
+        const payload = {
+          ...draft.data,
+          nombre: gateNombre,
+          ...(producto === "salud" ? { apellido1: gateApellido1 } : {}),
+          telefono: gateTelefono,
+          email: gateEmail,
+          aceptaPrivacidad: true,
+          autorizaContacto: true,
+          ...(isHealthLike ? { aceptaDatosSalud: true } : {}),
+          aceptaComercial: gateAceptaComercial,
+          consent,
+        };
+        const res = await fetch(draft.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; presupuestoId?: string; error?: string; errors?: Record<string, string[]> } | null;
+        if (!res.ok || !body?.ok) {
+          const first = body?.errors ? Object.values(body.errors).find((v) => v && v[0])?.[0] : undefined;
+          setGateError(first ?? body?.error ?? "No hemos podido enviar tus datos. Inténtalo de nuevo.");
+          setGateSubmitting(false);
+          return;
+        }
+        const newPid = body.presupuestoId ?? "";
+        const updated = updateQuote({
+          nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
+          id: newPid, consentAt: consent,
+        }) ?? {
+          id: newPid, producto: draft.producto, createdAt: nowIso,
+          nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
+          consentAt: consent,
+        };
+        if (updated) {
+          setQuote(updated);
+          addClientQuote(updated);
+        }
+        saveClientProfile({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
+        clearLeadDraft();
+        setHasDraft(false);
+        pushDataLayerEvent("generate_lead", { producto: draft.producto, form: "comparativa-gate" });
+        // Reflejamos el pid en la URL para que /comparativa recargable
+        // siga funcionando (compartir enlace, back/forward).
+        if (newPid) {
+          const nextUrl = `/comparativa?producto=${producto}&pid=${encodeURIComponent(newPid)}`;
+          router.replace(nextUrl);
+          // También seteamos el estado local para disparar el useEffect
+          // de Codeoscopic sin esperar a re-lectura de searchParams.
+          setPresupuestoId(newPid);
+        }
+      } else {
+        // Flujo legacy: el lead ya existe; solo refrescamos contacto.
+        await fetch("/api/client/update-contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lookupPhone: quote?.telefono,
+            lookupEmail: quote?.email,
+            patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: gateAceptaComercial },
+          }),
+        });
+        const next = updateQuote({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
+        if (next) setQuote(next);
+      }
+    } catch {
+      setGateError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+      setGateSubmitting(false);
+      return;
+    } finally {
+      setGateSubmitting(false);
+    }
     setUnlocked(true);
   }
 
-  // Salir del velo sin dejar (más) datos. A diferencia de algunos
-  // competidores, el cierre aquí funciona de verdad — no es un patrón
-  // oscuro que finge cerrarse para forzar el formulario.
+  // Salir sin dejar más datos: SOLO permitido en modo legacy (lead ya
+  // existe). En modo obligatorio (draft pendiente) no hay salida — sin
+  // datos de contacto no podemos crear el lead ni mostrar precios.
   function skipGate() {
+    if (mustGate) return;
     setUnlocked(true);
   }
 
@@ -168,7 +270,7 @@ export function Comparativa() {
   // estar en estimate=true (o hasta un timeout de 90s: pasado ese tiempo,
   // dejamos de martillear y mostramos lo que haya). Sólo salud por ahora.
   useEffect(() => {
-    if (producto !== "salud" || !presupuestoIdParam) return;
+    if (producto !== "salud" || !presupuestoId) return;
     const local: { stop: boolean } = { stop: false };
     pollingRef.current = local;
     setRealStatus("loading");
@@ -210,7 +312,7 @@ export function Comparativa() {
         const createRes = await fetch("/api/quote/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ presupuestoId: presupuestoIdParam }),
+          body: JSON.stringify({ presupuestoId: presupuestoId }),
         });
         const createBody = (await createRes.json().catch(() => null)) as
           | { ok: true; insuranceId: string; snapshot: unknown }
@@ -237,7 +339,7 @@ export function Comparativa() {
           if (local.stop) return;
           // Pasamos pid al polling para que el endpoint persista el snapshot
           // en el presupuesto server-side (para el bloque de admin).
-          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuestoIdParam)}`);
+          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuestoId)}`);
           const pollBody = (await pollRes.json().catch(() => null)) as
             | { ok: true; done: boolean; snapshot: unknown }
             | { ok: false }
@@ -256,7 +358,7 @@ export function Comparativa() {
     })();
 
     return () => { local.stop = true; };
-  }, [producto, presupuestoIdParam]);
+  }, [producto, presupuestoId]);
 
   function saveEdits() {
     const next = updateQuote({
@@ -270,7 +372,7 @@ export function Comparativa() {
     setEditing(false);
   }
 
-  if (loaded && !quote) {
+  if (loaded && !quote && !hasDraft) {
     return (
       <>
         <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
@@ -294,9 +396,24 @@ export function Comparativa() {
   const widgetWaText = buildWhatsAppText({ producto, quote, origen: "comparativa" });
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
 
+  // Blur pesado + no scroll + inerte cuando el gate está activo. El modal
+  // se renderiza APARTE (fuera del blur) para que sea nítido y usable.
+  const gateBlocking = !unlocked;
+  const mainBlurred = gateBlocking ? "pointer-events-none select-none blur-md" : "";
+  // Bloquea el scroll del body mientras el gate esté visible — evita
+  // desplazamientos por debajo del modal (que además está en blur y
+  // aria-hidden). Al desbloquear, se restaura.
+  useEffect(() => {
+    if (!loaded || !gateBlocking) return;
+    const body = document.body;
+    const prev = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => { body.style.overflow = prev; };
+  }, [gateBlocking, loaded]);
+
   return (
     <>
-      <main id="contenido" className="mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20">
+      <main id="contenido" aria-hidden={gateBlocking} className={`mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20 ${mainBlurred}`}>
         <MinimalTopBar />
         <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-white">
           <Check width={30} height={30} />
@@ -435,8 +552,8 @@ export function Comparativa() {
           </div>
         )}
 
-        <div className="relative mt-5">
-          <div aria-hidden={!unlocked} className={!unlocked ? "pointer-events-none select-none blur-sm" : undefined}>
+        <div className="mt-5">
+          <div>
             <div className="rounded-card border border-hair bg-mist p-4">
               <p className="text-[13px] font-bold text-navy">
                 {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
@@ -552,22 +669,6 @@ export function Comparativa() {
                   })}
             </ul>
           </div>
-
-          {!unlocked && (
-            <div className="absolute inset-x-0 top-0">
-              <ComparativaGate
-                nombre={gateNombre} onNombre={setGateNombre}
-                telefono={gateTelefono} onTelefono={setGateTelefono}
-                email={gateEmail} onEmail={setGateEmail}
-                aceptaPrivacidad={gateAceptaPrivacidad} onAceptaPrivacidad={setGateAceptaPrivacidad}
-                aceptaComercial={gateAceptaComercial} onAceptaComercial={setGateAceptaComercial}
-                error={gateError}
-                submitting={gateSubmitting}
-                onSubmit={unlockComparativa}
-                onSkip={skipGate}
-              />
-            </div>
-          )}
         </div>
 
         {/* Rescate "igualación de precio": bloque discreto pero visible
@@ -626,7 +727,26 @@ export function Comparativa() {
 
         <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>
-      <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />
+      {gateBlocking && (
+        <ComparativaGate
+          producto={producto}
+          isHealthLike={isHealthLike}
+          mustGate={mustGate}
+          nombre={gateNombre} onNombre={setGateNombre}
+          apellido1={gateApellido1} onApellido1={setGateApellido1}
+          telefono={gateTelefono} onTelefono={setGateTelefono}
+          email={gateEmail} onEmail={setGateEmail}
+          aceptaPrivacidad={gateAceptaPrivacidad} onAceptaPrivacidad={setGateAceptaPrivacidad}
+          autorizaContacto={gateAutorizaContacto} onAutorizaContacto={setGateAutorizaContacto}
+          aceptaDatosSalud={gateAceptaDatosSalud} onAceptaDatosSalud={setGateAceptaDatosSalud}
+          aceptaComercial={gateAceptaComercial} onAceptaComercial={setGateAceptaComercial}
+          error={gateError}
+          submitting={gateSubmitting}
+          onSubmit={unlockComparativa}
+          onSkip={skipGate}
+        />
+      )}
+      {!gateBlocking && <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
     </>
   );
 }
@@ -671,19 +791,30 @@ function CompanyActions({
 }
 
 /* ------------------------------ Gate de contacto --------------------------- */
-// Vela la comparativa (blur) hasta que el usuario confirma sus datos de
-// contacto y consentimientos. A diferencia de algunos formularios de
-// referencia del sector, "Ver sin completar" cierra de verdad — no fingimos
-// un cierre que en realidad no hace nada, eso solo genera desconfianza.
+// Modal fullscreen con backdrop opaco. En modo mustGate (draft pendiente
+// = salud/vida) NO permite cerrar: sin datos no podemos crear el lead ni
+// mostrar precios. En modo legacy (lead ya existe) sí se puede "Ver sin
+// completar" para no romper el flujo antiguo.
 function ComparativaGate({
-  nombre, onNombre, telefono, onTelefono, email, onEmail,
-  aceptaPrivacidad, onAceptaPrivacidad, aceptaComercial, onAceptaComercial,
+  producto, isHealthLike, mustGate,
+  nombre, onNombre, apellido1, onApellido1,
+  telefono, onTelefono, email, onEmail,
+  aceptaPrivacidad, onAceptaPrivacidad,
+  autorizaContacto, onAutorizaContacto,
+  aceptaDatosSalud, onAceptaDatosSalud,
+  aceptaComercial, onAceptaComercial,
   error, submitting, onSubmit, onSkip,
 }: {
+  producto: string;
+  isHealthLike: boolean;
+  mustGate: boolean;
   nombre: string; onNombre: (v: string) => void;
+  apellido1: string; onApellido1: (v: string) => void;
   telefono: string; onTelefono: (v: string) => void;
   email: string; onEmail: (v: string) => void;
   aceptaPrivacidad: boolean; onAceptaPrivacidad: (v: boolean) => void;
+  autorizaContacto: boolean; onAutorizaContacto: (v: boolean) => void;
+  aceptaDatosSalud: boolean; onAceptaDatosSalud: (v: boolean) => void;
   aceptaComercial: boolean; onAceptaComercial: (v: boolean) => void;
   error: string | null;
   submitting: boolean;
@@ -691,74 +822,106 @@ function ComparativaGate({
   onSkip: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-md rounded-[20px] border border-hair bg-white p-5 shadow-card sm:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-[18px] font-extrabold leading-snug text-navy">¡Ya casi está!</h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Confirma tus datos para ver el precio completo de cada compañía.
-          </p>
+    <div
+      role="dialog" aria-modal="true" aria-labelledby="gate-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-navy/80 p-0 md:p-6"
+    >
+      <div className="flex h-full w-full flex-col overflow-y-auto bg-white shadow-card md:h-auto md:max-h-[92vh] md:max-w-lg md:rounded-[24px]">
+        <div className="flex items-start justify-between gap-3 border-b border-hair px-6 pb-4 pt-6 md:pt-8">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-brand-red">Casi hemos terminado</p>
+            <h2 id="gate-title" className="mt-1 text-[20px] font-extrabold leading-snug text-navy md:text-[22px]">
+              Confirma tus datos para ver tu comparativa
+            </h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-slate2">
+              Con esto podemos {isHealthLike ? "tarificar con las aseguradoras y mostrarte" : "mostrarte"} tus precios personalizados.
+            </p>
+          </div>
+          {!mustGate && (
+            <button
+              type="button" onClick={onSkip}
+              aria-label="Ver la comparativa sin completar el formulario"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
+            >
+              ✕
+            </button>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={onSkip}
-          aria-label="Ver la comparativa sin completar el formulario"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
-        >
-          ✕
-        </button>
+
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3 px-6 py-5">
+          <input
+            type="text" value={nombre} onChange={(e) => onNombre(e.target.value)}
+            placeholder="Nombre" autoComplete="given-name" autoFocus
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+          {producto === "salud" && (
+            <input
+              type="text" value={apellido1} onChange={(e) => onApellido1(e.target.value)}
+              placeholder="Primer apellido" autoComplete="family-name"
+              className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+            />
+          )}
+          <input
+            type="tel" inputMode="tel" value={telefono} onChange={(e) => onTelefono(e.target.value)}
+            placeholder="Teléfono móvil" autoComplete="tel"
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+          <input
+            type="email" inputMode="email" value={email} onChange={(e) => onEmail(e.target.value)}
+            placeholder="Correo electrónico" autoComplete="email"
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+
+          <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+            {BRAND_NAME}, como responsable del tratamiento, usará tus datos para tarificar tu seguro y que un asesor te confirme el precio final.{" "}
+            <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
+          </p>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" checked={aceptaPrivacidad} onChange={(e) => onAceptaPrivacidad(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+            <span className="text-[13px] leading-relaxed text-slate2">
+              He leído y acepto la <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" checked={autorizaContacto} onChange={(e) => onAutorizaContacto(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+            <span className="text-[13px] leading-relaxed text-slate2">
+              Autorizo que {BRAND_NAME} me contacte por teléfono, WhatsApp o email para gestionar mi presupuesto.
+            </span>
+          </label>
+          {isHealthLike && (
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" checked={aceptaDatosSalud} onChange={(e) => onAceptaDatosSalud(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+              <span className="text-[13px] leading-relaxed text-slate2">
+                Consiento el tratamiento de mis <strong className="text-navy">datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi tarifa.
+              </span>
+            </label>
+          )}
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" checked={aceptaComercial} onChange={(e) => onAceptaComercial(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+            <span className="text-[13px] leading-relaxed text-slate2">
+              Quiero recibir comunicaciones comerciales de {BRAND_NAME} (opcional).
+            </span>
+          </label>
+
+          {error && <p role="alert" className="mt-1 rounded-[10px] bg-brand-red/10 px-4 py-2.5 text-[13px] font-medium text-brand-red-deep">{error}</p>}
+
+          <button
+            type="submit" disabled={submitting} aria-busy={submitting || undefined}
+            className="mt-3 inline-flex min-h-[52px] w-full items-center justify-center rounded-[12px] bg-emerald-600 px-5 text-[16px] font-bold text-white transition-colors hover:bg-emerald-700 disabled:bg-slate2/40"
+          >
+            {submitting ? "Preparando tu comparativa…" : "Ver mi comparativa"}
+          </button>
+          {!mustGate && (
+            <button type="button" onClick={onSkip} className="text-center text-[12px] font-medium text-slate2 underline">
+              Ver sin completar
+            </button>
+          )}
+        </form>
       </div>
-
-      <form onSubmit={onSubmit} noValidate className="mt-4 flex flex-col gap-3">
-        <input
-          type="text" value={nombre} onChange={(e) => onNombre(e.target.value)}
-          placeholder="Nombre y apellidos" autoComplete="name"
-          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
-        />
-        <input
-          type="tel" inputMode="tel" value={telefono} onChange={(e) => onTelefono(e.target.value)}
-          placeholder="Teléfono móvil" autoComplete="tel"
-          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
-        />
-        <input
-          type="email" inputMode="email" value={email} onChange={(e) => onEmail(e.target.value)}
-          placeholder="Correo electrónico" autoComplete="email"
-          className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
-        />
-
-        <p className="text-[12px] leading-relaxed text-slate2">
-          {BRAND_NAME}, como responsable del tratamiento, usará tus datos para mostrarte tu comparativa y que un asesor pueda confirmarte el precio final.{" "}
-          <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
-        </p>
-        <label className="flex cursor-pointer items-start gap-3">
-          <input type="checkbox" checked={aceptaPrivacidad} onChange={(e) => onAceptaPrivacidad(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            He leído y acepto la <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3">
-          <input type="checkbox" checked={aceptaComercial} onChange={(e) => onAceptaComercial(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[12px] leading-relaxed text-slate2">
-            Quiero recibir comunicaciones comerciales personalizadas de {BRAND_NAME} (opcional).
-          </span>
-        </label>
-
-        {error && <p role="alert" className="text-[12px] font-medium text-brand-red">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          aria-busy={submitting || undefined}
-          className="mt-1 inline-flex min-h-[48px] w-full items-center justify-center rounded-[12px] bg-emerald-600 px-5 text-[15px] font-bold text-white transition-colors hover:bg-emerald-700 disabled:bg-slate2/40"
-        >
-          {submitting ? "Comprobando…" : "Ver mi comparativa completa"}
-        </button>
-        <button type="button" onClick={onSkip} className="text-center text-[12px] font-medium text-slate2 underline">
-          Ver sin completar
-        </button>
-      </form>
     </div>
   );
 }

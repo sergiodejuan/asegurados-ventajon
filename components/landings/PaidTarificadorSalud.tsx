@@ -6,25 +6,27 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { leadSchema, normalizePhone } from "@/lib/schema";
-import { saveQuote, saveCallResult } from "@/lib/quote";
+import { normalizePhone } from "@/lib/schema";
+import { saveQuote, saveCallResult, saveLeadDraft } from "@/lib/quote";
 import { saveClientProfile } from "@/lib/clientArea";
 import { Check, ChevronDown, ChevronLeft, Phone, Spinner } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
-// Tarificador de salud EXCLUSIVO de /lp/salud/tarificador. Réplica del
-// diseño del tarificador de Línea Directa: 4 pasos guiados en la columna
-// principal + sidebar sticky "Te llamamos gratis" con un formulario
-// independiente (mismo pipeline que el resto del CRM). Aparte del
-// /tarificador estándar para no mezclar tráfico paid con orgánico y poder
-// medir su ROI aparte (source "tarificador-salud-lp").
+// Tarificador de salud EXCLUSIVO de /lp/salud/tarificador.
+//
+// Unificación de flujo (2026-08): el tarificador SOLO recoge datos técnicos
+// de tarificación (asegurados, salud, zona/CP). NO pide nombre, teléfono,
+// email ni consentimientos — eso lo hace el modal-gate de /comparativa,
+// donde se crea el lead REAL. Antes se pedían dos veces (aquí y allí).
+//
+// La transición al modal viaja por sessionStorage (saveLeadDraft). En
+// /comparativa el modal es obligatorio y no permite ver precios sin datos.
 
 const STEPS = [
   { key: "asegurados", label: "Asegurados" },
   { key: "salud", label: "Datos de salud" },
-  { key: "datos", label: "Datos personales" },
-  { key: "envio", label: "Finalizar" },
+  { key: "zona", label: "Tu zona" },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
@@ -37,18 +39,7 @@ type Form = {
   coberturaDental: boolean;
   inicio: "cuanto_antes" | "proximo_mes" | "comparando";
   codigoPostal: "Islas Canarias" | "Islas Baleares" | "Península" | "";
-  nombre: string;
-  apellido1: string;
-  apellido2: string;
-  telefono: string;
-  email: string;
-  // Plus5: DNI/NIE se retira del tarificador — se pide en el flujo
-  // post-elección, cuando el cliente confirma la contratación.
   codigoPostalReal: string;
-  aceptaPrivacidad: boolean;
-  autorizaContacto: boolean;
-  aceptaDatosSalud: boolean; // Art. 9 RGPD (categorías especiales — salud)
-  aceptaComercial: boolean;
 };
 
 const INITIAL_FORM: Form = {
@@ -59,16 +50,7 @@ const INITIAL_FORM: Form = {
   coberturaDental: false,
   inicio: "cuanto_antes",
   codigoPostal: "",
-  nombre: "",
-  apellido1: "",
-  apellido2: "",
-  telefono: "",
-  email: "",
   codigoPostalReal: "",
-  aceptaPrivacidad: false,
-  autorizaContacto: false,
-  aceptaDatosSalud: false,
-  aceptaComercial: false,
 };
 
 const INICIO_VALUES: Form["inicio"][] = ["cuanto_antes", "proximo_mes", "comparando"];
@@ -129,18 +111,9 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
       if (!form.sexo) errs.sexo = "Selecciona una opción.";
       if (form.fumador === null) errs.fumador = "Indícanos si fumas.";
     }
-    if (step === "datos") {
-      if (form.nombre.trim().length < 2) errs.nombre = "Dinos tu nombre.";
-      if (form.apellido1.trim().length < 2) errs.apellido1 = "Dinos tu primer apellido.";
-      if (!/^[6-9]\d{8}$/.test(normalizePhone(form.telefono))) errs.telefono = "Introduce un móvil español válido.";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errs.email = "Revisa tu correo.";
+    if (step === "zona") {
       if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
       if (!/^\d{5}$/.test(form.codigoPostalReal)) errs.codigoPostalReal = "5 dígitos.";
-    }
-    if (step === "envio") {
-      if (!form.aceptaPrivacidad) errs.aceptaPrivacidad = "Es necesario aceptar la política.";
-      if (!form.autorizaContacto) errs.autorizaContacto = "Es necesario para poder llamarte.";
-      if (!form.aceptaDatosSalud) errs.aceptaDatosSalud = "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD).";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -156,8 +129,8 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateStep("envio")) return;
-    // Validación final combinada
+    if (!validateStep("zona")) return;
+    // Validación final combinada de todos los pasos técnicos.
     for (const s of STEPS) {
       if (!validateStep(s.key)) {
         setStepIndex(STEPS.findIndex((st) => st.key === s.key));
@@ -167,70 +140,40 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
     setSubmitError(null);
     setSubmitting(true);
     try {
-      const payload = {
+      // Payload draft — todo lo técnico. El modal-gate de /comparativa
+      // añadirá nombre/telefono/email/consents antes de crear el lead real.
+      const draftData = {
         inicio: form.inicio,
         codigoPostal: form.codigoPostal,
         numAsegurados: form.numAsegurados,
         fechaNacimiento: form.fechaNacimiento,
         sexo: form.sexo,
-        // DNI/NIE se pide en el flujo post-elección, no aquí.
         codigoPostalReal: form.codigoPostalReal,
         fumador: !!form.fumador,
         aseguradosAdicionales: [],
         coberturaDental: form.coberturaDental,
         yaTieneSeguro: false,
-        nombre: form.nombre,
-        apellido1: form.apellido1,
-        apellido2: form.apellido2,
-        telefono: form.telefono,
-        email: form.email,
-        aceptaPrivacidad: form.aceptaPrivacidad,
-        autorizaContacto: form.autorizaContacto,
-        aceptaDatosSalud: form.aceptaDatosSalud,
-        aceptaComercial: form.aceptaComercial,
+        apellido2: "",
         company: "",
-        consent: {
-          privacidadAt: now, contactoAt: now, datosSaludAt: now,
-          ...(form.aceptaComercial ? { comercialAt: now } : {}),
-        },
         utm: getAttribution(),
         origen: "lp-salud" as const,
         turnstileToken,
-      };
-      const parsed = leadSchema.safeParse(payload);
-      if (!parsed.success) {
-        setSubmitError("Revisa los datos, hay algún campo que no cuadra.");
-        return;
-      }
-      const res = await fetch("/api/lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+      } satisfies Record<string, unknown>;
+      saveLeadDraft({ producto: "salud", endpoint: "/api/lead", data: draftData });
+      // Guardamos también un QuoteProfile parcial para que la comparativa
+      // pueda mostrar los filtros de arriba sin esperar al backend.
+      saveQuote({
+        producto: "salud",
+        codigoPostal: form.codigoPostal,
+        numAsegurados: form.numAsegurados,
+        coberturaDental: form.coberturaDental,
+        fechaNacimiento: form.fechaNacimiento,
+        sexo: form.sexo || undefined,
+        id: "",
+        createdAt: now,
       });
-      const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; presupuestoId?: string; errors?: Record<string, string[]>; error?: string } | null;
-      if (res.ok && body?.ok) {
-        saveQuote({
-          producto: "salud",
-          nombre: form.nombre,
-          telefono: form.telefono,
-          email: form.email,
-          codigoPostal: form.codigoPostal,
-          numAsegurados: form.numAsegurados,
-          coberturaDental: form.coberturaDental,
-          fechaNacimiento: form.fechaNacimiento,
-          sexo: form.sexo || undefined,
-          consentAt: payload.consent,
-          id: body.presupuestoId ?? "",
-          createdAt: now,
-        });
-        saveClientProfile({ nombre: form.nombre, telefono: form.telefono, email: form.email });
-        pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-salud-tarificador" });
-        const target = body.presupuestoId ? `/comparativa?pid=${encodeURIComponent(body.presupuestoId)}&producto=salud` : "/comparativa?producto=salud";
-        router.push(target);
-        return;
-      }
-      const first = body?.errors ? Object.values(body.errors).find((v) => v && v[0]) : undefined;
-      setSubmitError(first?.[0] ?? body?.error ?? "No hemos podido guardar tu solicitud. Inténtalo de nuevo.");
+      pushDataLayerEvent("generate_lead_step", { producto: "salud", form: "lp-salud-tarificador" });
+      router.push("/comparativa?producto=salud&draft=1");
     } catch {
       setSubmitError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
     } finally {
@@ -279,31 +222,35 @@ export function PaidTarificadorSalud({ phone, logoUrl }: { phone: string; logoUr
             {currentStep === "salud" && (
               <SaludStep form={form} set={set} errors={errors} />
             )}
-            {currentStep === "datos" && (
-              <DatosStep form={form} set={set} errors={errors} />
-            )}
-            {currentStep === "envio" && (
-              <EnvioStep
-                form={form} set={set} errors={errors}
-                submitting={submitting} submitError={submitError}
-                turnstileToken={turnstileToken} onTurnstile={setTurnstileToken}
-                onSubmit={onSubmit}
-              />
+            {currentStep === "zona" && (
+              <ZonaStep form={form} set={set} errors={errors} />
             )}
 
-            {/* Nav (back / next) */}
+            {/* Nav (back / next) — el último paso muestra "Ver mi comparativa" */}
             <div className="mt-8 flex items-center justify-between gap-3">
               {canGoBack ? (
                 <button type="button" onClick={goBack} className="inline-flex items-center gap-1 rounded-card border border-hair bg-white px-4 py-2.5 text-[14px] font-semibold text-navy hover:bg-mist">
                   <ChevronLeft width={16} height={16} /> Atrás
                 </button>
               ) : <span />}
-              {currentStep !== "envio" && (
+              {currentStep !== "zona" ? (
                 <button type="button" onClick={goNext} className="inline-flex items-center justify-center rounded-card bg-brand-red px-6 py-3 text-[15px] font-bold text-white hover:bg-brand-red-deep">
                   Continuar
                 </button>
+              ) : (
+                <button
+                  type="button" onClick={onSubmit} disabled={submitting} aria-busy={submitting || undefined}
+                  className="inline-flex items-center justify-center gap-2 rounded-card bg-brand-red px-6 py-3 text-[15px] font-bold text-white hover:bg-brand-red-deep disabled:bg-slate2/40"
+                >
+                  {submitting && <Spinner width={16} height={16} />}
+                  {submitting ? "Cargando…" : "Ver mi comparativa"}
+                </button>
               )}
             </div>
+            {submitError && (
+              <p role="alert" className="mt-3 rounded-[10px] bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>
+            )}
+            <TurnstileWidget onToken={setTurnstileToken} />
 
             <p className="mt-6 text-[12px] leading-relaxed text-slate2">
               Los datos que nos proporciones en el presupuesto serán tratados por {BRAND_NAME} para cursar tu solicitud, y contactar contigo para gestionar tus dudas.
@@ -461,38 +408,18 @@ function SaludStep({ form, set, errors }: {
   );
 }
 
-function DatosStep({ form, set, errors }: {
+function ZonaStep({ form, set, errors }: {
   form: Form;
   set: <K extends keyof Form>(k: K, v: Form[K]) => void;
   errors: Partial<Record<keyof Form, string>>;
 }) {
   return (
     <div>
-      <h1 className="text-[24px] font-extrabold text-navy md:text-[28px]">Tus datos personales</h1>
+      <h1 className="text-[24px] font-extrabold text-navy md:text-[28px]">¿Dónde vives?</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-slate2">
-        Los usaremos para enviarte tu comparativa y para que un asesor te contacte si lo autorizas.
+        Nos ayuda a ajustar tu comparativa a las aseguradoras disponibles en tu zona.
       </p>
       <div className="mt-6 grid gap-5 md:grid-cols-2">
-        <Field label="Nombre" error={errors.nombre}>
-          <input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre" autoComplete="given-name"
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] focus:border-navy focus:outline-none" />
-        </Field>
-        <Field label="Primer apellido" error={errors.apellido1}>
-          <input value={form.apellido1} onChange={(e) => set("apellido1", e.target.value)} placeholder="Primer apellido" autoComplete="family-name"
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] focus:border-navy focus:outline-none" />
-        </Field>
-        <Field label="Segundo apellido (opcional)">
-          <input value={form.apellido2} onChange={(e) => set("apellido2", e.target.value)} placeholder="Segundo apellido"
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] focus:border-navy focus:outline-none" />
-        </Field>
-        <Field label="Teléfono" error={errors.telefono}>
-          <input type="tel" inputMode="tel" value={form.telefono} onChange={(e) => set("telefono", e.target.value)} placeholder="Ej: 642642632" autoComplete="tel"
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums focus:border-navy focus:outline-none" />
-        </Field>
-        <Field label="Email" error={errors.email}>
-          <input type="email" inputMode="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="tu@correo.com" autoComplete="email"
-            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] focus:border-navy focus:outline-none" />
-        </Field>
         <Field label="¿Dónde vives?" error={errors.codigoPostal}>
           <div className="relative">
             <select value={form.codigoPostal} onChange={(e) => set("codigoPostal", e.target.value as Form["codigoPostal"])}
@@ -512,87 +439,10 @@ function DatosStep({ form, set, errors }: {
             className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums focus:border-navy focus:outline-none" />
         </Field>
       </div>
-    </div>
-  );
-}
-
-function EnvioStep({
-  form, set, errors, submitting, submitError, turnstileToken, onTurnstile, onSubmit,
-}: {
-  form: Form;
-  set: <K extends keyof Form>(k: K, v: Form[K]) => void;
-  errors: Partial<Record<keyof Form, string>>;
-  submitting: boolean; submitError: string | null;
-  turnstileToken: string; onTurnstile: (t: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-}) {
-  // turnstileToken se propaga al submit del padre — el widget lo escribe aquí,
-  // el padre lo lee al enviar. Sin uso local aparente, pero necesario para la
-  // pista visual en producción cuando Turnstile está activo.
-  void turnstileToken;
-
-  return (
-    <form onSubmit={onSubmit}>
-      <h1 className="text-[24px] font-extrabold text-navy md:text-[28px]">Últimos detalles y ver tu precio</h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-slate2">
-        Confirma los consentimientos legales y te mostramos tu comparativa personalizada.
+      <p className="mt-6 text-[13px] leading-relaxed text-slate2">
+        Al continuar verás tu comparativa. Te pediremos nombre, teléfono y consentimientos justo antes de mostrarte los precios finales.
       </p>
-
-      <div className="mt-6 flex flex-col gap-4">
-        <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-          <input type="checkbox" checked={form.aceptaPrivacidad} onChange={(e) => set("aceptaPrivacidad", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-          <span className="text-[14px] leading-relaxed">
-            He leído y acepto la <Link href="/legal#privacidad" className="text-navy underline">Política de privacidad</Link>.
-          </span>
-        </label>
-        {errors.aceptaPrivacidad && <p className="text-[13px] font-semibold text-brand-red">{errors.aceptaPrivacidad}</p>}
-
-        <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-          <input type="checkbox" checked={form.autorizaContacto} onChange={(e) => set("autorizaContacto", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-          <span className="text-[14px] leading-relaxed">
-            Autorizo que {BRAND_NAME} me contacte por teléfono/WhatsApp/email para gestionar mi presupuesto.
-          </span>
-        </label>
-        {errors.autorizaContacto && <p className="text-[13px] font-semibold text-brand-red">{errors.autorizaContacto}</p>}
-
-        {/* Art. 9 RGPD — consentimiento específico y separado para datos de
-            salud (fumador, antecedentes, cobertura). Sin él la aseguradora
-            no puede tarificar; el AEPD exige que sea explícito e informado. */}
-        <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-          <input type="checkbox" checked={form.aceptaDatosSalud} onChange={(e) => set("aceptaDatosSalud", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-          <span className="text-[14px] leading-relaxed">
-            Consiento el tratamiento de mis <strong>datos de salud</strong> (art. 9.2.a RGPD) para calcular mi tarifa y compararla entre aseguradoras. Puedo retirar este consentimiento en cualquier momento.
-          </span>
-        </label>
-        {errors.aceptaDatosSalud && <p className="text-[13px] font-semibold text-brand-red">{errors.aceptaDatosSalud}</p>}
-
-        <label className="flex items-start gap-3 rounded-[12px] border border-hair bg-white p-4">
-          <input type="checkbox" checked={form.aceptaComercial} onChange={(e) => set("aceptaComercial", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 rounded border-hair text-navy" />
-          <span className="text-[14px] leading-relaxed">
-            Acepto recibir ofertas comerciales relacionadas con seguros (opcional).
-          </span>
-        </label>
-      </div>
-
-      <TurnstileWidget onToken={onTurnstile} />
-
-      {submitError && (
-        <p role="alert" className="mt-4 rounded-[10px] bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>
-      )}
-
-      <button
-        type="submit" disabled={submitting}
-        aria-busy={submitting || undefined}
-        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-brand-red px-6 py-4 text-[16px] font-bold text-white hover:bg-brand-red-deep disabled:bg-slate2/40"
-      >
-        {submitting && <Spinner width={18} height={18} />}
-        {submitting ? "Calculando…" : "Ver mi comparativa"}
-      </button>
-    </form>
+    </div>
   );
 }
 

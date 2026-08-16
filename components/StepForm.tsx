@@ -8,7 +8,7 @@ import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, DECESOS_CONFIG, type FormData, 
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
-import { saveQuote } from "@/lib/quote";
+import { saveQuote, saveLeadDraft } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
@@ -83,10 +83,21 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     setResumeData(null);
   }
 
-  const activeSteps = config.steps.filter((s) => !s.showIf || s.showIf(data));
+  // Unificación de flujo (2026-08): en salud/vida NO pedimos nombre/tel/email/
+  // consents aquí. El modal-gate de /comparativa recoge esa parte y crea el
+  // lead REAL. Aquí solo capturamos datos técnicos de tarificación, guardamos
+  // draft y navegamos. auto/decesos siguen con el flujo tradicional
+  // (endpoint POST con contacto) porque no tienen comparativa Codeoscopic.
+  const skipContactStep = variant === "salud" || variant === "vida";
+  const activeSteps = config.steps.filter((s) => {
+    if (skipContactStep && s.type === "contact") return false;
+    if (s.showIf && !s.showIf(data)) return false;
+    return true;
+  });
   const total = activeSteps.length;
   const idx = Math.min(stepIndex, total - 1);
   const current = activeSteps[idx];
+  const isLastStep = idx >= total - 1;
 
   useEffect(() => { topRef.current?.focus(); }, [idx]);
   useEffect(() => { onStepChange?.(idx); }, [idx, onStepChange]);
@@ -134,7 +145,14 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   }, [exitIntentArmed]);
 
   const set = (patch: FormData) => setData((d) => ({ ...d, ...patch }));
-  const next = () => { setErrors({}); setStepIndex((s) => Math.min(s + 1, total)); };
+  const next = () => {
+    setErrors({});
+    // En salud/vida el último step es técnico (no hay "contact"). Al avanzar
+    // desde ahí, en vez de saltar a un step inexistente, se guarda draft y
+    // se navega a /comparativa donde el modal-gate pide contacto y consents.
+    if (skipContactStep && isLastStep) { submitDraft(); return; }
+    setStepIndex((s) => Math.min(s + 1, total));
+  };
   const back = () => { setErrors({}); setSubmitError(null); setStepIndex((s) => Math.max(s - 1, 0)); };
 
   type ExtraInsured = { dd?: string; mm?: string; aaaa?: string; sexo?: "hombre" | "mujer" };
@@ -171,6 +189,61 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     if (!/^\d{5}$/.test(String(data.codigoPostalReal ?? ""))) e.codigoPostalReal = "El código postal debe tener 5 dígitos.";
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  // Salud/vida: al terminar los pasos técnicos, guardamos draft + navegamos
+  // a /comparativa. El modal-gate de allí crea el lead REAL con contacto y
+  // consents. No creamos lead aquí — antes se creaba con contacto y luego
+  // el modal lo repetía; ese doble paso confundía y era redundante.
+  function submitDraft() {
+    setSubmitError(null);
+    const draftData: Record<string, unknown> = {
+      ...data,
+      fechaNacimiento: `${data.dd ?? ""}/${data.mm ?? ""}/${data.aaaa ?? ""}`,
+      seguroActualServicios: (data.seguroActualServicios as string[]) ?? [],
+      aseguradosAdicionales: ((data.aseguradosExtra as ExtraInsured[]) ?? [])
+        .filter((a) => a.dd && a.mm && a.aaaa && a.sexo)
+        .map((a) => ({ fechaNacimiento: `${a.dd}/${a.mm}/${a.aaaa}`, sexo: a.sexo })),
+      company: "",
+      utm: getAttribution(),
+      turnstileToken,
+      ...(origen ? { origen } : {}),
+    };
+    // Quitar campos que se rellenan en el modal-gate para evitar arrastrar
+    // ceros o strings vacíos que la validación final rechazaría.
+    delete draftData.nombre;
+    delete draftData.apellido1;
+    delete draftData.apellido2;
+    delete draftData.telefono;
+    delete draftData.email;
+    delete draftData.aceptaPrivacidad;
+    delete draftData.autorizaContacto;
+    delete draftData.aceptaDatosSalud;
+    delete draftData.aceptaComercial;
+    delete draftData.dd; delete draftData.mm; delete draftData.aaaa;
+    delete draftData.aseguradosExtra;
+
+    saveLeadDraft({ producto: variant as "salud" | "vida", endpoint: config.endpoint, data: draftData });
+    // QuoteProfile parcial para que /comparativa pueda mostrar los filtros
+    // y llamadas de ayuda desde el minuto uno, sin esperar al backend.
+    const quoteProfile = {
+      id: "",
+      producto: variant as "salud" | "vida",
+      createdAt: new Date().toISOString(),
+      codigoPostal: String(data.codigoPostal ?? ""),
+      numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1 : undefined,
+      coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
+      fechaNacimiento: String(draftData.fechaNacimiento ?? ""),
+      sexo: data.sexo as "hombre" | "mujer" | undefined,
+      motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
+      fumador: variant === "vida" ? !!data.fumador : undefined,
+      inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
+    };
+    saveQuote(quoteProfile);
+    try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
+    pushDataLayerEvent("generate_lead_step", { producto: variant, form: "tarificador" });
+    pendingUrlRef.current = `/comparativa?producto=${variant}&draft=1`;
+    setFinalizing(true);
   }
 
   async function submit() {
