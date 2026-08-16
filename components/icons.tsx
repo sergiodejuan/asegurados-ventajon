@@ -86,6 +86,8 @@ export function IconByName({ name, ...p }: { name: string } & SVGProps<SVGSVGEle
     case "flower": return (<svg {...base} {...p}><circle cx="12" cy="12" r="3" /><path d="M12 9V2M12 22v-7M9 12H2M22 12h-7" /></svg>);
     case "home": return (<svg {...base} {...p}><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 21v-6h6v6" /></svg>);
     case "car": return (<svg {...base} {...p}><path d="M5 13 6.5 7.5A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.5L19 13" /><path d="M3 13h18v5H3z" /><circle cx="7.5" cy="18.5" r="1.5" /><circle cx="16.5" cy="18.5" r="1.5" /></svg>);
+    case "gift": return (<svg {...base} {...p}><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>);
+    case "chat": return (<svg {...base} {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
     default: return (<svg {...base} {...p}><circle cx="12" cy="12" r="9" /></svg>);
   }
 }

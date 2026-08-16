@@ -50,6 +50,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
       { href: "/admin/campanas/landings", label: "Landings paid", key: "landings", modulo: "campana" },
       { href: "/admin/campanas/landings/comparar", label: "Comparar landings", key: "landings-comparar", modulo: "campana" },
       { href: "/admin/campanas/precio-mejor", label: "Landing precio mejor", key: "lp-price-match", modulo: "campana" },
+      { href: "/admin/campanas/referidos", label: "Programa referidos", key: "lp-referral", modulo: "campana" },
       { href: "/admin/exit-intents", label: "Exit-intent", key: "exitintents", modulo: "exitintents" },
     ],
   },
@@ -113,7 +114,7 @@ function groupKeyForActive(active: string): string | null {
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "productos" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
