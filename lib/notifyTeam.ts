@@ -35,11 +35,21 @@ function labelProducto(p: string): string {
   return PRODUCTO_LABELS[p] ?? (p ? p[0].toUpperCase() + p.slice(1) : "—");
 }
 
+// Iniciales para el asunto — nombre completo NO va al inbox (P0.11 auditoría
+// consultora). Si el buzón se compromete o se reenvía, no filtramos la
+// identidad; el agente ve el nombre completo en la ficha (autenticada).
+function initials(nombre: string): string {
+  const parts = nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (!parts.length) return "S/N";
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join(".");
+}
+
 function subjectFor(lead: Lead, source: string): string {
   const label = SOURCE_LABELS[source] ?? source;
-  const nombre = lead.nombre || "(sin nombre)";
   const producto = lead.producto ? ` · ${labelProducto(lead.producto)}` : "";
-  return `[Lead nuevo] ${nombre}${producto} · ${label}`;
+  const iniciales = initials(lead.nombre || "");
+  const cp = lead.codigoPostal ? ` · CP ${lead.codigoPostal}` : "";
+  return `[Lead nuevo] ${iniciales}${producto}${cp} · ${label}`;
 }
 
 function escape(v: string): string {
@@ -178,36 +188,24 @@ function renderHtml({ lead, source, presupuestoId, precioAprox, logoUrl, extraNo
   const presupUrl = base && presupuestoId ? `${base}/admin/presupuestos?id=${encodeURIComponent(presupuestoId)}` : "";
   const sourceLabel = SOURCE_LABELS[source] ?? source;
 
-  const contactoRows: [string, string][] = [];
-  if (lead.telefono) contactoRows.push(["Teléfono", lead.telefono]);
-  if (lead.email) contactoRows.push(["Email", lead.email]);
-  if (lead.codigoPostal) contactoRows.push(["Código postal", lead.codigoPostal]);
-  if (lead.documento) contactoRows.push([lead.documentoTipo?.toUpperCase() || "Documento", lead.documento]);
+  // P0.11: el correo NO transporta PII completa (nombre, teléfono, email,
+  // DNI, DOB, tarificación detallada, UTM). Si el buzón se compromete o el
+  // correo se reenvía, no filtramos datos personales — solo mostramos
+  // suficiente contexto para decidir si abrir la ficha, y un enlace directo
+  // al backoffice donde el agente ya autenticado ve el detalle completo.
+  const resumenRows: [string, string][] = [];
+  resumenRows.push(["Origen", sourceLabel]);
+  resumenRows.push(["Producto", labelProducto(lead.producto)]);
+  if (lead.codigoPostal) resumenRows.push(["Código postal", lead.codigoPostal]);
+  if (precioAprox != null) resumenRows.push(["Precio orientativo", fmtEuros(precioAprox, "mes")]);
+  resumenRows.push(["Fecha", fmtDate(lead.createdAt)]);
+  resumenRows.push(["ID lead", lead.id]);
+  if (presupuestoId) resumenRows.push(["ID presupuesto", presupuestoId]);
+  resumenRows.push(["Comunicaciones comerciales", fmtBool(lead.aceptaComercial)]);
+  if (extraNote) resumenRows.push(["Nota", extraNote]);
 
-  const originRows: [string, string][] = [];
-  originRows.push(["Origen", sourceLabel]);
-  originRows.push(["Producto", labelProducto(lead.producto)]);
-  originRows.push(["Fecha", fmtDate(lead.createdAt)]);
-  originRows.push(["ID lead", lead.id]);
-  if (presupuestoId) originRows.push(["ID presupuesto", presupuestoId]);
-  if (precioAprox != null) originRows.push(["Precio orientativo", fmtEuros(precioAprox, "mes")]);
-  originRows.push(["Comunicaciones comerciales", fmtBool(lead.aceptaComercial)]);
-  if (extraNote) originRows.push(["Nota", extraNote]);
-
-  const productoRows = productRows(lead);
-  const utm = utmRows(lead);
-
-  const pm = lead.priceMatch;
-  const priceMatchBlock = pm ? `
-    <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:20px;border:1px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff5f5;">
-      <tr><td style="padding:12px 14px;background:#dc2626;color:#fff;font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;">Igualación de precio</td></tr>
-      ${renderTable([
-        ["Compañía actual", pm.companiaActual || "—"],
-        ["Precio actual", fmtEuros(pm.precioActual, pm.periodicidad)],
-        ...(pm.comentario ? [["Comentario", pm.comentario] as [string, string]] : []),
-        ...(pm.capturaUrl ? [["Captura", pm.capturaUrl.startsWith("data:") ? "Enviada por el usuario (adjunta en la ficha)" : pm.capturaUrl] as [string, string]] : []),
-      ])}
-    </table>` : "";
+  const iniciales = initials(lead.nombre || "");
+  const hasPriceMatch = !!lead.priceMatch;
 
   const buttonBase = "display:inline-block;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;line-height:1;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;";
   const primaryBtn = leadUrl ? `<a href="${leadUrl}" style="${buttonBase}background:#0b1a3a;color:#ffffff;">Abrir ficha del lead →</a>` : "";
@@ -237,11 +235,11 @@ function renderHtml({ lead, source, presupuestoId, precioAprox, logoUrl, extraNo
           </table>
         </td></tr>
 
-        <!-- Hero -->
+        <!-- Hero (sin PII: solo iniciales, producto y fecha) -->
         <tr><td style="padding:26px 28px 6px 28px;">
           <p style="margin:0;color:#64748b;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">${escape(sourceLabel)}</p>
-          <h1 style="margin:6px 0 0 0;font-size:22px;line-height:1.25;color:#0b1a3a;font-weight:800;">${escape(lead.nombre || "(sin nombre)")}</h1>
-          <p style="margin:6px 0 0 0;color:#475569;font-size:14px;">${escape(labelProducto(lead.producto))} · ${escape(fmtDate(lead.createdAt))}</p>
+          <h1 style="margin:6px 0 0 0;font-size:22px;line-height:1.25;color:#0b1a3a;font-weight:800;">Lead nuevo · ${escape(iniciales)}</h1>
+          <p style="margin:6px 0 0 0;color:#475569;font-size:14px;">${escape(labelProducto(lead.producto))} · ${escape(fmtDate(lead.createdAt))}${lead.codigoPostal ? ` · CP ${escape(lead.codigoPostal)}` : ""}${hasPriceMatch ? " · Igualación de precio" : ""}</p>
         </td></tr>
 
         <!-- CTA -->
@@ -249,32 +247,21 @@ function renderHtml({ lead, source, presupuestoId, precioAprox, logoUrl, extraNo
           ${primaryBtn}${secondaryBtn}
         </td></tr>
 
-        <!-- Bloques -->
+        <!-- Resumen (sin datos personales — solo señales para decidir si abrir la ficha) -->
         <tr><td style="padding:20px 28px 4px 28px;">
-          ${contactoRows.length ? `
           <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-            <tr><td style="padding:10px 14px;background:#f8fafc;color:#0b1a3a;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Contacto</td></tr>
-            ${renderTable(contactoRows)}
-          </table>` : ""}
-
-          ${productoRows.length ? `
-          <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-            <tr><td style="padding:10px 14px;background:#f8fafc;color:#0b1a3a;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Tarificación</td></tr>
-            ${renderTable(productoRows)}
-          </table>` : ""}
-
-          <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-            <tr><td style="padding:10px 14px;background:#f8fafc;color:#0b1a3a;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Origen</td></tr>
-            ${renderTable(originRows)}
+            <tr><td style="padding:10px 14px;background:#f8fafc;color:#0b1a3a;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Resumen</td></tr>
+            ${renderTable(resumenRows)}
           </table>
 
-          ${utm.length ? `
-          <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #eef2f7;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-            <tr><td style="padding:10px 14px;background:#f8fafc;color:#0b1a3a;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Atribución (UTM)</td></tr>
-            ${renderTable(utm)}
-          </table>` : ""}
-
-          ${priceMatchBlock}
+          <table role="presentation" style="width:100%;border-collapse:collapse;border:1px dashed #cbd5e1;border-radius:12px;overflow:hidden;margin-bottom:16px;background:#f8fafc;">
+            <tr><td style="padding:14px 16px;color:#475569;font-size:12px;line-height:1.55;">
+              Por seguridad y RGPD (art. 32, categorías especiales), este correo NO incluye
+              nombre completo, teléfono, email, documento de identidad, fecha de nacimiento,
+              tarificación detallada ni parámetros UTM. Abre la ficha en el panel para ver
+              todo el detalle con tu sesión autenticada.
+            </td></tr>
+          </table>
         </td></tr>
 
         <!-- Footer -->
@@ -329,9 +316,13 @@ export async function notifyTeamNewLead(n: NewLeadNotification): Promise<void> {
   if (shouldNotify(cfg.push, ctx)) {
     const label = SOURCE_LABELS[n.source] ?? n.source;
     try {
+      // Push tampoco lleva PII (nombre/email/teléfono). Solo señales para
+      // que el agente decida abrir el panel — el iOS/Android lock screen es
+      // un vector de exposición inaceptable para datos personales.
+      const iniciales = initials(lead.nombre || "");
       await sendPushToTeam({
         title: `Lead nuevo · ${label}`,
-        body: `${lead.nombre || "(sin nombre)"}${lead.producto ? ` · ${labelProducto(lead.producto)}` : ""}${lead.codigoPostal ? ` · CP ${lead.codigoPostal}` : ""}${precioAprox != null ? ` · ~${precioAprox.toFixed(0)} €/mes` : ""}`,
+        body: `${iniciales}${lead.producto ? ` · ${labelProducto(lead.producto)}` : ""}${lead.codigoPostal ? ` · CP ${lead.codigoPostal}` : ""}${precioAprox != null ? ` · ~${precioAprox.toFixed(0)} €/mes` : ""}`,
         url: `/admin?lead=${encodeURIComponent(lead.id)}`,
       });
     } catch (err) {
