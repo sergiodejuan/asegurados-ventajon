@@ -15,8 +15,14 @@ import { TurnstileWidget } from "@/components/TurnstileWidget";
 // aviso legal debajo. Envío al mismo endpoint que el resto, marcado como
 // origen "lp-salud" — el CRM lo trata con la etiqueta propia
 // "Quiero que me llamen (landing paid)".
+//
+// Si se pasa onSuccess, el llamador decide qué hacer con el resultado (p.ej.
+// mostrar un "gracias" propio dentro de la misma landing, con la preferencia
+// de día/hora incluida). Sin onSuccess, mantiene el comportamiento por
+// defecto de siempre: navegar a /gracias.
 
-type Props = { onSuccess?: () => void };
+export type PaidLlamadaSuccess = { telefono: string; dia: string; turno: string };
+type Props = { onSuccess?: (result: PaidLlamadaSuccess) => void };
 
 export function PaidLlamadaForm({ onSuccess }: Props) {
   const router = useRouter();
@@ -61,7 +67,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
         saveCallResult({ nombre, diaLlamada: dia, turnoLlamada: turno, producto: "salud" });
         saveClientProfile({ nombre, telefono, diaLlamada: dia, turnoLlamada: turno });
         pushDataLayerEvent("generate_lead", { producto: "salud", form: "lp-salud-llamada" });
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess({ telefono, dia, turno });
         else router.push("/gracias");
         return;
       }

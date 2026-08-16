@@ -165,6 +165,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
               <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-stretch sm:gap-3 md:mt-8">
                 <PaidLlamadaModal
                   onOpen={() => trackCta("hero_llamar")}
+                  phone={config.phone}
                   className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-5 text-[15px] font-bold text-emerald-700 hover:bg-emerald-50 md:min-h-[56px] md:px-6 md:text-[16px]"
                 >
                   {config.hero.ctaLlamarLabel}
@@ -219,7 +220,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-brand-red px-6 text-[15px] font-bold text-white sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaCalcularLabel}
             </PaidHeroQuoteModal>
-            <PaidLlamadaModal onOpen={() => trackCta("porque_llamar")}
+            <PaidLlamadaModal onOpen={() => trackCta("porque_llamar")} phone={config.phone}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-6 text-[15px] font-bold text-emerald-700 sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaLlamarLabel}
             </PaidLlamadaModal>
@@ -267,7 +268,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
                 </div>
               )}
               <div className="mx-auto mt-5 flex max-w-md flex-col gap-2.5 sm:flex-row sm:gap-3 md:mt-6">
-                <PaidLlamadaModal onOpen={() => trackCta("banner_llamar")}
+                <PaidLlamadaModal onOpen={() => trackCta("banner_llamar")} phone={config.phone}
                   className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-pill border-2 border-white bg-white/10 px-5 text-[14px] font-bold text-white hover:bg-white/20 md:min-h-[52px] md:px-6 md:text-[15px]">
                   {config.hero.ctaLlamarLabel}
                 </PaidLlamadaModal>
@@ -291,30 +292,34 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <ul className="mt-8 grid gap-4 md:mt-10 md:grid-cols-3 md:gap-5">
             {config.productos.items.map((p) => {
               const hasBg = !!p.imageUrl;
-              const ProductModal = p.ctaAction === "calcular" ? PaidHeroQuoteModal : PaidLlamadaModal;
               const cardClassName = `flex h-full min-h-[320px] w-full flex-col overflow-hidden rounded-[20px] text-left transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy md:min-h-[420px] md:rounded-[24px] ${hasBg ? "text-white" : "border border-hair bg-white shadow-soft"}`;
               const cardStyle = hasBg ? {
                 backgroundImage: `linear-gradient(180deg, rgba(13,21,58,0.25) 0%, rgba(13,21,58,0.65) 55%, rgba(13,21,58,0.92) 100%), url("${p.imageUrl}")`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               } : undefined;
+              const cardContent = (
+                <div className="mt-auto flex flex-col p-5 md:p-6">
+                  <h3 className={`text-[20px] font-extrabold md:text-[24px] ${hasBg ? "text-white" : "text-navy"}`}>{p.title}</h3>
+                  <p className={`mt-2 text-[11px] font-semibold uppercase tracking-wide md:text-[12px] ${hasBg ? "text-white/85" : "text-slate2"}`}>{p.priceLabel}</p>
+                  <p className={`mt-0.5 text-[20px] font-extrabold tnums md:text-[24px] ${hasBg ? "text-white" : "text-brand-red"}`}>{p.price}</p>
+                  <p className={`mt-3 text-[14px] leading-relaxed md:text-[15px] ${hasBg ? "text-white/95" : "text-ink"}`}>{p.description}</p>
+                  <span className={`mt-4 inline-flex min-h-[46px] w-full items-center justify-center rounded-pill px-5 text-[14px] font-bold md:mt-5 md:min-h-[48px] md:text-[15px] ${p.ctaAction === "calcular" ? "bg-brand-red text-white" : hasBg ? "border-2 border-white bg-transparent text-white" : "border-2 border-navy bg-white text-navy"}`}>
+                    {p.ctaLabel}
+                  </span>
+                </div>
+              );
               return (
                 <li key={p.id}>
-                  <ProductModal
-                    onOpen={() => trackCta("producto", p.id)}
-                    className={cardClassName}
-                    style={cardStyle}
-                  >
-                    <div className="mt-auto flex flex-col p-5 md:p-6">
-                      <h3 className={`text-[20px] font-extrabold md:text-[24px] ${hasBg ? "text-white" : "text-navy"}`}>{p.title}</h3>
-                      <p className={`mt-2 text-[11px] font-semibold uppercase tracking-wide md:text-[12px] ${hasBg ? "text-white/85" : "text-slate2"}`}>{p.priceLabel}</p>
-                      <p className={`mt-0.5 text-[20px] font-extrabold tnums md:text-[24px] ${hasBg ? "text-white" : "text-brand-red"}`}>{p.price}</p>
-                      <p className={`mt-3 text-[14px] leading-relaxed md:text-[15px] ${hasBg ? "text-white/95" : "text-ink"}`}>{p.description}</p>
-                      <span className={`mt-4 inline-flex min-h-[46px] w-full items-center justify-center rounded-pill px-5 text-[14px] font-bold md:mt-5 md:min-h-[48px] md:text-[15px] ${p.ctaAction === "calcular" ? "bg-brand-red text-white" : hasBg ? "border-2 border-white bg-transparent text-white" : "border-2 border-navy bg-white text-navy"}`}>
-                        {p.ctaLabel}
-                      </span>
-                    </div>
-                  </ProductModal>
+                  {p.ctaAction === "calcular" ? (
+                    <PaidHeroQuoteModal onOpen={() => trackCta("producto", p.id)} className={cardClassName} style={cardStyle}>
+                      {cardContent}
+                    </PaidHeroQuoteModal>
+                  ) : (
+                    <PaidLlamadaModal onOpen={() => trackCta("producto", p.id)} className={cardClassName} style={cardStyle} phone={config.phone}>
+                      {cardContent}
+                    </PaidLlamadaModal>
+                  )}
                 </li>
               );
             })}
@@ -396,7 +401,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-brand-red px-6 text-[15px] font-bold text-white sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaCalcularLabel}
             </PaidHeroQuoteModal>
-            <PaidLlamadaModal onOpen={() => trackCta("comparativa_llamar")}
+            <PaidLlamadaModal onOpen={() => trackCta("comparativa_llamar")} phone={config.phone}
               className="inline-flex min-h-[48px] items-center justify-center rounded-pill border-2 border-emerald-500 bg-white px-6 text-[15px] font-bold text-emerald-700 sm:min-w-[240px] md:min-h-[52px]">
               {config.hero.ctaLlamarLabel}
             </PaidLlamadaModal>
@@ -470,6 +475,7 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           <div className="flex flex-1 items-center gap-2 md:flex-none md:gap-3">
             <PaidLlamadaModal
               onOpen={() => trackCta("bottom_llamar")}
+              phone={config.phone}
               className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill border-2 border-white bg-transparent px-2 text-[13px] font-bold text-white hover:bg-white/10 md:flex-none md:min-h-[48px] md:px-6 md:text-[14px]"
             >
               {config.hero.ctaLlamarLabel}

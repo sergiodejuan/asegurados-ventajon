@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PaidLlamadaForm } from "@/components/landings/PaidLlamadaForm";
+import { PaidLlamadaPageCard } from "@/components/landings/PaidLlamadaPageCard";
 import { getPaidLandingSaludConfig, getTheme } from "@/lib/store";
 import { BRAND_NAME } from "@/lib/brand";
 import { ArrowRight, IconByName, Phone } from "@/components/icons";
@@ -64,19 +64,7 @@ export default async function LpSaludLlamadaPage() {
       </header>
 
       <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 md:py-16">
-        <div className="mx-auto max-w-xl rounded-[20px] bg-white p-6 shadow-soft md:p-10">
-          <div className="flex items-start gap-4">
-            <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-red/10 text-brand-red">
-              <IconByName name="doc" width={20} height={20} />
-            </span>
-            <h1 className="text-[22px] font-extrabold leading-tight text-navy md:text-[26px]">
-              Solicita tu presupuesto personalizado
-            </h1>
-          </div>
-          <div className="mt-6">
-            <PaidLlamadaForm />
-          </div>
-        </div>
+        <PaidLlamadaPageCard phone={phone} />
 
         <p className="mx-auto mt-6 max-w-xl text-center text-[12px] leading-relaxed text-slate2">
           Si nos solicitas que te llamemos tus datos serán tratados por {BRAND_NAME}, para ponernos en contacto contigo con la finalidad de gestionar tu petición de seguros. Puedes consultar más información{" "}
