@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { leadSchema } from "@/lib/schema";
-import { upsertLead, createPresupuesto } from "@/lib/store";
+import {
+  upsertLead, createPresupuesto,
+  appendReferralConvertido, getReferralByCode, getReferralLandingConfig,
+} from "@/lib/store";
+import { sendReferralOptInEmail, sendReferralProgressEmail } from "@/lib/referralMail";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
 import { blandConfigured, triggerBlandCall, humanizeInicio } from "@/lib/bland";
@@ -45,7 +49,11 @@ export async function POST(request: Request) {
   // se distingue en el source para poder medirlo aparte. Si el envío llega
   // con el UTM de una promoción, esa es la fuente que queda en el lead —
   // pesa más que el origen genérico, porque dice de qué promoción concreta vino.
+  // Prioridad de source: si el lead viene con código de referido (?ref=CODE)
+  // el source es "referido" — pesa más que promoción o landing, porque
+  // dice de dónde salió el LEAD, no la campaña de marketing que lo trajo.
   const source =
+    (d.utm?.ref ? "referido" : null) ??
     promotionSourceFromUtm(d.utm) ??
     (d.origen === "asistente" ? "tarificador-salud-widget"
     : d.origen === "seo-landing" ? "tarificador-salud-seo"
@@ -177,7 +185,58 @@ export async function POST(request: Request) {
   await notifyTeamNewLead({
     leadId: id, source, presupuestoId: presupuesto?.id,
     aceptaComercial: d.aceptaComercial,
+    extraNote: d.utm?.ref ? `Referido por código ${d.utm.ref}` : undefined,
   }).catch((err) => console.error("[lead] notifyTeam error", err));
+
+  // Programa referidos: si llega con ?ref=CODE, registramos la conversión
+  // y disparamos email de opt-in al amigo + email informativo al referidor.
+  // Todo en best-effort: si algo falla no rompemos el flow del lead.
+  if (d.utm?.ref) {
+    try {
+      const refCfg = await getReferralLandingConfig();
+      const refDoc = await getReferralByCode(d.utm.ref);
+      if (refCfg.programaActivo && refDoc && !refDoc.bloqueado) {
+        // Anti-self-referral: no cuenta si el amigo es el propio referidor
+        // (mismo lead id — impide granjear bonos con múltiples emails desde
+        // la misma cuenta) ni si supera el cap anual.
+        const now = new Date();
+        const startYear = new Date(now.getFullYear(), 0, 1).getTime();
+        const conversionesEsteAno = refDoc.convertidos.filter(
+          (c) => Date.parse(c.cotizadoAt) >= startYear,
+        ).length;
+        if (id !== refDoc.referidorLeadId && conversionesEsteAno < refCfg.incentivo.capAnualPorReferidor) {
+          await appendReferralConvertido(d.utm.ref, {
+            leadId: id,
+            nombre: d.nombre,
+            producto: "salud",
+            presupuestoId: presupuesto?.id ?? "",
+            status: "cotizado",
+            cotizadoAt: new Date().toISOString(),
+          });
+          // Emails: al amigo (opt-in) y al referidor (progreso). Ambos
+          // ignoran errores para no bloquear al usuario.
+          sendReferralOptInEmail({
+            toEmail: d.email,
+            toNombre: d.nombre,
+            code: d.utm.ref,
+            leadId: id,
+            referidorNombre: refDoc.referidorNombre,
+            monto: refCfg.incentivo.montoReferido,
+          }).catch((err) => console.error("[lead] referral opt-in email", err));
+          sendReferralProgressEmail({
+            toEmail: refDoc.referidorEmail,
+            referidorNombre: refDoc.referidorNombre,
+            amigoNombre: d.nombre,
+            producto: "salud",
+            monto: refCfg.incentivo.montoReferidor,
+          }).catch((err) => console.error("[lead] referral progress email", err));
+        }
+      }
+    } catch (err) {
+      console.error("[lead] referral registration error", err);
+    }
+  }
+
   // Exponemos el presupuestoId para que /comparativa pueda pedirle
   // cotizaciones reales a Codeoscopic (ver app/api/quote/create y
   // components/Comparativa.tsx). Es solo un id, no revela datos.

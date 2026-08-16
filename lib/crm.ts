@@ -38,6 +38,10 @@ export const SOURCE_LABELS: Record<string, string> = {
   // saber el ROI real de las campañas de anuncios frente al tráfico orgánico.
   "tarificador-salud-lp": "Tarificador salud (landing paid)",
   "quiero-que-me-llamen-lp": "Quiero que me llamen (landing paid)",
+  // Lead entrante por programa "Amigos Ventajon" — venía desde
+  // ventajon.com/r/{slug}. El código del referidor viaja en utm.ref y se
+  // guarda en el submission del lead para atribución de bono.
+  "referido": "Referido por amigo",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;

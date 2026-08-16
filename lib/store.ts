@@ -20,6 +20,7 @@ import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto, type LandingDevice, type LandingDaypart } from "./landings";
 import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
+import { DEFAULT_REFERRAL_LANDING, type ReferralLandingConfig } from "./referralLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -1346,6 +1347,226 @@ export async function savePriceMatchLandingConfig(next: PriceMatchLandingConfig)
   const stamped: PriceMatchLandingConfig = { ...next, updatedAt: new Date().toISOString() };
   await jset(PRICE_MATCH_KEY, stamped);
   return stamped;
+}
+
+/* ------------------ Landing programa referidos + doc referral ---------------- */
+// Editable desde /admin/campanas/referidos. Mismo criterio de merge que las
+// demás landings: mantiene defaults por sub-sección para no romper si se
+// guarda una config parcial.
+//
+// Además de la config, aquí viven los documentos de referral en sí:
+//   · referral:code:{CODE} — { referidorLeadId, creadoAt, convertidos: [], bloqueado }
+//   · idx:refcode:{CODE} → leadId del referidor (búsqueda rápida por código)
+//   · referral:byLead:{leadId} → CODE (para no re-generar código si ya tiene)
+//
+// Un lead que llega con ?ref=CODE guarda el código en utm; al contratar,
+// disparamos appendReferralConvertido y — si supera 30 días de vigencia —
+// se paga el bono al referidor. El bono al referido se paga tras opt-in.
+
+const REFERRAL_LANDING_KEY = "landing:referral";
+
+export async function getReferralLandingConfig(): Promise<ReferralLandingConfig> {
+  const stored = await jget<ReferralLandingConfig>(REFERRAL_LANDING_KEY);
+  if (!stored) return DEFAULT_REFERRAL_LANDING;
+  return {
+    ...DEFAULT_REFERRAL_LANDING,
+    ...stored,
+    programaActivo: typeof stored.programaActivo === "boolean" ? stored.programaActivo : DEFAULT_REFERRAL_LANDING.programaActivo,
+    incentivo: { ...DEFAULT_REFERRAL_LANDING.incentivo, ...(stored.incentivo ?? {}) },
+    hero: { ...DEFAULT_REFERRAL_LANDING.hero, ...(stored.hero ?? {}) },
+    compromisoBadges: Array.isArray(stored.compromisoBadges) ? stored.compromisoBadges : DEFAULT_REFERRAL_LANDING.compromisoBadges,
+    comoFunciona: {
+      ...DEFAULT_REFERRAL_LANDING.comoFunciona,
+      ...(stored.comoFunciona ?? {}),
+      steps: Array.isArray(stored.comoFunciona?.steps) ? stored.comoFunciona!.steps : DEFAULT_REFERRAL_LANDING.comoFunciona.steps,
+    },
+    socialProof: {
+      ...DEFAULT_REFERRAL_LANDING.socialProof,
+      ...(stored.socialProof ?? {}),
+      testimonios: Array.isArray(stored.socialProof?.testimonios) ? stored.socialProof!.testimonios : DEFAULT_REFERRAL_LANDING.socialProof.testimonios,
+    },
+    cta: { ...DEFAULT_REFERRAL_LANDING.cta, ...(stored.cta ?? {}) },
+    mensajeCompartir: {
+      ...DEFAULT_REFERRAL_LANDING.mensajeCompartir,
+      ...(stored.mensajeCompartir ?? {}),
+      email: { ...DEFAULT_REFERRAL_LANDING.mensajeCompartir.email, ...(stored.mensajeCompartir?.email ?? {}) },
+    },
+    faq: {
+      ...DEFAULT_REFERRAL_LANDING.faq,
+      ...(stored.faq ?? {}),
+      items: Array.isArray(stored.faq?.items) ? stored.faq!.items : DEFAULT_REFERRAL_LANDING.faq.items,
+    },
+    footer: {
+      ...DEFAULT_REFERRAL_LANDING.footer,
+      ...(stored.footer ?? {}),
+      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_REFERRAL_LANDING.footer.enlaces,
+    },
+    utm: { ...DEFAULT_REFERRAL_LANDING.utm, ...(stored.utm ?? {}) },
+  };
+}
+
+export async function saveReferralLandingConfig(next: ReferralLandingConfig): Promise<ReferralLandingConfig> {
+  const stamped: ReferralLandingConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(REFERRAL_LANDING_KEY, stamped);
+  return stamped;
+}
+
+/* --------- Documentos de referral (código único por cliente) ------- */
+
+export type ReferralConvertido = {
+  leadId: string; // el amigo
+  nombre: string; // solo para mostrar al referidor en su dashboard
+  producto: string;
+  presupuestoId: string;
+  status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
+  cotizadoAt: string;
+  optInAt?: string;
+  contratadoAt?: string;
+  pagadoReferidorAt?: string;
+  pagadoReferidoAt?: string;
+};
+
+export type ReferralDoc = {
+  code: string; // MARIA-LP, JUANP-3X, etc.
+  referidorLeadId: string;
+  referidorNombre: string;
+  referidorEmail: string;
+  creadoAt: string;
+  bloqueado: boolean; // fraude detectado / manual desde admin
+  convertidos: ReferralConvertido[];
+};
+
+// Slug legible desde nombre + 2 chars random. Determinista para el mismo
+// nombre + intento — evita colisiones probando sufijo aleatorio. Solo
+// letras/dígitos, mayúsculas. Ej. "María Pérez" → "MARIA-P-3X".
+function slugifyReferralName(nombre: string): string {
+  const norm = nombre
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase().replace(/[^A-Z]/g, " ").trim();
+  const parts = norm.split(/\s+/).filter(Boolean);
+  if (!parts.length) return "AMIGO";
+  const first = parts[0].slice(0, 6);
+  const initial = parts.length > 1 ? parts[1][0] : "";
+  return initial ? `${first}-${initial}` : first;
+}
+function randomSuffix(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin I,O,1,0 (confundibles)
+  let out = "";
+  for (let i = 0; i < 2; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+// Reutiliza el código si el lead ya tenía uno (idempotente por leadId).
+// Si no, genera uno único evitando colisiones con reintento.
+export async function getOrCreateReferralCode(
+  referidorLeadId: string,
+  referidorNombre: string,
+  referidorEmail: string,
+): Promise<ReferralDoc> {
+  const existingCode = await jget<string>(`referral:byLead:${referidorLeadId}`);
+  if (existingCode) {
+    const doc = await jget<ReferralDoc>(`referral:code:${existingCode}`);
+    if (doc) return doc;
+  }
+  const base = slugifyReferralName(referidorNombre);
+  for (let i = 0; i < 8; i++) {
+    const candidate = `${base}-${randomSuffix()}`;
+    const clash = await jget<string>(`idx:refcode:${candidate}`);
+    if (clash) continue;
+    const doc: ReferralDoc = {
+      code: candidate,
+      referidorLeadId,
+      referidorNombre,
+      referidorEmail,
+      creadoAt: new Date().toISOString(),
+      bloqueado: false,
+      convertidos: [],
+    };
+    await jset(`referral:code:${candidate}`, doc);
+    await jset(`idx:refcode:${candidate}`, referidorLeadId);
+    await jset(`referral:byLead:${referidorLeadId}`, candidate);
+    return doc;
+  }
+  throw new Error("[referral] no se pudo generar código único tras 8 intentos");
+}
+
+export async function getReferralByCode(code: string): Promise<ReferralDoc | null> {
+  return jget<ReferralDoc>(`referral:code:${code}`);
+}
+
+export async function getReferralByLeadId(leadId: string): Promise<ReferralDoc | null> {
+  const code = await jget<string>(`referral:byLead:${leadId}`);
+  return code ? getReferralByCode(code) : null;
+}
+
+// Añade un nuevo convertido al documento del código, con lock para evitar
+// pérdida de escrituras concurrentes cuando dos amigos entran a la vez con
+// el mismo código y ambos cotizan casi simultáneamente.
+export async function appendReferralConvertido(
+  code: string,
+  entry: ReferralConvertido,
+): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    // Deduplica por leadId — un mismo amigo no puede contar dos veces
+    // aunque rellene el tarificador varias veces.
+    if (doc.convertidos.some((c) => c.leadId === entry.leadId)) return doc;
+    doc.convertidos.push(entry);
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
+}
+
+// Actualiza el status de un convertido concreto (opt-in, contratado, pagado).
+// Usa el mismo lock para no pisar escrituras si llegan dos updates casi
+// simultáneos del mismo lead.
+export async function updateReferralConvertidoStatus(
+  code: string,
+  leadId: string,
+  patch: Partial<ReferralConvertido>,
+): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    const idx = doc.convertidos.findIndex((c) => c.leadId === leadId);
+    if (idx < 0) return doc;
+    doc.convertidos[idx] = { ...doc.convertidos[idx], ...patch };
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
+}
+
+// Lookup rápido de leadId por teléfono o email — sin cargar el Lead
+// completo. Devuelve null si no hay match. Se usa desde /api/referral/generate
+// para encontrar al cliente que quiere generar su código sin sesión.
+export async function findLeadIdByPhoneOrEmail(
+  phone?: string,
+  email?: string,
+): Promise<string | null> {
+  if (phone) {
+    const id = await jget<string>(`idx:phone:${phone}`);
+    if (id) return id;
+  }
+  if (email) {
+    const id = await jget<string>(`idx:email:${email}`);
+    if (id) return id;
+  }
+  return null;
+}
+
+// Elegibilidad del referidor: solo clientes con AL MENOS un presupuesto
+// en status "ganado" (equivalente CRM a póliza contratada). Se usa antes
+// de generar el código y también antes de pagar el bono al referidor.
+export async function isEligibleReferrer(leadId: string): Promise<boolean> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return false;
+  const submissions = lead.submissions ?? [];
+  for (const sub of submissions) {
+    const p = await jget<Presupuesto>(`presupuesto:${sub.id}`);
+    if (p && p.status === "ganado") return true;
+  }
+  return false;
 }
 
 /* ------------------------ Exit-intent de la web general --------------------- */

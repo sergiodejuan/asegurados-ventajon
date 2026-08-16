@@ -26,6 +26,9 @@ const utmField = z
     campaign: z.string().optional(),
     content: z.string().optional(),
     term: z.string().optional(),
+    // Programa referidos — código único del cliente que refirió.
+    // Formato tipo "MARIA-P-3X" (máx. 40 chars por si el nombre es largo).
+    ref: z.string().max(40).optional(),
     referrer: z.string().optional(),
     landingPage: z.string().optional(),
   })
@@ -399,3 +402,30 @@ export const priceMatchSchema = z.object({
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type PriceMatchInput = z.input<typeof priceMatchSchema>;
+
+/* --------------------- Programa referidos (Amigos Ventajon) ------------------ */
+// Formulario del referidor generando su enlace/código personal desde la
+// landing /referidos o desde su área de cliente. NO recoge ningún dato del
+// amigo — el referido llega por el link ?ref=CODE, no lo introduce el
+// referidor (art. 21 LSSI: no se puede enviar publicidad a terceros sin su
+// consentimiento). El schema es minimalista: solo identifica al referidor
+// para asociar el código a su lead existente.
+export const referralGenerateSchema = z.object({
+  // El referidor DEBE tener un lead + presupuesto contratado; el endpoint
+  // valida elegibilidad server-side. Aquí solo pedimos su email/tel para
+  // el lookup (la sesión cliente ya lo cubre en el flujo autenticado; este
+  // schema es para el fallback anónimo desde /referidos).
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico.").optional(),
+  telefono: phoneField.optional(),
+  company: honeypot,
+  turnstileToken: z.string().max(2000).optional().default(""),
+});
+export type ReferralGenerateInput = z.input<typeof referralGenerateSchema>;
+
+// Opt-in del referido tras completar comparativa. El backend genera un
+// token firmado (HMAC) y lo envía por email; el usuario hace clic y este
+// endpoint lo valida antes de disparar el envío del vale Amazon.
+export const referralOptInSchema = z.object({
+  token: z.string().min(20).max(300),
+});
+export type ReferralOptInInput = z.input<typeof referralOptInSchema>;
