@@ -3,6 +3,14 @@ name: Security audit
 # Auditoría de dependencias: se ejecuta en cada PR (para no meter CVEs
 # nuevas) y semanalmente los lunes (para pillar CVEs publicadas después de
 # hacer merge). Falla si aparecen vulnerabilidades HIGH o CRITICAL.
+#
+# P0.15: acciones pineadas por SHA (no por tag) para evitar que una acción
+# comprometida en su release publique código nuevo bajo la misma etiqueta
+# y lo ejecutemos con permisos del repo. Los SHAs corresponden a las
+# versiones marcadas en el comentario y se actualizan con Dependabot.
+#
+# Permisos por defecto restringidos al mínimo (read-all) — cada job pide
+# más si lo necesita. Nunca permitir write por defecto.
 
 on:
   pull_request:
@@ -13,16 +21,20 @@ on:
     - cron: "0 6 * * 1" # cada lunes a las 06:00 UTC
   workflow_dispatch: # también manual desde la UI de Actions
 
+permissions: read-all
+
 jobs:
   npm-audit:
     name: npm audit (high+ severity)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: "20"
           cache: "npm"
