@@ -8,6 +8,7 @@ import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/adminFormat";
 import { StatTile, ViewToggle, FilterTab, FilterDropdown, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
+import { SendEmailModal } from "@/components/admin/SendEmailModal";
 
 type Activity = { at: string; type: string; note: string; meta?: { agente?: string; channel?: string } };
 type ConsentRecord = {
@@ -111,6 +112,7 @@ function LeadsCrm() {
   const [selected, setSelected] = useState<Lead | null>(null);
   const [agents, setAgents] = useState<{ id: string; nombre: string }[]>([]);
   const [filterCartera, setFilterCartera] = useState<"all" | "mia">("all");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const load = useCallback(async (tk: string) => {
     setError(null); setLoading(true);
@@ -136,6 +138,7 @@ function LeadsCrm() {
   }, [loadedOnce]);
 
   async function openLead(id: string) {
+    setEmailModalOpen(false);
     // Se pide la ficha fresca (no la del listado, que puede estar desactualizada
     // si el propio cliente ha cambiado sus datos desde /area-cliente).
     try {
@@ -247,6 +250,13 @@ function LeadsCrm() {
               </div>
               <p className="mt-1 text-[14px] tnums text-slate2">{l.telefono || "sin teléfono"}</p>
               <p className="text-[14px] text-slate2">{l.email || "sin email"}</p>
+              <button
+                type="button" onClick={() => setEmailModalOpen(true)} disabled={!l.email}
+                title={l.email ? undefined : "Este lead no tiene un email guardado."}
+                className="mt-3 rounded-pill border border-navy px-3.5 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:border-hair disabled:text-slate2 disabled:hover:bg-transparent"
+              >
+                Enviar email
+              </button>
 
               <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Fuente(s)</dt><dd className="text-right font-medium text-ink">{l.sources.map((s) => sources[s] ?? s).join(", ")}</dd></div>
@@ -425,6 +435,13 @@ function LeadsCrm() {
             </CollapsiblePanel>
           </div>
         </div>
+
+        {emailModalOpen && (
+          <SendEmailModal
+            lead={{ id: l.id, nombre: l.nombre, email: l.email, producto: l.producto }}
+            onClose={() => setEmailModalOpen(false)}
+          />
+        )}
       </main>
     );
   }

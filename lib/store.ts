@@ -15,6 +15,7 @@ import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from 
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
+import { SEED_EMAIL_TEMPLATES, type EmailTemplate, type EmailTemplateDraft } from "./leadEmailTemplates";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
 import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto, type LandingDevice, type LandingDaypart } from "./landings";
@@ -479,7 +480,7 @@ export async function updateLead(
 
 export async function addEmailLog(
   leadId: string,
-  entry: { id: string; to: string; subject: string; tipo: string }
+  entry: { id: string; to: string; subject: string; tipo: string; agente?: string }
 ): Promise<void> {
   const lead = await jget<Lead>(`lead:${leadId}`);
   if (!lead) return;
@@ -489,6 +490,7 @@ export async function addEmailLog(
     status: "enviado", openedAt: "", openCount: 0, clickedAt: "", clickCount: 0,
   };
   lead.emails = [log, ...(lead.emails ?? [])];
+  lead.activity.unshift({ at: now, type: "email", note: `Email enviado: ${entry.subject}`, meta: entry.agente ? { agente: entry.agente } : undefined });
   lead.updatedAt = now;
   await jset(`lead:${leadId}`, lead);
   await zadd("leads:index", Date.parse(now), leadId);
@@ -884,6 +886,74 @@ export async function deletePromotion(id: string): Promise<boolean> {
   const next = all.filter((p) => p.id !== id);
   if (next.length === all.length) return false;
   await jset(PROMOTIONS_KEY, next);
+  return true;
+}
+
+/* ------------------------- Plantillas de email (leads) ------------------ */
+// Editables desde /admin/configuracion/plantillas-email, usadas al enviar un
+// correo manual desde la ficha de un lead — ver
+// app/api/admin/leads/[id]/enviar-email y lib/leadEmailTemplates.ts. Mismo
+// patrón de colección con semilla aditiva que promociones/testimonios.
+
+const EMAIL_TEMPLATES_KEY = "email_templates:all";
+
+async function readEmailTemplates(): Promise<EmailTemplate[]> {
+  const stored = await jget<EmailTemplate[]>(EMAIL_TEMPLATES_KEY);
+  if (!stored || !stored.length) {
+    const seeded = [...SEED_EMAIL_TEMPLATES];
+    await jset(EMAIL_TEMPLATES_KEY, seeded);
+    return seeded;
+  }
+  const knownIds = new Set(stored.map((t) => t.id));
+  const missing = SEED_EMAIL_TEMPLATES.filter((t) => !knownIds.has(t.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(EMAIL_TEMPLATES_KEY, next);
+    return next;
+  }
+  return stored;
+}
+
+export async function listEmailTemplates(): Promise<EmailTemplate[]> {
+  const all = await readEmailTemplates();
+  return [...all].sort((a, b) => (a.nombre < b.nombre ? -1 : 1));
+}
+
+export async function getEmailTemplate(id: string): Promise<EmailTemplate | null> {
+  const all = await readEmailTemplates();
+  return all.find((t) => t.id === id) ?? null;
+}
+
+export async function createEmailTemplate(draft: EmailTemplateDraft): Promise<EmailTemplate> {
+  const all = await readEmailTemplates();
+  const now = new Date().toISOString();
+  const template: EmailTemplate = {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    nombre: draft.nombre ?? "",
+    asunto: draft.asunto ?? "",
+    cuerpoHtml: draft.cuerpoHtml ?? "",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(template);
+  await jset(EMAIL_TEMPLATES_KEY, all);
+  return template;
+}
+
+export async function updateEmailTemplate(id: string, patch: EmailTemplateDraft): Promise<EmailTemplate | null> {
+  const all = await readEmailTemplates();
+  const idx = all.findIndex((t) => t.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(EMAIL_TEMPLATES_KEY, all);
+  return all[idx];
+}
+
+export async function deleteEmailTemplate(id: string): Promise<boolean> {
+  const all = await readEmailTemplates();
+  const next = all.filter((t) => t.id !== id);
+  if (next.length === all.length) return false;
+  await jset(EMAIL_TEMPLATES_KEY, next);
   return true;
 }
 

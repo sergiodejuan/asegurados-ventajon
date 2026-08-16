@@ -53,7 +53,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 
 export type Activity = {
   at: string;
-  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact" | "rgpd";
+  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact" | "rgpd" | "email";
   note: string;
   meta?: Record<string, unknown>;
 };
@@ -488,7 +488,7 @@ export function toPublicAgent(a: Agent): PublicAgent {
 // CRM: quién hizo qué, cuándo y sobre qué ficha. Complementa (no sustituye)
 // las notas propias de cada lead/presupuesto/llamada.
 
-export type AuditAction = "crear" | "actualizar" | "eliminar" | "login" | "asignar" | "comentar";
+export type AuditAction = "crear" | "actualizar" | "eliminar" | "login" | "asignar" | "comentar" | "enviar-email";
 
 export type AuditLog = {
   id: string;
