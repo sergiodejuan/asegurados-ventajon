@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getReferralByCode, getReferralLandingConfig, getTheme, getPaidLandingSaludConfig } from "@/lib/store";
-import { PaidLandingSalud } from "@/components/landings/PaidLandingSalud";
+import { getReferralByCode, getReferralLandingConfig, getTheme, getLandingBySlug } from "@/lib/store";
+import { PaidLanding } from "@/components/landings/PaidLanding";
 import { SITE_URL } from "@/lib/brand";
 
 // Landing personalizada del amigo (/r/{code}).
@@ -13,12 +13,12 @@ import { SITE_URL } from "@/lib/brand";
 //   3. Añadimos ?ref=CODE al href del CTA (lib/attribution.ts lo captura
 //      en localStorage y lo propaga al POST /api/lead).
 //
-// Visualmente reutilizamos /lp/salud, con un banner personalizado sobre
-// el hero que dice "{referidorNombre} te invita" + explicación del bono.
-// Es la landing de conversión más ancha que tenemos — máxima probabilidad
-// de que el amigo termine cotizando.
+// Visualmente reutilizamos la landing paid "salud" (slug "salud") de
+// /admin/campanas/landings, con un kicker personalizado sobre el hero.
 
 export const dynamic = "force-dynamic";
+
+const REFERRAL_LANDING_SLUG = "salud"; // slug de la landing paid a reutilizar
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const doc = await getReferralByCode(decodeURIComponent(params.slug)).catch(() => null);
@@ -33,27 +33,27 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function ReferralPersonalPage({ params }: { params: { slug: string } }) {
   const code = decodeURIComponent(params.slug);
-  const [doc, refConfig, saludConfig, theme] = await Promise.all([
+  const [doc, refConfig, landing, theme] = await Promise.all([
     getReferralByCode(code).catch(() => null),
     getReferralLandingConfig(),
-    getPaidLandingSaludConfig(),
+    getLandingBySlug(REFERRAL_LANDING_SLUG, { onlyPublished: true }),
     getTheme(),
   ]);
 
   // Código inexistente o bloqueado → redirect a landing genérica para no
   // regalar información sobre qué códigos son válidos.
-  if (!doc || doc.bloqueado || !refConfig.programaActivo) {
+  if (!doc || doc.bloqueado || !refConfig.programaActivo || !landing) {
     redirect("/referidos");
   }
 
-  // Adaptamos la landing paid de salud: añadimos un kicker personal al
-  // hero con "{nombre} te invita". La atribución ?ref=CODE se cuela en
-  // localStorage vía captureAttribution al montar Analytics.tsx en el
-  // cliente — no hay que redirigir a otra URL.
-  const personalizedConfig = {
-    ...saludConfig,
+  // Adaptamos la landing paid: añadimos un kicker personal al hero con
+  // "{nombre} te invita". La atribución ?ref=CODE se cuela en localStorage
+  // vía captureAttribution al montar Analytics.tsx en el cliente — no hay
+  // que redirigir a otra URL.
+  const personalizedLanding = {
+    ...landing,
     hero: {
-      ...saludConfig.hero,
+      ...landing.hero,
       kicker: `${doc.referidorNombre} te invita · ${refConfig.incentivo.montoReferido}€ Amazon por cotizar`,
     },
   };
@@ -68,8 +68,8 @@ export default async function ReferralPersonalPage({ params }: { params: { slug:
           __html: `if (typeof window !== 'undefined' && window.location && window.location.search.indexOf('ref=') === -1) { const u = new URL(window.location.href); u.searchParams.set('ref', ${JSON.stringify(code)}); history.replaceState(null, '', u.toString()); }`,
         }}
       />
-      <PaidLandingSalud
-        config={personalizedConfig}
+      <PaidLanding
+        landing={personalizedLanding}
         logoUrl={theme.logoUrl || theme.minimalLogoUrl || ""}
       />
     </>
