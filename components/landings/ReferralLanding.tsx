@@ -63,13 +63,13 @@ export function ReferralLanding({
           <button
             type="button" onClick={() => openModal("logo")}
             aria-label={`${BRAND_NAME} — invitar a un amigo`}
-            className="inline-flex items-center"
+            className="inline-flex min-w-0 items-center"
           >
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt={BRAND_NAME} className="h-10 w-auto max-w-[190px] object-contain" />
             ) : (
-              <span translate="no" className="font-display text-[16px] font-extrabold text-navy">{BRAND_NAME}</span>
+              <span translate="no" className="truncate whitespace-nowrap font-display text-[14px] font-extrabold text-navy sm:text-[16px]">{BRAND_NAME}</span>
             )}
           </button>
           <div className="hidden items-center gap-3 md:flex">
@@ -85,9 +85,9 @@ export function ReferralLanding({
           </div>
           <a
             href={phoneHref} onClick={() => trackCta("phone_top_mobile")}
-            className="inline-flex items-center gap-1.5 rounded-pill bg-brand-red px-4 py-2 text-[14px] font-bold text-white md:hidden"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-brand-red px-3 py-1.5 text-[13px] font-bold text-white sm:px-4 sm:py-2 sm:text-[14px] md:hidden"
           >
-            <Phone width={16} height={16} /><span className="tnums">{phone}</span>
+            <Phone width={14} height={14} className="shrink-0" /><span className="tnums whitespace-nowrap">{phone}</span>
           </a>
         </div>
       </header>
@@ -280,21 +280,19 @@ export function ReferralLanding({
       {/* ---------------------- STICKY BOTTOM BAR ---------------------- */}
       <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-brand-red shadow-[0_-16px_40px_-16px_rgba(18,32,79,0.45)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:gap-6 md:px-8 md:py-4">
-          <a href={phoneHref} onClick={() => trackCta("phone_bottom")}
+          <a href={phoneHref} onClick={() => trackCta("phone_bottom")} aria-label={`Llamar al ${phone}`}
             className="inline-flex shrink-0 items-center gap-2 text-white">
             <span className="hidden flex-col text-left leading-tight md:flex">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-white/75">¿Dudas?</span>
               <span className="text-[16px] font-extrabold tnums">{phone}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[14px] font-extrabold md:hidden">
-              <Phone width={16} height={16} />
-              <span className="tnums">{phone}</span>
-            </span>
+            <Phone width={18} height={18} className="md:hidden" />
           </a>
-          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:gap-3">
             <button type="button" onClick={() => openModal("bottom_invitar")} disabled={programaPausado}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-pill bg-white px-4 text-[13px] font-bold text-brand-red hover:bg-white/90 md:min-h-[48px] md:px-6 md:text-[14px] disabled:bg-white/60">
-              Invitar a un amigo · llévate {config.incentivo.montoReferidor}€
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-pill bg-white px-3 text-center text-[13px] font-bold leading-tight text-brand-red hover:bg-white/90 sm:px-4 md:min-h-[48px] md:w-auto md:px-6 md:text-[14px] disabled:bg-white/60">
+              <span className="sm:hidden">Invitar · +{config.incentivo.montoReferidor}€</span>
+              <span className="hidden sm:inline">Invitar a un amigo · llévate {config.incentivo.montoReferidor}€</span>
             </button>
           </div>
         </div>
