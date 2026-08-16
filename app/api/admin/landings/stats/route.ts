@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listLandings, listLeads, getLandingCounters } from "@/lib/store";
+import { listLandings, listLeads, getLandingCounters, aggregateLandingCounters } from "@/lib/store";
 import { requireModule } from "@/lib/agentAuth";
 
 export const runtime = "nodejs";
@@ -14,10 +14,14 @@ function daysAgoStr(n: number) {
 
 // Estadísticas por landing para el dashboard de comparación
 // (/admin/campanas/landings/comparar): vistas y clics de CTA (contadores
-// diarios, ver lib/store.ts trackLandingEvent/getLandingCounters) + leads
+// diarios, ver lib/store.ts trackLandingEvent/getLandingCounters), desglose
+// por dispositivo y por franja horaria (aggregateLandingCounters), y leads
 // generados (filtrando la lista completa de leads por landingSlug y rango de
 // fechas — mismo patrón in-memory que ya usa purgeStaleLeads sobre
-// listLeads(), sin necesitar un índice nuevo por landing).
+// listLeads(), sin necesitar un índice nuevo por landing). El desglose por
+// dispositivo/franja solo cubre vistas y clics — los leads no llevan esas
+// dos dimensiones (no hay forma barata de unir un lead con la vista/clic
+// concretos que lo originaron), así que leads/conversión se quedan en total.
 export async function GET(request: Request) {
   const auth = await requireModule(request, "campana");
   if (!auth.ok) return auth.response;
@@ -30,21 +34,18 @@ export async function GET(request: Request) {
 
   const stats = await Promise.all(landings.map(async (l) => {
     const counters = await getLandingCounters(l.slug, from, to);
-    let views = 0, ctaCalcular = 0, ctaLlamar = 0;
-    for (const day of Object.values(counters)) {
-      views += day.view ?? 0;
-      ctaCalcular += day.cta_calcular ?? 0;
-      ctaLlamar += day.cta_llamar ?? 0;
-    }
+    const { total, byDevice, byDaypart } = aggregateLandingCounters(counters);
     const leadsCount = leads.filter((lead) => {
       if (lead.landingSlug !== l.slug) return false;
       const day = lead.createdAt.slice(0, 10);
       return day >= from && day <= to;
     }).length;
-    const conversionRate = views > 0 ? leadsCount / views : null;
+    const conversionRate = total.views > 0 ? leadsCount / total.views : null;
     return {
       id: l.id, slug: l.slug, producto: l.producto, status: l.status, h1: l.hero.h1,
-      views, ctaCalcular, ctaLlamar, leads: leadsCount, conversionRate,
+      views: total.views, ctaCalcular: total.ctaCalcular, ctaLlamar: total.ctaLlamar,
+      leads: leadsCount, conversionRate,
+      byDevice, byDaypart,
     };
   }));
 

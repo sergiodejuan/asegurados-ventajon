@@ -205,6 +205,44 @@ export function buildTarificadorHref(landing: Pick<Landing, "producto" | "slug" 
   return `${base}?${params.toString()}`;
 }
 
+/* ------------- Analítica del beacon de comparación de landings ------------ */
+// Dimensiones adicionales del beacon (ver trackLandingEvent/
+// aggregateLandingCounters en lib/store.ts): dispositivo y franja horaria,
+// para poder segmentar el dashboard de /admin/campanas/landings/comparar
+// más allá del total. Se clasifican en el servidor en el propio endpoint del
+// beacon (app/api/landing/track), no en el cliente — así no depende de que
+// el navegador mande datos extra y es consistente entre "view" y cada CTA.
+
+export type LandingDevice = "mobile" | "tablet" | "desktop";
+export type LandingDaypart = "madrugada" | "manana" | "tarde" | "noche";
+
+export const DEVICE_LABELS: Record<LandingDevice, string> = { mobile: "Móvil", tablet: "Tablet", desktop: "Escritorio" };
+export const DAYPART_LABELS: Record<LandingDaypart, string> = {
+  madrugada: "Madrugada (0-6h)", manana: "Mañana (6-12h)", tarde: "Tarde (12-18h)", noche: "Noche (18-24h)",
+};
+
+// Heurística estándar de sniffing de User-Agent — suficiente para analítica
+// interna (no es una decisión de negocio ni de seguridad, solo agrupa
+// tendencias). iPad/tablet Android se detectan antes que "mobile" porque
+// muchos user-agents de tablet incluyen también la palabra "Mobile".
+export function deviceFromUserAgent(ua: string): LandingDevice {
+  if (/ipad|android(?!.*mobile)|tablet|kindle|playbook|silk/i.test(ua)) return "tablet";
+  if (/mobile|iphone|ipod|android|blackberry|windows phone|opera mini/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+// Franja horaria en hora peninsular (Europe/Madrid) — referencia razonable
+// para decidir cuándo lanzar campañas, aunque parte de la audiencia esté en
+// Canarias (una hora por detrás): la tendencia relativa entre franjas es lo
+// que importa aquí, no el minuto exacto.
+export function daypartNow(date = new Date()): LandingDaypart {
+  const hour = Number(new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", hour12: false }).format(date));
+  if (hour < 6) return "madrugada";
+  if (hour < 12) return "manana";
+  if (hour < 18) return "tarde";
+  return "noche";
+}
+
 const DEFAULT_HERO: Landing["hero"] = {
   kicker: "",
   h1: "El Seguro de Salud para que tu salud no espere",

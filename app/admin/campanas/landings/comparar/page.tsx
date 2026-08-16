@@ -2,11 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import {
+  DEVICE_LABELS, DAYPART_LABELS,
+  type LandingDevice, type LandingDaypart,
+} from "@/lib/landings";
 
+type CounterTotals = { views: number; ctaCalcular: number; ctaLlamar: number };
 type LandingStat = {
   id: string; slug: string; producto: string; status: "borrador" | "publicado"; h1: string;
   views: number; ctaCalcular: number; ctaLlamar: number; leads: number; conversionRate: number | null;
+  byDevice: Record<LandingDevice, CounterTotals>;
+  byDaypart: Record<LandingDaypart, CounterTotals>;
 };
+
+type Segment = "total" | "device" | "daypart";
+const DEVICE_ORDER: LandingDevice[] = ["mobile", "tablet", "desktop"];
+const DAYPART_ORDER: LandingDaypart[] = ["madrugada", "manana", "tarde", "noche"];
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -35,6 +46,7 @@ function Dashboard() {
   const { token } = useAdminToken();
   const [from, setFrom] = useState(daysAgoStr(30));
   const [to, setTo] = useState(todayStr());
+  const [segment, setSegment] = useState<Segment>("total");
   const [stats, setStats] = useState<LandingStat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +101,22 @@ function Dashboard() {
             </button>
           ))}
         </div>
+        <label className="ml-auto block">
+          <span className="mb-1 block text-[12px] font-semibold text-ink">Segmentar por</span>
+          <select value={segment} onChange={(e) => setSegment(e.target.value as Segment)}
+            className="rounded-card border border-hair bg-white px-3 py-2 text-[13px]">
+            <option value="total">Total (sin segmentar)</option>
+            <option value="device">Dispositivo</option>
+            <option value="daypart">Franja horaria</option>
+          </select>
+        </label>
       </div>
+      {segment !== "total" && (
+        <p className="mt-2 text-[12px] leading-relaxed text-slate2">
+          El desglose por {segment === "device" ? "dispositivo" : "franja horaria"} solo cubre vistas y clics de CTA — los leads y la
+          conversión se muestran siempre en total, ya que no se puede saber con qué vista o clic concreto se corresponde cada lead.
+        </p>
+      )}
 
       {error && <p role="alert" className="mt-4 text-[13px] font-medium text-brand-red">{error}</p>}
       {loading && <p className="mt-4 text-[13px] text-slate2">Cargando…</p>}
@@ -142,6 +169,46 @@ function Dashboard() {
           </table>
         </div>
       )}
+
+      {!loading && segment !== "total" && sorted.length > 0 && (
+        <div className="mt-5 flex flex-col gap-3">
+          {sorted.map((s) => (
+            <SegmentBreakdownCard key={s.id} stat={s} segment={segment} />
+          ))}
+        </div>
+      )}
     </main>
+  );
+}
+
+// Desglose de una landing por dispositivo o franja horaria: barra por
+// bucket sobre "vistas" (la métrica de arriba del funnel, la que tiene
+// sentido comparar por dónde/cuándo se ve la landing), con clics de
+// calcular/llamar como cifras secundarias debajo de cada barra.
+function SegmentBreakdownCard({ stat, segment }: { stat: LandingStat; segment: "device" | "daypart" }) {
+  const buckets = segment === "device"
+    ? DEVICE_ORDER.map((k) => ({ key: k, label: DEVICE_LABELS[k], totals: stat.byDevice[k] }))
+    : DAYPART_ORDER.map((k) => ({ key: k, label: DAYPART_LABELS[k], totals: stat.byDaypart[k] }));
+  const maxViews = Math.max(1, ...buckets.map((b) => b.totals.views));
+
+  return (
+    <div className="rounded-card border border-hair bg-white p-4">
+      <p className="text-[13px] font-bold text-navy">{stat.h1 || `/lp/${stat.slug}`}</p>
+      <p className="text-[11px] text-slate2">/lp/{stat.slug}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {buckets.map((b) => (
+          <div key={b.key} className="flex items-center gap-3">
+            <span className="w-32 shrink-0 text-[12px] font-medium text-ink">{b.label}</span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-mist">
+              <div className="h-full rounded-full bg-navy" style={{ width: `${(b.totals.views / maxViews) * 100}%` }} />
+            </div>
+            <span className="w-14 shrink-0 text-right tnums text-[12px] font-semibold text-ink">{b.totals.views.toLocaleString("es-ES")}</span>
+            <span className="w-32 shrink-0 text-right text-[11px] text-slate2">
+              calc {b.totals.ctaCalcular.toLocaleString("es-ES")} · llam {b.totals.ctaLlamar.toLocaleString("es-ES")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

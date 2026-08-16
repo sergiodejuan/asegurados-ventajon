@@ -17,7 +17,7 @@ import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDr
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
-import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto } from "./landings";
+import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto, type LandingDevice, type LandingDaypart } from "./landings";
 import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
@@ -1168,17 +1168,67 @@ function dayRange(fromDay: string, toDay: string): string[] {
 
 export type LandingEventKind = "view" | "cta_calcular" | "cta_llamar";
 
-export async function trackLandingEvent(slug: string, kind: LandingEventKind, day = todayStr()): Promise<void> {
-  await hincrby(beaconKey(slug, day), kind, 1);
+// Cada campo del hash combina las 3 dimensiones ("kind:device:daypart") en
+// vez de abrir una clave de Redis por combinación — sigue siendo un único
+// HINCRBY/HGETALL por landing y día, solo que con más campos dentro. El
+// desglose por dispositivo/franja horaria se reconstruye sumando los campos
+// que correspondan (ver parseCounterField / aggregateLandingCounters).
+function counterField(kind: LandingEventKind, device: LandingDevice, daypart: LandingDaypart): string {
+  return `${kind}:${device}:${daypart}`;
+}
+function parseCounterField(field: string): { kind: LandingEventKind; device: LandingDevice; daypart: LandingDaypart } | null {
+  const [kind, device, daypart] = field.split(":");
+  if (!kind || !device || !daypart) return null;
+  return { kind: kind as LandingEventKind, device: device as LandingDevice, daypart: daypart as LandingDaypart };
 }
 
-// { [yyyy-mm-dd]: { view: N, cta_calcular: N, cta_llamar: N } } para el rango pedido.
+export async function trackLandingEvent(
+  slug: string, kind: LandingEventKind, device: LandingDevice, daypart: LandingDaypart, day = todayStr()
+): Promise<void> {
+  await hincrby(beaconKey(slug, day), counterField(kind, device, daypart), 1);
+}
+
+// { [yyyy-mm-dd]: { "view:mobile:tarde": N, ... } } para el rango pedido —
+// forma cruda, pensada para agregar con aggregateLandingCounters.
 export async function getLandingCounters(slug: string, fromDay: string, toDay: string): Promise<Record<string, Record<string, number>>> {
   const out: Record<string, Record<string, number>> = {};
   for (const day of dayRange(fromDay, toDay)) {
     out[day] = await hgetall(beaconKey(slug, day));
   }
   return out;
+}
+
+export type LandingCounterTotals = { views: number; ctaCalcular: number; ctaLlamar: number };
+
+// Reduce la forma cruda de getLandingCounters a: el total (todas las
+// dimensiones sumadas) + el desglose por dispositivo y por franja horaria —
+// consumido por app/api/admin/landings/stats.
+export function aggregateLandingCounters(counters: Record<string, Record<string, number>>): {
+  total: LandingCounterTotals;
+  byDevice: Record<LandingDevice, LandingCounterTotals>;
+  byDaypart: Record<LandingDaypart, LandingCounterTotals>;
+} {
+  const empty = (): LandingCounterTotals => ({ views: 0, ctaCalcular: 0, ctaLlamar: 0 });
+  const total = empty();
+  const byDevice: Record<LandingDevice, LandingCounterTotals> = { mobile: empty(), tablet: empty(), desktop: empty() };
+  const byDaypart: Record<LandingDaypart, LandingCounterTotals> = { madrugada: empty(), manana: empty(), tarde: empty(), noche: empty() };
+
+  function add(bucket: LandingCounterTotals, kind: LandingEventKind, n: number) {
+    if (kind === "view") bucket.views += n;
+    else if (kind === "cta_calcular") bucket.ctaCalcular += n;
+    else if (kind === "cta_llamar") bucket.ctaLlamar += n;
+  }
+
+  for (const dayFields of Object.values(counters)) {
+    for (const [field, n] of Object.entries(dayFields)) {
+      const parsed = parseCounterField(field);
+      if (!parsed) continue; // campo de un formato antiguo/desconocido — se ignora, no rompe el resto
+      add(total, parsed.kind, n);
+      if (byDevice[parsed.device]) add(byDevice[parsed.device], parsed.kind, n);
+      if (byDaypart[parsed.daypart]) add(byDaypart[parsed.daypart], parsed.kind, n);
+    }
+  }
+  return { total, byDevice, byDaypart };
 }
 
 /* ---------------- Landing "igualación de precio" ---------------- */
