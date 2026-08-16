@@ -9,6 +9,7 @@ import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { PaidReviewsCarousel } from "@/components/landings/PaidReviewsCarousel";
 import { PaidHeroQuoteModal } from "@/components/landings/PaidHeroQuoteModal";
 import { PaidLlamadaModal } from "@/components/landings/PaidLlamadaModal";
+import { PaidQuickCallBar } from "@/components/landings/PaidQuickCallBar";
 
 // Landing PAID de salud (/lp/salud). Réplica del layout de Línea Directa
 // Salud pero con paleta y voz de marca Asegurados Ventajon. Toda la copia,
@@ -82,14 +83,12 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
             )}
           </Link>
 
-          {/* Desktop: CTA verde + teléfono. Móvil: solo un botón redondo verde de teléfono (más compacto que texto). */}
-          <div className="hidden items-center gap-3 md:flex">
-            <PaidLlamadaModal
-              onOpen={() => trackCta("nav_llamada")}
-              className="inline-flex items-center gap-2 rounded-pill bg-emerald-600 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-emerald-700"
-            >
-              <Phone width={16} height={16} aria-hidden="true" /> Llamadme gratis
-            </PaidLlamadaModal>
+          {/* Desktop: barra "tu teléfono" + Llamadme gratis, como la referencia de
+              Línea Directa, + teléfono directo. Móvil: no hay hueco junto al logo
+              para la barra, así que solo el botón redondo de llamada directa
+              (ver debajo); la misma captura rápida vive en variant="section". */}
+          <div className="hidden items-center gap-4 md:flex">
+            <PaidQuickCallBar phone={config.phone} variant="navbar" />
             <a
               href={phoneHref} onClick={() => trackCta("phone_top")}
               className="inline-flex items-center gap-2 text-[15px] font-bold text-emerald-700"
@@ -322,23 +321,18 @@ export function PaidLandingSalud({ config, logoUrl }: { config: PaidLandingSalud
           </ul>
         </section>
 
-        {/* ---------------------- CONTRATA POR TELÉFONO ---------------------- */}
-        <section className="mx-auto mt-12 max-w-6xl px-5 md:mt-24" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 300px" }}>
-          <div className="rounded-[20px] bg-white p-5 shadow-soft md:p-10">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <h2 className="text-[20px] font-extrabold text-navy md:text-[28px]">{config.contrataTelefono.title}</h2>
-              <PaidLlamadaModal onOpen={() => trackCta("contrata_llamar")}
-                className="inline-flex min-h-[48px] items-center justify-center rounded-pill bg-emerald-600 px-6 text-[14px] font-bold text-white hover:bg-emerald-700 md:min-h-[52px] md:px-8 md:text-[15px]">
-                {config.contrataTelefono.ctaLabel}
-              </PaidLlamadaModal>
-              <p className="text-[14px] text-slate2 md:text-[15px]">
-                o llama al{" "}
-                <a href={phoneHref} onClick={() => trackCta("phone_middle")} className="font-bold tnums text-navy underline">
-                  {config.phone}
-                </a>
-              </p>
-            </div>
-          </div>
+        {/* ---------------------- CONTRATA POR TELÉFONO ----------------------
+            Misma barra de captura rápida (solo teléfono) que la referencia de
+            Línea Directa coloca justo debajo de las tarjetas de producto —
+            mobile-first: se apila en columna en pantallas estrechas y pasa a
+            una sola línea en desktop. */}
+        <section className="mx-auto mt-12 max-w-6xl px-5 md:mt-24" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 200px" }}>
+          <PaidQuickCallBar
+            phone={config.phone}
+            variant="section"
+            label={config.contrataTelefono.title}
+            ctaLabel={config.contrataTelefono.ctaLabel}
+          />
         </section>
 
         {/* ---------------------- COMPARATIVA ---------------------- */}
