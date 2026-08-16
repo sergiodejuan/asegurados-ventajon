@@ -9,6 +9,7 @@ import { saveCallResult } from "@/lib/quote";
 import { saveClientProfile } from "@/lib/clientArea";
 import { Spinner, ChevronDown } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
 // Formulario minimalista de "que me llamen" solo para /lp/salud/llamada.
 // Sigue la referencia de Línea Directa: teléfono + día + hora + botón, con
@@ -31,6 +32,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
   const [dia, setDia] = useState<string>(DIAS_LLAMADA[0]);
   const [turno, setTurno] = useState<string>(TURNOS_LLAMADA[0]);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [aceptaComercial, setAceptaComercial] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<string>("");
@@ -54,7 +56,7 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
           turnoLlamada: turno,
           aceptaPrivacidad: true,
           autorizaContacto: true,
-          aceptaComercial: false,
+          aceptaComercial,
           company: "",
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
@@ -138,6 +140,12 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
         </div>
       </label>
 
+      <PaidLlamadaLegalNotice
+        idPrefix="llamada-form"
+        aceptaComercial={aceptaComercial}
+        onChangeAceptaComercial={setAceptaComercial}
+      />
+
       <TurnstileWidget onToken={setTurnstileToken} />
 
       {error && (
@@ -153,10 +161,6 @@ export function PaidLlamadaForm({ onSuccess }: Props) {
         {submitting && <Spinner width={18} height={18} />}
         {submitting ? "Enviando…" : "Quiero que me llamen"}
       </button>
-
-      <p className="text-center text-[12px] leading-relaxed text-slate2">
-        El envío supone la aceptación de la <a href="/legal#privacidad" className="text-navy underline">Política de privacidad</a>.
-      </p>
     </form>
   );
 }

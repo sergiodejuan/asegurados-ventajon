@@ -8,6 +8,7 @@ import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { BRAND_NAME } from "@/lib/brand";
+import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
 // Réplica del "Llamadme gratis" de una sola línea que Línea Directa embebe
 // en su navbar y bajo sus tarjetas de producto: solo pide el teléfono (sin
@@ -21,6 +22,13 @@ import { BRAND_NAME } from "@/lib/brand";
 // el icono de llamada directa que ya existía y esta barra solo se usa en
 // variant="section" (bajo "Tipos de Seguros"), que sí es mobile-first: se
 // apila en columna en pantallas estrechas.
+//
+// El aviso de tratamiento de datos + consentimiento comercial (ver
+// PaidLlamadaLegalNotice) no cabe permanentemente en la barra compacta del
+// navbar (cabecera de altura fija) — ahí se muestra en un desplegable al
+// pulsar el icono "i", igual que hace la propia referencia de Línea Directa
+// en su navbar. En variant="section" sí hay sitio de sobra, así que se
+// muestra siempre visible debajo de la barra.
 export function PaidQuickCallBar({
   phone, variant = "navbar", label, ctaLabel = "Llamadme gratis",
 }: {
@@ -30,6 +38,8 @@ export function PaidQuickCallBar({
   ctaLabel?: string;
 }) {
   const [telefono, setTelefono] = useState("");
+  const [aceptaComercial, setAceptaComercial] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -51,7 +61,7 @@ export function PaidQuickCallBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: "", telefono, codigoPostal: "", producto: "salud",
-          aceptaPrivacidad: true, autorizaContacto: true, aceptaComercial: false,
+          aceptaPrivacidad: true, autorizaContacto: true, aceptaComercial,
           company: "",
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
@@ -63,6 +73,7 @@ export function PaidQuickCallBar({
       if (res.ok && body?.ok) {
         pushDataLayerEvent("generate_lead", { producto: "salud", form: `lp-salud-quickcall-${variant}` });
         setSent(true);
+        setNoticeOpen(false);
         return;
       }
       const first = body?.errors ? Object.values(body.errors).find((v) => v && v[0]) : undefined;
@@ -80,12 +91,12 @@ export function PaidQuickCallBar({
   }
 
   return (
-    <>
+    <div className={variant === "navbar" ? "relative" : undefined}>
       <form
         onSubmit={submit}
         className={variant === "section"
           ? "flex flex-col gap-3 rounded-[16px] border border-hair bg-white p-4 sm:flex-row sm:items-center sm:gap-4 sm:rounded-pill sm:py-2.5"
-          : "flex items-center"}
+          : "flex items-center gap-2"}
       >
         {variant === "section" && (
           <div className="flex items-center gap-3 sm:mr-auto">
@@ -116,8 +127,33 @@ export function PaidQuickCallBar({
             {ctaLabel}
           </button>
         </div>
+        {variant === "navbar" && (
+          <button
+            type="button"
+            onClick={() => setNoticeOpen((o) => !o)}
+            aria-label="Información sobre el tratamiento de tus datos"
+            aria-expanded={noticeOpen}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-hair text-[12px] font-bold italic text-slate2 transition-colors hover:border-navy hover:text-navy"
+          >
+            i
+          </button>
+        )}
       </form>
+
+      {variant === "navbar" && noticeOpen && (
+        <div className="absolute right-0 top-full z-40 mt-2 w-[320px] rounded-[16px] border border-hair bg-white p-4 shadow-card">
+          <PaidLlamadaLegalNotice idPrefix="quickcall-navbar" aceptaComercial={aceptaComercial} onChangeAceptaComercial={setAceptaComercial} />
+        </div>
+      )}
+
       {error && <p role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{error}</p>}
+
+      {variant === "section" && (
+        <div className="mt-3">
+          <PaidLlamadaLegalNotice idPrefix="quickcall-section" aceptaComercial={aceptaComercial} onChangeAceptaComercial={setAceptaComercial} />
+        </div>
+      )}
+
       <TurnstileWidget onToken={setTurnstileToken} />
 
       <Modal open={sent} onClose={closeGracias} title="¡Gracias!">
@@ -139,6 +175,6 @@ export function PaidQuickCallBar({
           Volver a {BRAND_NAME}
         </button>
       </Modal>
-    </>
+    </div>
   );
 }

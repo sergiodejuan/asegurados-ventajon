@@ -11,6 +11,7 @@ import { saveQuote, saveCallResult } from "@/lib/quote";
 import { saveClientProfile } from "@/lib/clientArea";
 import { Check, ChevronDown, ChevronLeft, Phone, Spinner } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
 // Tarificador de salud EXCLUSIVO de /lp/salud/tarificador. Réplica del
 // diseño del tarificador de Línea Directa: 4 pasos guiados en la columna
@@ -614,6 +615,7 @@ function SidebarLlamadaForm() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<string>("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [aceptaComercial, setAceptaComercial] = useState(false);
   useEffect(() => { setNow(new Date().toISOString()); }, []);
 
   const canSend = useMemo(() => telefono.trim().length >= 9, [telefono]);
@@ -629,7 +631,7 @@ function SidebarLlamadaForm() {
         body: JSON.stringify({
           nombre, telefono, codigoPostal: "", producto: "salud",
           diaLlamada: dia, turnoLlamada: turno,
-          aceptaPrivacidad: true, autorizaContacto: true, aceptaComercial: false,
+          aceptaPrivacidad: true, autorizaContacto: true, aceptaComercial,
           company: "",
           consent: { privacidadAt: now, contactoAt: now },
           utm: getAttribution(),
@@ -674,15 +676,17 @@ function SidebarLlamadaForm() {
         </select>
         <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate2"><ChevronDown width={14} height={14} /></span>
       </div>
+      <PaidLlamadaLegalNotice
+        idPrefix="tarificador-sidebar"
+        aceptaComercial={aceptaComercial}
+        onChangeAceptaComercial={setAceptaComercial}
+      />
       <TurnstileWidget onToken={setTurnstileToken} />
       {error && <p role="alert" className="text-[12px] font-semibold text-brand-red">{error}</p>}
       <button type="submit" disabled={submitting || !canSend} className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[12px] bg-brand-red px-4 text-[15px] font-bold text-white hover:bg-brand-red-deep disabled:bg-slate2/40">
         {submitting && <Spinner width={16} height={16} />}
         {submitting ? "Enviando…" : "Quiero que me llamen"}
       </button>
-      <p className="text-center text-[11px] leading-relaxed text-slate2">
-        El envío supone la aceptación de la <Link href="/legal#privacidad" className="text-navy underline">Política de privacidad</Link>.
-      </p>
     </form>
   );
 }

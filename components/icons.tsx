@@ -30,6 +30,9 @@ export function Menu(p: SVGProps<SVGSVGElement>) {
 export function CalendarIcon(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><rect x={3} y={4} width={18} height={18} rx={2} /><path d="M16 2v4M8 2v4M3 10h18" /></svg>);
 }
+export function Clock(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3 3" /></svg>);
+}
 export function Star(p: SVGProps<SVGSVGElement>) {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
