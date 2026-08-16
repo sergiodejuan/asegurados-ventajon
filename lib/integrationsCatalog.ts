@@ -4,6 +4,21 @@
 // páginas cliente (documentación) como desde el servidor (para construir las
 // respuestas de estado/test) sin arrastrar nada sensible al bundle.
 
+/* ------------------------------ Tremendous --------------------------------- */
+// Motor de pago del programa "Amigos Ventajon" (ver docs/referrals.md y
+// lib/tremendous.ts) — envía los vales Amazon eGift de 20€ tanto al amigo
+// referido como al cliente que lo trajo. Variables obligatorias vs.
+// opcionales según docs/referrals.md.
+
+export const TREMENDOUS_ENV_VARS: { nombre: string; descripcion: string; obligatoria: boolean }[] = [
+  { nombre: "TREMENDOUS_API_KEY", descripcion: "Bearer token de la cuenta Tremendous (https://app.tremendous.com/rewards/api).", obligatoria: true },
+  { nombre: "TREMENDOUS_FUNDING_SOURCE_ID", descripcion: "ID de la fuente de fondos (Balance, ACH, tarjeta) — GET /funding_sources o el panel.", obligatoria: true },
+  { nombre: "REFERRAL_TOKEN_SECRET", descripcion: "Cadena aleatoria larga (32+ bytes base64) que firma los tokens HMAC de opt-in del programa. Aislada de otros secretos.", obligatoria: true },
+  { nombre: "CRON_SECRET", descripcion: "Bearer que protege /api/referral/process-payouts (el cron diario de pagos T+N días). Vercel lo pasa automáticamente si está definido.", obligatoria: true },
+  { nombre: "TREMENDOUS_CAMPAIGN_ID", descripcion: "ID de una campaña Tremendous que restrinja los productos entregables — crear una \"Amazon.es EUR\" para que el destinatario no pueda cambiar a otro vale.", obligatoria: false },
+  { nombre: "TREMENDOUS_BASE_URL", descripcion: "Por defecto producción (https://api.tremendous.com/api/v2). En dev/QA usar sandbox: https://testflight.tremendous.com/api/v2 (dinero ficticio).", obligatoria: false },
+];
+
 /* ------------------------------ Codescopic -------------------------------- */
 // Aún no hay integración real: no existe lib/codescopic.ts ni variables de
 // entorno para ello. Lo que sí existe es la preparación hecha en el

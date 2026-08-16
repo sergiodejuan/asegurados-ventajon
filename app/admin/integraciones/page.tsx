@@ -8,6 +8,7 @@ import type { ConnectionStatus } from "@/components/admin/ConnectionBanner";
 
 const SECTIONS = [
   { href: "/admin/integraciones/codescopic", title: "Codescopic", description: "Motor de tarificación externo: documentación del payload, campos ya preparados y variables pendientes." },
+  { href: "/admin/integraciones/tremendous", title: "Tremendous", description: "Motor de pago del programa de referidos: envío automático de vales Amazon eGift al amigo y al referidor." },
   { href: "/admin/integraciones/api", title: "API propia de la web", description: "Todos los endpoints de asegurados-ventajon.com: tarificadores, área de cliente y panel de administración." },
   { href: "/admin/integraciones/webhooks", title: "Webhooks", description: "Notificaciones salientes de cada lead y los webhooks entrantes de Retell/Bland al terminar una llamada." },
 ];
@@ -62,6 +63,9 @@ function IntegracionesIndex() {
     if (!status) return null;
     if (href.endsWith("/codescopic")) {
       return status.codescopic.configured ? { status: "ok", label: "Conectado" } : { status: "off", label: "Pendiente de credenciales" };
+    }
+    if (href.endsWith("/tremendous")) {
+      return status.tremendous.configured ? { status: "ok", label: "Conectado" } : { status: "off", label: "Pendiente de credenciales" };
     }
     if (href.endsWith("/api")) {
       return status.apiPropia.storageMode === "kv"

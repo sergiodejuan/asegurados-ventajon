@@ -162,6 +162,33 @@ export async function sendAmazonReward(input: {
   };
 }
 
+// Comprobación de solo lectura para el botón "Probar conexión" de
+// /admin/integraciones/tremendous: confirma que TREMENDOUS_API_KEY es
+// válida y que TREMENDOUS_FUNDING_SOURCE_ID existe de verdad en la cuenta —
+// sin crear ninguna order ni gastar saldo. GET /funding_sources es el
+// endpoint más ligero de la API que exige autenticación real.
+export async function listFundingSources(): Promise<
+  | { ok: true; sources: { id: string; name: string; balance?: string }[]; matchesConfigured: boolean }
+  | { ok: false; error: string }
+> {
+  if (!apiKey()) return { ok: false, error: "Falta TREMENDOUS_API_KEY." };
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}/funding_sources`, {
+      headers: { Authorization: `Bearer ${apiKey()}`, Accept: "application/json" },
+    });
+  } catch (err) {
+    return { ok: false, error: `Red: ${(err as Error).message}` };
+  }
+  const parsed = (await res.json().catch(() => null)) as
+    | { funding_sources?: { id: string; name?: string; meta?: { display_name?: string }; balance?: string }[]; errors?: { message: string }[] }
+    | null;
+  if (!res.ok) return { ok: false, error: parsed?.errors?.[0]?.message ?? `HTTP ${res.status}` };
+  const sources = (parsed?.funding_sources ?? []).map((s) => ({ id: s.id, name: s.meta?.display_name ?? s.name ?? s.id, balance: s.balance }));
+  const configured = fundingSourceId();
+  return { ok: true, sources, matchesConfigured: !configured || sources.some((s) => s.id === configured) };
+}
+
 // Comprueba el estado de una order previamente creada — útil para
 // reconciliar bonos que quedaron en PENDING_REVIEW (fondos insuficientes,
 // aprobación manual del team). El admin puede pintar esta info en el

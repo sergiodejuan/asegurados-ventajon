@@ -4,7 +4,8 @@ import { storageMode } from "@/lib/store";
 import { retellConfigured } from "@/lib/retell";
 import { blandConfigured } from "@/lib/bland";
 import { turnstileConfigured } from "@/lib/turnstile";
-import { CODESCOPIC_ENV_VARS } from "@/lib/integrationsCatalog";
+import { tremendousConfigured } from "@/lib/tremendous";
+import { CODESCOPIC_ENV_VARS, TREMENDOUS_ENV_VARS } from "@/lib/integrationsCatalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +17,17 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   const codescopicMissing = CODESCOPIC_ENV_VARS.map((v) => v.nombre).filter((name) => !process.env[name]);
+  const tremendousMissing = TREMENDOUS_ENV_VARS.filter((v) => v.obligatoria).map((v) => v.nombre).filter((name) => !process.env[name]);
 
   return NextResponse.json({
     ok: true,
     codescopic: {
       configured: codescopicMissing.length === 0,
       missing: codescopicMissing,
+    },
+    tremendous: {
+      configured: tremendousConfigured() && tremendousMissing.length === 0,
+      missing: tremendousMissing,
     },
     apiPropia: {
       storageMode: storageMode(),

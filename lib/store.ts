@@ -1583,6 +1583,16 @@ export type ReferralSummary = {
     code: string; leadId: string; nombre: string; status: ReferralConvertido["status"];
     ultimoErrorPago: string; lado: "referido" | "referidor";
   }[];
+  // Un registro por amigo referido (sin agregar), para la tabla de detalle
+  // del dashboard — con acceso directo a la ficha del amigo Y a la del
+  // referidor. Puede crecer con cientos de filas; el propio dashboard pagina
+  // en cliente, aquí se devuelve completo (ver nota de coste en la firma de
+  // getReferralSummary).
+  detalle: {
+    code: string; leadId: string; nombre: string; producto: string; status: ReferralConvertido["status"];
+    referidorLeadId: string; referidorNombre: string;
+    cotizadoAt: string; contratadoAt: string; pagadoReferidoAt: string; pagadoReferidorAt: string;
+  }[];
 };
 
 export async function getReferralSummary(): Promise<ReferralSummary> {
@@ -1594,6 +1604,7 @@ export async function getReferralSummary(): Promise<ReferralSummary> {
   let totalConvertidos = 0, bonosReferidoPagados = 0, bonosReferidorPagados = 0, conErrorPago = 0;
   const atencion: ReferralSummary["atencion"] = [];
   const topReferidores: ReferralSummary["topReferidores"] = [];
+  const detalle: ReferralSummary["detalle"] = [];
 
   for (const doc of docs) {
     let contratados = 0, pagados = 0;
@@ -1612,6 +1623,12 @@ export async function getReferralSummary(): Promise<ReferralSummary> {
         const lado: "referido" | "referidor" = c.ultimoErrorPago.startsWith("referidor:") ? "referidor" : "referido";
         atencion.push({ code: doc.code, leadId: c.leadId, nombre: c.nombre, status: c.status, ultimoErrorPago: c.ultimoErrorPago, lado });
       }
+      detalle.push({
+        code: doc.code, leadId: c.leadId, nombre: c.nombre, producto: c.producto, status: c.status,
+        referidorLeadId: doc.referidorLeadId, referidorNombre: doc.referidorNombre,
+        cotizadoAt: c.cotizadoAt, contratadoAt: c.contratadoAt ?? "",
+        pagadoReferidoAt: c.pagadoReferidoAt ?? "", pagadoReferidorAt: c.pagadoReferidorAt ?? "",
+      });
     }
     topReferidores.push({
       code: doc.code, referidorLeadId: doc.referidorLeadId, referidorNombre: doc.referidorNombre,
@@ -1619,6 +1636,7 @@ export async function getReferralSummary(): Promise<ReferralSummary> {
     });
   }
   topReferidores.sort((a, b) => b.totalConvertidos - a.totalConvertidos);
+  detalle.sort((a, b) => (a.cotizadoAt < b.cotizadoAt ? 1 : -1));
 
   // Pendiente de pago al referidor: ya contratado pero aún sin abonar (ni en
   // periodo de gracia ni ya procesable) — dinero comprometido a futuro.
@@ -1638,6 +1656,7 @@ export async function getReferralSummary(): Promise<ReferralSummary> {
     conErrorPago,
     topReferidores: topReferidores.slice(0, 10),
     atencion: atencion.slice(0, 20),
+    detalle,
   };
 }
 

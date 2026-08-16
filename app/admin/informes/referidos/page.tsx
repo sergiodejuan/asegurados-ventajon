@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
 
 type EstadoKey = "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
@@ -16,7 +16,18 @@ type ReferralSummary = {
   conErrorPago: number;
   topReferidores: { code: string; referidorLeadId: string; referidorNombre: string; totalConvertidos: number; contratados: number; pagados: number }[];
   atencion: { code: string; leadId: string; nombre: string; status: EstadoKey; ultimoErrorPago: string; lado: "referido" | "referidor" }[];
+  detalle: {
+    code: string; leadId: string; nombre: string; producto: string; status: EstadoKey;
+    referidorLeadId: string; referidorNombre: string;
+    cotizadoAt: string; contratadoAt: string; pagadoReferidoAt: string; pagadoReferidorAt: string;
+  }[];
 };
+
+function fmt(iso: string) {
+  if (!iso) return "—";
+  try { return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(iso)); }
+  catch { return iso; }
+}
 
 const ESTADO_ORDER: EstadoKey[] = ["cotizado", "opt-in", "contratado", "pagado", "cancelado"];
 const ESTADO_LABELS: Record<EstadoKey, string> = {
@@ -28,6 +39,13 @@ const ESTADO_LABELS: Record<EstadoKey, string> = {
 // nunca un color distinto por serie sin significado de estado.
 const ESTADO_BAR_COLOR: Record<EstadoKey, string> = {
   cotizado: "bg-slate-300", "opt-in": "bg-navy", contratado: "bg-amber-400", pagado: "bg-emerald-500", cancelado: "bg-brand-red/60",
+};
+const ESTADO_PILL_COLOR: Record<EstadoKey, string> = {
+  cotizado: "bg-slate-200 text-slate-600",
+  "opt-in": "bg-navy/10 text-navy",
+  contratado: "bg-amber-100 text-amber-700",
+  pagado: "bg-emerald-100 text-emerald-700",
+  cancelado: "bg-brand-red/10 text-brand-red-deep",
 };
 
 function euros(n: number): string {
@@ -51,6 +69,7 @@ function ReferralsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryMsg, setRetryMsg] = useState<Record<string, string>>({});
+  const [detalleSearch, setDetalleSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -84,6 +103,13 @@ function ReferralsDashboard() {
     }
     setRetrying(null);
   }
+
+  const filteredDetalle = useMemo(() => {
+    const all = summary?.detalle ?? [];
+    const q = detalleSearch.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((d) => `${d.nombre} ${d.referidorNombre} ${d.code}`.toLowerCase().includes(q));
+  }, [summary, detalleSearch]);
 
   if (loading && !summary) return <main className="mx-auto max-w-5xl px-5 py-10 text-center text-[14px] text-slate2">Cargando…</main>;
   if (error) return <main className="mx-auto max-w-5xl px-5 py-10 text-center text-[14px] font-medium text-brand-red">{error}</main>;
@@ -170,6 +196,63 @@ function ReferralsDashboard() {
           </ul>
         </section>
       )}
+
+      <section className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[15px] font-bold text-navy">Detalle de amigos referidos</h2>
+          <input
+            value={detalleSearch} onChange={(e) => setDetalleSearch(e.target.value)}
+            placeholder="Buscar por nombre, referidor o código…"
+            className="w-full max-w-xs rounded-card border border-hair bg-white px-3 py-1.5 text-[13px]"
+          />
+        </div>
+        <p className="mt-1 text-[12px] text-slate2">{filteredDetalle.length} de {summary.detalle.length} amigos referidos.</p>
+        {filteredDetalle.length === 0 ? (
+          <p className="mt-2 text-[13px] text-slate2">Ningún amigo referido todavía.</p>
+        ) : (
+          <div className="mt-3 max-h-[480px] overflow-auto rounded-card border border-hair bg-white">
+            <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
+              <thead className="sticky top-0 bg-mist text-[11px] font-bold uppercase tracking-wide text-slate2">
+                <tr>
+                  <th className="px-4 py-3">Amigo</th>
+                  <th className="px-4 py-3">Referidor</th>
+                  <th className="px-4 py-3">Producto</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Cotizado</th>
+                  <th className="px-4 py-3">Bono amigo</th>
+                  <th className="px-4 py-3">Bono referidor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDetalle.map((d) => (
+                  <tr key={`${d.code}:${d.leadId}`} className="border-t border-hair">
+                    <td className="px-4 py-3">
+                      <a href={`/admin?lead=${d.leadId}`} className="font-semibold text-navy hover:underline">{d.nombre || "Sin nombre"}</a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <a href={`/admin?lead=${d.referidorLeadId}`} className="text-navy hover:underline">{d.referidorNombre || "Sin nombre"}</a>
+                      <p className="tnums text-[11px] text-slate2">{d.code}</p>
+                    </td>
+                    <td className="px-4 py-3 capitalize text-ink">{d.producto || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-pill px-2 py-0.5 text-[11px] font-bold ${ESTADO_PILL_COLOR[d.status]}`}>{ESTADO_LABELS[d.status]}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate2">{fmt(d.cotizadoAt)}</td>
+                    <td className="px-4 py-3">
+                      {d.pagadoReferidoAt ? <span className="font-semibold text-emerald-700">{fmt(d.pagadoReferidoAt)}</span> : <span className="text-slate2">pendiente</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {d.pagadoReferidorAt
+                        ? <span className="font-semibold text-emerald-700">{fmt(d.pagadoReferidorAt)}</span>
+                        : d.contratadoAt ? <span className="text-amber-700">en gracia</span> : <span className="text-slate2">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="mt-6">
         <h2 className="text-[15px] font-bold text-navy">Top referidores</h2>

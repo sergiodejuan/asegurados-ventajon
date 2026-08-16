@@ -5,6 +5,7 @@ import { useAdminToken } from "@/components/admin/AdminShell";
 
 export type IntegrationStatus = {
   codescopic: { configured: boolean; missing: string[] };
+  tremendous: { configured: boolean; missing: string[] };
   apiPropia: { storageMode: "kv" | "memory"; turnstileConfigured: boolean; adminTokenSet: boolean };
   webhooks: {
     saliente: { configured: boolean };

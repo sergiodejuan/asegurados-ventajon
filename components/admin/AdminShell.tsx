@@ -74,6 +74,7 @@ const NAV: ({ kind: "link" } & NavLeaf | { kind: "group"; label: string; key: st
     children: [
       { href: "/admin/integraciones", label: "Resumen", key: "integraciones", modulo: "integraciones" },
       { href: "/admin/integraciones/codescopic", label: "Codescopic", key: "integraciones-codescopic", modulo: "integraciones" },
+      { href: "/admin/integraciones/tremendous", label: "Tremendous", key: "integraciones-tremendous", modulo: "integraciones" },
       { href: "/admin/integraciones/api", label: "API propia", key: "integraciones-api", modulo: "integraciones" },
       { href: "/admin/integraciones/webhooks", label: "Webhooks", key: "integraciones-webhooks", modulo: "integraciones" },
     ],
@@ -119,7 +120,7 @@ export type AdminActiveKey =
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
-  | "integraciones" | "integraciones-codescopic" | "integraciones-api" | "integraciones-webhooks"
+  | "integraciones" | "integraciones-codescopic" | "integraciones-tremendous" | "integraciones-api" | "integraciones-webhooks"
   | "cookies" | "analitica" | "accesibilidad" | "avisos" | "plantillas-email" | "rgpd" | "agentes" | "permisos" | "registro";
 
 function visibleFor(identity: Identity | null) {

@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 import { requireModule } from "@/lib/agentAuth";
 import { pingStore } from "@/lib/store";
-import { CODESCOPIC_ENV_VARS } from "@/lib/integrationsCatalog";
+import { CODESCOPIC_ENV_VARS, TREMENDOUS_ENV_VARS } from "@/lib/integrationsCatalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type TestTarget = "codescopic" | "api-propia" | "webhook-saliente" | "webhook-retell" | "webhook-bland";
+type TestTarget = "codescopic" | "tremendous" | "api-propia" | "webhook-saliente" | "webhook-retell" | "webhook-bland";
+
+async function testTremendous(): Promise<{ ok: boolean; detail: string }> {
+  const REQUIRED = TREMENDOUS_ENV_VARS.filter((v) => v.obligatoria).map((v) => v.nombre);
+  const missing = REQUIRED.filter((name) => !process.env[name]);
+  if (missing.length) {
+    return { ok: false, detail: `Faltan variables de entorno: ${missing.join(", ")}. Ver docs/referrals.md para cómo obtenerlas.` };
+  }
+  const { listFundingSources } = await import("@/lib/tremendous");
+  const result = await listFundingSources();
+  if (!result.ok) return { ok: false, detail: `No se pudo autenticar contra Tremendous: ${result.error}` };
+  if (!result.matchesConfigured) {
+    return { ok: false, detail: `OAuth OK, pero TREMENDOUS_FUNDING_SOURCE_ID no aparece entre las ${result.sources.length} fuentes de fondos de la cuenta. Revisa el ID.` };
+  }
+  return { ok: true, detail: `Autenticación OK. La cuenta tiene ${result.sources.length} fuente(s) de fondos y la configurada existe.` };
+}
 
 async function testCodescopic(): Promise<{ ok: boolean; detail: string }> {
   // CODESCOPIC_USER_EMAIL es opcional (cabecera X-User-Email); no lo
@@ -93,6 +108,10 @@ export async function POST(request: Request) {
     case "codescopic": {
       const r = await testCodescopic();
       return NextResponse.json(r, { status: r.ok ? 200 : 503 });
+    }
+    case "tremendous": {
+      const r = await testTremendous();
+      return NextResponse.json(r, { status: r.ok ? 200 : 502 });
     }
     case "api-propia": {
       const r = await testApiPropia();
