@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { ComparativaHelpBar } from "./ComparativaHelpBar";
-import { Check } from "./icons";
+import { Check, Phone } from "./icons";
 import { PriceMatchForm } from "./PriceMatchForm";
 import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { BRAND_NAME, PARTNERS } from "@/lib/brand";
@@ -867,8 +867,9 @@ export function Comparativa() {
               )}
               {realQuotes.length > 0 && (
                 <ul className="mt-3 flex flex-col gap-3">
-                  {sortedRealQuotes.map((q) => (
-                    <li key={q.id} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                  {sortedRealQuotes.map((q, i) => (
+                    <Fragment key={q.id}>
+                    <li className="rounded-card border border-hair bg-white p-4 shadow-soft">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2.5">
                           {q.imageUrl
@@ -923,6 +924,11 @@ export function Comparativa() {
                         {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} onSolicitar={() => solicitarSalud({ compania: q.compania, precio: q.premium, quoteId: q.id, modalidad: q.modalidad, insuranceId: insuranceId || undefined })} />}
                       </div>
                     </li>
+                    {/* Bloque de llamada cada 3 opciones (no tras la última). */}
+                    {(i + 1) % 3 === 0 && i !== sortedRealQuotes.length - 1 && (
+                      <InlineCallBanner locked={!unlocked} />
+                    )}
+                    </Fragment>
                   ))}
                 </ul>
               )}
@@ -1112,6 +1118,37 @@ function RealQuotesSkeleton({ count = 3, withHeading = true }: { count?: number;
         ))}
       </ul>
     </div>
+  );
+}
+
+// Bloque de llamada intercalado cada 3 opciones reales (patrón de los
+// comparadores tipo Rastreator): un recordatorio de que un asesor llama gratis
+// para ayudar a elegir. Los agentes atienden L–V de 9:00 a 19:00 (hora
+// canaria). Lleva al funnel genérico de "que me llamen" (no crea presupuesto
+// de una opción concreta, es ayuda general).
+function InlineCallBanner({ locked = false }: { locked?: boolean }) {
+  return (
+    <li className="list-none">
+      <div className="flex flex-col items-start gap-3 rounded-card bg-navy p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-white">
+            <Phone width={20} height={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold leading-snug">¿Necesitas ayuda para encontrar el mejor seguro de salud?</p>
+            <p className="mt-0.5 text-[12px] text-white/75">Te llamamos gratis · L–V de 9:00 a 19:00 h (hora canaria)</p>
+          </div>
+        </div>
+        <a
+          href="/quiero-que-me-llamen?producto=salud"
+          tabIndex={locked ? -1 : 0}
+          className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-1.5 rounded-pill bg-white px-5 text-[14px] font-bold text-navy transition-colors hover:bg-white/90 sm:w-auto"
+        >
+          <Phone width={16} height={16} aria-hidden />
+          Te llamamos gratis
+        </a>
+      </div>
+    </li>
   );
 }
 
