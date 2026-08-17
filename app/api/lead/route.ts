@@ -151,6 +151,7 @@ export async function POST(request: Request) {
       producto: "seguro de salud",
       email: d.email,
       codigoPostal: d.codigoPostal,
+      codigoPostalReal: d.codigoPostalReal,
       precioAprox: presupuesto?.precioAprox,
       presupuestoId: submissionId,
       servicioAdicional: d.coberturaDental ? "Cobertura dental" : "Sin cobertura dental",
@@ -166,21 +167,30 @@ export async function POST(request: Request) {
     leadId: id, quoteId: submissionId, producto: "salud",
     nombre: d.nombre, email: d.email, numAsegurados: d.numAsegurados, coberturaDental: d.coberturaDental,
     whatsappSummarySent: manychatThankyouConfigured() && d.autorizaContacto,
-  });
+  }).catch((err) => console.error("[lead] comparativa summary email error (no bloqueante):", (err as Error).message));
 
   // Conversions API de Meta: solo si ha marcado la casilla de comunicaciones
   // comerciales (es un envío con fines publicitarios, no de gestión del
   // servicio) — mismo criterio de consentimiento que exige el propio píxel.
   if (d.aceptaComercial) {
-    await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });
+    await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) })
+      .catch((err) => console.error("[lead] meta capi error (no bloqueante):", (err as Error).message));
   }
 
   // Si la ficha ya existía (mismo teléfono/email que un lead anterior), no
   // se concede sesión al instante: cualquiera que conociera ese contacto
   // podría "entrar" como esa persona. Se manda un enlace de verificación al
   // email YA guardado en la ficha en vez de autenticar sin más.
-  if (deduped) await sendAreaClienteVerificationEmail(id);
-  else setClientSessionCookie(id);
+  // Best-effort: ni la verificación por email ni la cookie de sesión de
+  // cliente deben tumbar el alta del lead. En particular, setClientSessionCookie
+  // lanza si falta CLIENT_SESSION_SECRET en producción — un fallo de config no
+  // puede impedir que el usuario vea su comparativa (el lead ya está creado).
+  try {
+    if (deduped) await sendAreaClienteVerificationEmail(id);
+    else setClientSessionCookie(id);
+  } catch (err) {
+    console.error("[lead] sesión/verificación de cliente falló (no bloqueante):", (err as Error).message);
+  }
 
   await notifyTeamNewLead({
     leadId: id, source, presupuestoId: presupuesto?.id,
