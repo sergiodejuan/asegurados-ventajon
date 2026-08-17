@@ -31,11 +31,18 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]["key"];
 
+// Cada asegurado adicional (los que no son el titular): Codeoscopic tarifica
+// por edad y sexo de CADA persona cubierta, así que el precio real solo sale
+// si los recogemos. Antes se enviaba siempre [] — el precio salía solo para
+// el titular. Ver lib/codeoscopicMap.ts risk.insureds.
+type AseguradoAdicional = { fechaNacimiento: string; sexo: "hombre" | "mujer" | "" };
+
 type Form = {
   numAsegurados: number;
   fechaNacimiento: string; // dd/mm/aaaa
   sexo: "hombre" | "mujer" | "";
   fumador: boolean | null;
+  aseguradosAdicionales: AseguradoAdicional[];
   coberturaDental: boolean;
   inicio: "cuanto_antes" | "proximo_mes" | "comparando";
   codigoPostal: "Islas Canarias" | "Islas Baleares" | "Península" | "";
@@ -47,11 +54,22 @@ const INITIAL_FORM: Form = {
   fechaNacimiento: "",
   sexo: "",
   fumador: null,
+  aseguradosAdicionales: [],
   coberturaDental: false,
   inicio: "cuanto_antes",
   codigoPostal: "",
   codigoPostalReal: "",
 };
+
+// Ajusta la lista de asegurados adicionales para que tenga exactamente
+// numAsegurados-1 entradas (el titular es el asegurado 1), conservando lo ya
+// escrito al subir/bajar el número.
+function resizeAsegurados(prev: AseguradoAdicional[], numAsegurados: number): AseguradoAdicional[] {
+  const wanted = Math.max(0, numAsegurados - 1);
+  const next = prev.slice(0, wanted);
+  while (next.length < wanted) next.push({ fechaNacimiento: "", sexo: "" });
+  return next;
+}
 
 const INICIO_VALUES: Form["inicio"][] = ["cuanto_antes", "proximo_mes", "comparando"];
 
@@ -83,7 +101,10 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
   const searchParams = useSearchParams();
   const prefill = useMemo(() => prefillFromParams(searchParams), []); // solo al montar: prefill del modal del hero
   const [stepIndex, setStepIndex] = useState(() => (prefill.numAsegurados !== undefined ? 1 : 0));
-  const [form, setForm] = useState<Form>(() => ({ ...INITIAL_FORM, ...prefill }));
+  const [form, setForm] = useState<Form>(() => {
+    const base = { ...INITIAL_FORM, ...prefill };
+    return { ...base, aseguradosAdicionales: resizeAsegurados(base.aseguradosAdicionales, base.numAsegurados) };
+  });
   const [turnstileToken, setTurnstileToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -101,6 +122,21 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
     setErrors((e) => ({ ...e, [k]: undefined }));
   }
 
+  // Cambiar el nº de asegurados redimensiona la lista de adicionales para que
+  // pidamos (o dejemos de pedir) los datos del resto de personas cubiertas.
+  function setNumAsegurados(v: number) {
+    setForm((f) => ({ ...f, numAsegurados: v, aseguradosAdicionales: resizeAsegurados(f.aseguradosAdicionales, v) }));
+    setErrors((e) => ({ ...e, numAsegurados: undefined }));
+  }
+
+  function setInsured(index: number, patch: Partial<AseguradoAdicional>) {
+    setForm((f) => ({
+      ...f,
+      aseguradosAdicionales: f.aseguradosAdicionales.map((a, i) => (i === index ? { ...a, ...patch } : a)),
+    }));
+    setErrors((e) => ({ ...e, aseguradosAdicionales: undefined }));
+  }
+
   function validateStep(step: StepKey): boolean {
     const errs: Partial<Record<keyof Form, string>> = {};
     if (step === "asegurados") {
@@ -110,6 +146,12 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
       if (!/^\d{2}\/\d{2}\/\d{4}$/.test(form.fechaNacimiento)) errs.fechaNacimiento = "Usa el formato dd/mm/aaaa.";
       if (!form.sexo) errs.sexo = "Selecciona una opción.";
       if (form.fumador === null) errs.fumador = "Indícanos si fumas.";
+      // Cada asegurado adicional necesita fecha de nacimiento y sexo para
+      // que Codeoscopic pueda tarificar su parte.
+      const incompleto = form.aseguradosAdicionales.some(
+        (a) => !/^\d{2}\/\d{2}\/\d{4}$/.test(a.fechaNacimiento) || !a.sexo
+      );
+      if (incompleto) errs.aseguradosAdicionales = "Completa la fecha de nacimiento y el sexo de cada asegurado.";
     }
     if (step === "zona") {
       if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
@@ -150,7 +192,9 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
         sexo: form.sexo,
         codigoPostalReal: form.codigoPostalReal,
         fumador: !!form.fumador,
-        aseguradosAdicionales: [],
+        aseguradosAdicionales: form.aseguradosAdicionales
+          .filter((a) => /^\d{2}\/\d{2}\/\d{4}$/.test(a.fechaNacimiento) && a.sexo)
+          .map((a) => ({ fechaNacimiento: a.fechaNacimiento, sexo: a.sexo })),
         coberturaDental: form.coberturaDental,
         yaTieneSeguro: false,
         apellido2: "",
@@ -218,10 +262,10 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
           {/* --- Columna izquierda: pregunta actual --- */}
           <section aria-live="polite" className="rounded-[20px] bg-white p-6 shadow-soft md:p-10">
             {currentStep === "asegurados" && (
-              <AseguradosStep value={form.numAsegurados} onChange={(v) => set("numAsegurados", v)} error={errors.numAsegurados} />
+              <AseguradosStep value={form.numAsegurados} onChange={setNumAsegurados} error={errors.numAsegurados} />
             )}
             {currentStep === "salud" && (
-              <SaludStep form={form} set={set} errors={errors} />
+              <SaludStep form={form} set={set} setInsured={setInsured} errors={errors} />
             )}
             {currentStep === "zona" && (
               <ZonaStep form={form} set={set} errors={errors} />
@@ -410,9 +454,10 @@ function DobInput({ value, onChange }: { value: string; onChange: (v: string) =>
   );
 }
 
-function SaludStep({ form, set, errors }: {
+function SaludStep({ form, set, setInsured, errors }: {
   form: Form;
   set: <K extends keyof Form>(k: K, v: Form[K]) => void;
+  setInsured: (index: number, patch: Partial<AseguradoAdicional>) => void;
   errors: Partial<Record<keyof Form, string>>;
 }) {
   return (
@@ -454,6 +499,42 @@ function SaludStep({ form, set, errors }: {
             ))}
           </div>
         </Field>
+        {form.aseguradosAdicionales.length > 0 && (
+          <div className="rounded-[16px] border border-hair bg-white p-4">
+            <p className="text-[15px] font-bold text-navy">Datos del resto de asegurados</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-slate2">
+              El precio depende de la edad y el sexo de cada persona cubierta. Solo necesitamos eso de cada una.
+            </p>
+            <div className="mt-4 flex flex-col gap-5">
+              {form.aseguradosAdicionales.map((a, i) => (
+                <div key={i} className="border-t border-hair pt-4 first:border-t-0 first:pt-0">
+                  <p className="mb-2 text-[13px] font-semibold text-ink">Asegurado {i + 2}</p>
+                  <Field label="Fecha de nacimiento" hint="Día, mes y año.">
+                    <DobInput value={a.fechaNacimiento} onChange={(v) => setInsured(i, { fechaNacimiento: v })} />
+                  </Field>
+                  <div className="mt-3">
+                    <Field label="Sexo">
+                      <div className="grid grid-cols-2 gap-3">
+                        {(["hombre", "mujer"] as const).map((s) => (
+                          <button
+                            key={s} type="button" aria-pressed={a.sexo === s}
+                            onClick={() => setInsured(i, { sexo: s })}
+                            className={`rounded-[12px] border px-4 py-3.5 text-[15px] font-semibold capitalize transition-colors ${a.sexo === s ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:bg-mist"}`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {errors.aseguradosAdicionales && (
+              <p role="alert" className="mt-3 text-[13px] font-medium text-brand-red">{errors.aseguradosAdicionales}</p>
+            )}
+          </div>
+        )}
         <Field label="¿Quieres cobertura dental?" hint="Opcional — añade limpiezas, revisiones y descuentos en tratamientos.">
           <div className="grid grid-cols-2 gap-3">
             {([{ v: true, l: "Sí, con dental" }, { v: false, l: "No, sin dental" }] as const).map((opt) => (
