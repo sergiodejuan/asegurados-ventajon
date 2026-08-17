@@ -801,7 +801,7 @@ export function Comparativa() {
                 <div>
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-pill bg-brand-red px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Recomendado</span>
-                    <h3 className="text-[14px] font-bold text-navy">Opciones negociadas por tu asesor</h3>
+                    <h3 className="text-[14px] font-bold text-navy">Opciones negociadas por Asegurados Ventajon</h3>
                   </div>
                   <ul className="flex flex-col gap-3">
                     {negociadas.map((c) => {
