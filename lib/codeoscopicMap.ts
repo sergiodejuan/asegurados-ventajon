@@ -143,6 +143,18 @@ export async function buildHealthPayload(lead: Lead, presupuesto: Presupuesto | 
     const g = toCodeoscopicGender(a.sexo);
     if (dob && g) insureds.push({ birthDate: dob, gender: { id: g } });
   }
+  // "Personas a asegurar" (numAsegurados) manda sobre el nº de asegurados: si
+  // el lead dice cubrir a más personas de las que tenemos con datos propios
+  // (típico cuando el usuario ajusta la cifra desde "Editar y recalcular" en la
+  // comparativa, donde solo elige el número, no las fechas de cada uno),
+  // completamos con asegurados equivalentes al titular (misma edad/sexo, sin
+  // documento) para que el precio escale con el tamaño de la familia. Es una
+  // estimación —la comparativa ya marca estos precios como orientativos— pero
+  // hace que el recálculo por nº de personas cambie de verdad la tarifa.
+  const objetivo = Math.max(1, Math.min(9, lead.numAsegurados ?? insureds.length));
+  while (insureds.length < objetivo) {
+    insureds.push({ birthDate: holderDob, gender: { id: holderGender } });
+  }
 
   // El inicio deseado puede venir en el propio lead o, si el usuario eligió
   // fecha personalizada, en el propio campo — el /api/lead ya resuelve esa

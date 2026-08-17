@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getLead, setLeadCodeoscopicInsuranceId, getHiddenBrands } from "@/lib/store";
+import { getLead, setLeadCodeoscopicInsuranceId, setLeadSaludTarificacion, getHiddenBrands } from "@/lib/store";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
 import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeoscopicSnapshot";
@@ -31,6 +31,13 @@ export const maxDuration = 60;
 const bodySchema = z.object({
   leadId: z.string().trim().min(1).optional(),
   presupuestoId: z.string().trim().min(1).optional(),
+  // Recálculo desde "Editar y recalcular" en la comparativa: persiste los
+  // datos de salud editados (nº de asegurados, dental) y fuerza una cotización
+  // NUEVA en Codeoscopic (no se reutiliza la cacheada), para que la tarifa
+  // refleje los cambios.
+  recalcular: z.boolean().optional(),
+  numAsegurados: z.number().int().min(1).max(9).optional(),
+  coberturaDental: z.boolean().optional(),
 }).refine((d) => d.leadId || d.presupuestoId, { message: "leadId requerido" });
 
 export async function POST(req: NextRequest) {
@@ -55,10 +62,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "producto_no_soportado" });
   }
 
+  // Recálculo: persistimos los datos de salud editados en la comparativa antes
+  // de construir el payload, para que la nueva cotización los refleje. No
+  // reutilizamos la cotización cacheada (más abajo se salta ese atajo).
+  if (parsed.data.recalcular) {
+    await setLeadSaludTarificacion(leadId, {
+      numAsegurados: parsed.data.numAsegurados,
+      coberturaDental: parsed.data.coberturaDental,
+    }).catch((err) => console.error("[quote/create] recalc patch falló:", (err as Error).message));
+    // Releemos el lead ya actualizado para que buildHealthPayload use los
+    // valores nuevos.
+    const fresh = await getLead(leadId);
+    if (fresh) Object.assign(lead, fresh);
+  }
+
   // Si ya hicimos un POST previo (p.ej. porque el usuario refrescó la
   // comparativa o volvió de "Más información"), reutilizamos el insurance en
-  // vez de crear otro. Evita llenar Codeoscopic de proyectos duplicados.
-  if (lead.codeoscopicInsuranceId) {
+  // vez de crear otro. Evita llenar Codeoscopic de proyectos duplicados. En un
+  // recálculo explícito NO se reutiliza: queremos una tarifa nueva.
+  if (lead.codeoscopicInsuranceId && !parsed.data.recalcular) {
     try {
       const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(lead.codeoscopicInsuranceId)}`);
       const summary = summarizeInsurance(snapshot);

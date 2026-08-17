@@ -154,6 +154,9 @@ export function Comparativa() {
   // etc.). Ver app/api/quote/create y app/api/quote/[insuranceId].
   const [realQuotes, setRealQuotes] = useState<RealQuote[]>([]);
   const [realStatus, setRealStatus] = useState<RealStatus>("idle");
+  // Se incrementa al pulsar "Recalcular precios": vuelve a lanzar el efecto de
+  // Codeoscopic con recalcular=true para refrescar también las opciones reales.
+  const [recalcNonce, setRecalcNonce] = useState(0);
   // Orden elegido por el usuario para los precios reales.
   const [sortBy, setSortBy] = useState<"default" | "precio" | "valoracion">("default");
   // Filtros multi-selección (salud): con/sin copago, dental, con/sin reembolso.
@@ -445,10 +448,17 @@ export function Comparativa() {
 
     (async () => {
       try {
+        // En un recálculo (recalcNonce > 0) mandamos los datos de salud
+        // editados y pedimos una cotización nueva; en el primer montaje no.
+        const recalcular = recalcNonce > 0;
         const createRes = await fetch("/api/quote/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ leadId: leadId }),
+          body: JSON.stringify(
+            recalcular
+              ? { leadId, recalcular: true, numAsegurados: quote?.numAsegurados ?? undefined, coberturaDental: quote?.coberturaDental ?? undefined }
+              : { leadId }
+          ),
         });
         const createBody = (await createRes.json().catch(() => null)) as
           | { ok: true; insuranceId: string; snapshot: unknown }
@@ -494,7 +504,10 @@ export function Comparativa() {
     })();
 
     return () => { local.stop = true; };
-  }, [producto, leadId]);
+    // quote solo se lee al recalcular (valores editados); no queremos re-lanzar
+    // el sondeo en cada cambio de quote, solo cuando cambia recalcNonce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [producto, leadId, recalcNonce]);
 
   // "Que te llamen gratis" en salud = mostrar interés en una opción concreta.
   // ESTE es el momento en el que se crea el presupuesto (antes solo hay un
@@ -529,6 +542,15 @@ export function Comparativa() {
     });
     if (next) setQuote(next);
     setEditing(false);
+    // Salud: además de recalcular los precios negociados (que se derivan del
+    // quote y se refrescan solos al re-renderizar), relanzamos el sondeo de
+    // Codeoscopic con los datos nuevos. Limpiamos las opciones reales para que
+    // se muestre el esqueleto de carga mientras llegan las nuevas.
+    if (producto === "salud" && leadId) {
+      setRealQuotes([]);
+      setRealStatus("loading");
+      setRecalcNonce((k) => k + 1);
+    }
   }
 
   if (loaded && !quote && !hasDraft) {
@@ -715,20 +737,14 @@ export function Comparativa() {
 
         <div className="mt-5">
           <div>
-            <div className="rounded-card border border-hair bg-mist p-4">
-              <p className="text-[13px] font-bold text-navy">
-                {producto === "salud" && realQuotes.length > 0 ? "Precios reales de las aseguradoras" : "Precios orientativos"}
+            {/* Nota orientativa solo para ramos sin precios reales (auto/vida/
+                decesos). En salud el estado de carga lo comunica el esqueleto
+                dinámico de más abajo, no un bloque estático. */}
+            {producto !== "salud" && (
+              <p className="rounded-card border border-hair bg-mist px-4 py-3 text-[13px] leading-relaxed text-slate2">
+                El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso.
               </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-                {producto === "salud" && realStatus === "loading" && (
-                  realQuotes.length > 0
-                    ? `Consultando en tiempo real con las aseguradoras — ${realQuotes.length} ${realQuotes.length === 1 ? "compañía" : "compañías"} ${realQuotes.length === 1 ? "ha" : "han"} respondido, esperando al resto…`
-                    : "Estamos afinando los precios en tiempo real con las aseguradoras… esto puede tardar unos segundos."
-                )}
-                {producto === "salud" && realStatus === "done" && realQuotes.length > 0 && `Precios reales de ${realQuotes.length} ${realQuotes.length === 1 ? "aseguradora" : "aseguradoras"} devueltos por el motor de tarificación. Tu asesor confirma el detalle final sin compromiso.`}
-                {(producto !== "salud" || realStatus === "unavailable" || realStatus === "error" || (realStatus !== "loading" && realQuotes.length === 0)) && "El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso."}
-              </p>
-            </div>
+            )}
 
             {/* Ofertas comerciales cerradas por el asesor (productos del
                 catálogo marcados como destacado). Van SIEMPRE arriba del todo,
@@ -853,6 +869,14 @@ export function Comparativa() {
               </p>
             )}
 
+            {/* Esqueleto de carga de las opciones reales (Codeoscopic): mensaje
+                dinámico + tarjetas shimmer mientras la API devuelve resultados.
+                Aparece debajo de las opciones negociadas, en el primer sondeo y
+                en cada recálculo. */}
+            {producto === "salud" && realStatus === "loading" && realQuotes.length === 0 && (
+              <RealQuotesSkeleton count={4} withHeading />
+            )}
+
             {producto === "salud" && realQuotes.length > 0 && (
               <p className="mt-6 mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>
             )}
@@ -921,6 +945,11 @@ export function Comparativa() {
                   </li>
                 ))}
               </ul>
+            )}
+            {/* Resultados parciales: ya hay compañías, pero seguimos esperando
+                al resto — shimmer compacto bajo la lista. */}
+            {producto === "salud" && realStatus === "loading" && realQuotes.length > 0 && (
+              <RealQuotesSkeleton count={2} withHeading={false} />
             )}
             {coveragesFor && insuranceId && unlocked && (
               <CoveragesModal
@@ -1051,6 +1080,56 @@ export function Comparativa() {
       {!gateBlocking && <WhatsAppHelpWidget raised message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
       {!gateBlocking && <ComparativaHelpBar quote={quote} producto={producto} />}
     </>
+  );
+}
+
+// Mensajes rotatorios del esqueleto de carga (fuera del componente para que la
+// dependencia del intervalo sea estable).
+const SKELETON_MESSAGES = [
+  "Consultando en tiempo real con las aseguradoras…",
+  "Comparando coberturas y condiciones…",
+  "Afinando tu mejor precio…",
+  "Ordenando las mejores opciones para ti…",
+];
+
+// Esqueleto de carga de las cotizaciones reales: un mensaje que va cambiando
+// (para que la espera no parezca congelada) y tarjetas "shimmer" con la misma
+// silueta que las opciones reales, de modo que la lista no dé un salto brusco
+// cuando llegan los precios.
+function RealQuotesSkeleton({ count = 3, withHeading = true }: { count?: number; withHeading?: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % SKELETON_MESSAGES.length), 2200);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className={withHeading ? "mt-6" : "mt-3"}>
+      {withHeading && <p className="mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>}
+      <p aria-live="polite" className="mb-3 flex items-center gap-2 text-[13px] text-slate2">
+        <span aria-hidden className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate2/25 border-t-brand-red" />
+        {SKELETON_MESSAGES[i]}
+      </p>
+      <ul className="flex flex-col gap-3">
+        {Array.from({ length: count }).map((_, k) => (
+          <li key={k} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="h-8 w-20 animate-pulse rounded bg-mist" />
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-3 w-28 animate-pulse rounded bg-mist" />
+                  <div className="h-2.5 w-20 animate-pulse rounded bg-mist" />
+                </div>
+              </div>
+              <div className="h-5 w-24 shrink-0 animate-pulse rounded bg-mist" />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <div className="h-9 flex-1 animate-pulse rounded-card bg-mist" />
+              <div className="h-9 flex-1 animate-pulse rounded-card bg-mist" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

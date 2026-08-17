@@ -443,6 +443,33 @@ export async function setLeadCodeoscopicInsuranceId(leadId: string, insuranceId:
   await jset(`lead:${leadId}`, lead);
 }
 
+// Actualiza los datos de tarificación de salud editables desde la comparativa
+// ("Editar y recalcular": nº de asegurados y cobertura dental). Se persisten
+// en el lead para que la ficha del back office refleje lo que el usuario pidió
+// y para que el siguiente POST /insurances de Codeoscopic tarifique con la
+// cifra actualizada. Devuelve true si algún valor cambió realmente.
+export async function setLeadSaludTarificacion(
+  leadId: string,
+  patch: { numAsegurados?: number | null; coberturaDental?: boolean | null }
+): Promise<boolean> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return false;
+  let changed = false;
+  if (typeof patch.numAsegurados === "number" && patch.numAsegurados !== lead.numAsegurados) {
+    lead.numAsegurados = Math.max(1, Math.min(9, patch.numAsegurados));
+    changed = true;
+  }
+  if (typeof patch.coberturaDental === "boolean" && patch.coberturaDental !== lead.coberturaDental) {
+    lead.coberturaDental = patch.coberturaDental;
+    changed = true;
+  }
+  if (changed) {
+    lead.updatedAt = new Date().toISOString();
+    await jset(`lead:${leadId}`, lead);
+  }
+  return changed;
+}
+
 export async function getLead(id: string): Promise<Lead | null> {
   return jget<Lead>(`lead:${id}`);
 }
