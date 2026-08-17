@@ -74,11 +74,12 @@ export function Comparativa() {
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
   const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
-  // presupuestoId es dinámico: viene del URL si el lead ya existe (auto/
-  // decesos, o navegación con pid antiguo), o se rellena al desbloquear el
-  // gate en salud/vida (que es cuando se crea el lead REAL en el backend).
-  const initialPid = searchParams.get("pid") ?? "";
-  const [presupuestoId, setPresupuestoId] = useState(initialPid);
+  // leadId es el ancla de la tarificación real de Codeoscopic (que cuelga del
+  // lead, no de un presupuesto). Viene del URL (?lead=, o ?pid= heredado) si
+  // el lead ya existe, o se rellena al desbloquear el gate (que es cuando se
+  // crea el lead REAL en el backend).
+  const initialLead = searchParams.get("lead") ?? searchParams.get("pid") ?? "";
+  const [leadId, setLeadId] = useState(initialLead);
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -182,9 +183,9 @@ export function Comparativa() {
       // recargamos con ?pid=...). No hay que volver a bloquear ni re-pedir los
       // datos: restauramos el pid y desbloqueamos si ya se pasó el gate antes
       // (tenemos pid en la URL, o un presupuesto/contacto guardado).
-      const restoredPid = initialPid || q?.id || "";
-      if (restoredPid && !presupuestoId) setPresupuestoId(restoredPid);
-      const yaPasoGate = !!(restoredPid || (q?.nombre && q?.telefono && q?.email));
+      const restoredLead = initialLead || q?.leadId || "";
+      if (restoredLead && !leadId) setLeadId(restoredLead);
+      const yaPasoGate = !!(restoredLead || (q?.nombre && q?.telefono && q?.email));
       if (yaPasoGate) setUnlocked(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,19 +249,21 @@ export function Comparativa() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; presupuestoId?: string; error?: string; errors?: Record<string, string[]> } | null;
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; error?: string; errors?: Record<string, string[]> } | null;
         if (!res.ok || !body?.ok) {
           const first = body?.errors ? Object.values(body.errors).find((v) => v && v[0])?.[0] : undefined;
           setGateError(first ?? body?.error ?? "No hemos podido enviar tus datos. Inténtalo de nuevo.");
           setGateSubmitting(false);
           return;
         }
-        const newPid = body.presupuestoId ?? "";
+        // /api/lead ya no crea presupuesto: devuelve el leadId, que es el
+        // ancla de la tarificación real de Codeoscopic.
+        const newLead = body.id ?? "";
         const updated = updateQuote({
           nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
-          id: newPid, consentAt: consent,
+          leadId: newLead, consentAt: consent,
         }) ?? {
-          id: newPid, producto: draft.producto, createdAt: nowIso,
+          id: newLead, leadId: newLead, producto: draft.producto, createdAt: nowIso,
           nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
           consentAt: consent,
         };
@@ -272,14 +275,14 @@ export function Comparativa() {
         clearLeadDraft();
         setHasDraft(false);
         pushDataLayerEvent("generate_lead", { producto: draft.producto, form: "comparativa-gate" });
-        // Reflejamos el pid en la URL para que /comparativa recargable
-        // siga funcionando (compartir enlace, back/forward).
-        if (newPid) {
-          const nextUrl = `/comparativa?producto=${producto}&pid=${encodeURIComponent(newPid)}`;
+        // Reflejamos el leadId en la URL para que /comparativa recargable
+        // siga funcionando (compartir enlace, back/forward) sin re-bloquear.
+        if (newLead) {
+          const nextUrl = `/comparativa?producto=${producto}&lead=${encodeURIComponent(newLead)}`;
           router.replace(nextUrl);
           // También seteamos el estado local para disparar el useEffect
           // de Codeoscopic sin esperar a re-lectura de searchParams.
-          setPresupuestoId(newPid);
+          setLeadId(newLead);
         }
       } else {
         // Flujo legacy: el lead ya existe; solo refrescamos contacto.
@@ -324,7 +327,7 @@ export function Comparativa() {
   // estar en estimate=true (o hasta un timeout de 90s: pasado ese tiempo,
   // dejamos de martillear y mostramos lo que haya). Sólo salud por ahora.
   useEffect(() => {
-    if (producto !== "salud" || !presupuestoId) return;
+    if (producto !== "salud" || !leadId) return;
     const local: { stop: boolean } = { stop: false };
     pollingRef.current = local;
     setRealStatus("loading");
@@ -377,7 +380,7 @@ export function Comparativa() {
         const createRes = await fetch("/api/quote/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ presupuestoId: presupuestoId }),
+          body: JSON.stringify({ leadId: leadId }),
         });
         const createBody = (await createRes.json().catch(() => null)) as
           | { ok: true; insuranceId: string; snapshot: unknown }
@@ -402,9 +405,9 @@ export function Comparativa() {
         while (!local.stop && Date.now() - started < TIMEOUT_MS) {
           await new Promise((r) => setTimeout(r, INTERVAL_MS));
           if (local.stop) return;
-          // Pasamos pid al polling para que el endpoint persista el snapshot
-          // en el presupuesto server-side (para el bloque de admin).
-          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}?pid=${encodeURIComponent(presupuestoId)}`);
+          // El polling se autoriza por la cookie de sesión de cliente (el lead
+          // dueño de este insurance). No hace falta pasar ids en la URL.
+          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}`);
           const pollBody = (await pollRes.json().catch(() => null)) as
             | { ok: true; done: boolean; snapshot: unknown }
             | { ok: false }
@@ -423,7 +426,30 @@ export function Comparativa() {
     })();
 
     return () => { local.stop = true; };
-  }, [producto, presupuestoId]);
+  }, [producto, leadId]);
+
+  // "Que te llamen gratis" en salud = mostrar interés en una opción concreta.
+  // ESTE es el momento en el que se crea el presupuesto (antes solo hay un
+  // lead que ha tarificado). Después llevamos al flujo de solicitud de llamada.
+  async function solicitarSalud(opts: { compania: string; precio?: number | null; quoteId?: string; modalidad?: string; insuranceId?: string }) {
+    const destino = `/quiero-que-me-llamen?producto=salud&compania=${encodeURIComponent(opts.compania)}${opts.precio != null ? `&precio=${opts.precio}` : ""}`;
+    try {
+      if (leadId) {
+        await fetch("/api/quote/interes", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId,
+            insuranceId: opts.insuranceId || undefined,
+            quoteId: opts.quoteId,
+            compania: opts.compania,
+            precio: opts.precio ?? undefined,
+            modalidad: opts.modalidad,
+          }),
+        });
+      }
+    } catch { /* best-effort: aunque falle el registro, llevamos al usuario al flujo de llamada */ }
+    router.push(destino);
+  }
 
   function saveEdits() {
     const next = updateQuote({
@@ -664,7 +690,7 @@ export function Comparativa() {
                           )}
                         </div>
                         {c.servicios?.[0] && <p className="mt-1.5 text-[12px] text-slate2">{c.servicios[0]}</p>}
-                        <CompanyActions producto={producto} compania={c.compania} precio={precio} locked={!unlocked} recommended />
+                        <CompanyActions producto={producto} compania={c.compania} precio={precio} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio })} />
                       </li>
                     );
                   })}
@@ -743,7 +769,7 @@ export function Comparativa() {
                           </a>
                         )}
                       </div>
-                      {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} />}
+                      {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} onSolicitar={() => solicitarSalud({ compania: q.compania, precio: q.premium, quoteId: q.id, modalidad: q.modalidad, insuranceId: insuranceId || undefined })} />}
                     </div>
                   </li>
                 ))}
@@ -803,7 +829,7 @@ export function Comparativa() {
                           <span>Sin copago</span>
                           <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
                         </div>
-                        <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} locked={!unlocked} recommended={!!c.destacado} />
+                        <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} locked={!unlocked} recommended={!!c.destacado} onSolicitar={() => solicitarSalud({ compania: c.compania, precio: price.conCopago })} />
                       </li>
                     );
                   })}
@@ -906,7 +932,7 @@ export function CompanyLogo({
 // desbloqueada, en la opción recomendada — esa se queda en verde a
 // propósito para que siga destacando, en vez de volver a rojo como el resto.
 function CompanyActions({
-  producto, compania, precio, locked = false, recommended = false, onMasInfo,
+  producto, compania, precio, locked = false, recommended = false, onMasInfo, onSolicitar,
 }: {
   producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
   // Si se pasa, "Más información" abre el detalle en la propia página (modal)
@@ -914,6 +940,9 @@ function CompanyActions({
   // reales de Codeoscopic, que no existen como página de catálogo y además
   // evita salir de la comparativa y volver a pasar por el gate.
   onMasInfo?: () => void;
+  // Si se pasa, "Que te llamen gratis" ejecuta este handler (crear presupuesto
+  // por interés + navegar) en vez de ser un simple enlace. Se usa en salud.
+  onSolicitar?: () => void;
 }) {
   const green = locked || recommended;
   // En móvil los botones se apilan a ancho completo (evita que "Que te llamen
@@ -937,13 +966,23 @@ function CompanyActions({
           Más información
         </a>
       )}
-      <a
-        href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
-        tabIndex={locked ? -1 : 0}
-        className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
-      >
-        Que te llamen gratis
-      </a>
+      {onSolicitar ? (
+        <button
+          type="button" onClick={onSolicitar}
+          tabIndex={locked ? -1 : 0}
+          className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
+        >
+          Que te llamen gratis
+        </button>
+      ) : (
+        <a
+          href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
+          tabIndex={locked ? -1 : 0}
+          className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
+        >
+          Que te llamen gratis
+        </a>
+      )}
     </div>
   );
 }

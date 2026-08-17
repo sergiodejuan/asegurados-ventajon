@@ -432,6 +432,17 @@ export async function listLeads(source?: string): Promise<Lead[]> {
   return out;
 }
 
+// Ancla la cotización de Codeoscopic al lead (ver Lead.codeoscopicInsuranceId).
+// Se usa en el flujo público de la comparativa: el lead tarifica sin crear
+// presupuesto; el insuranceId vive aquí hasta que el usuario elige una opción.
+export async function setLeadCodeoscopicInsuranceId(leadId: string, insuranceId: string): Promise<void> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return;
+  if (lead.codeoscopicInsuranceId === insuranceId) return;
+  lead.codeoscopicInsuranceId = insuranceId;
+  await jset(`lead:${leadId}`, lead);
+}
+
 export async function getLead(id: string): Promise<Lead | null> {
   return jget<Lead>(`lead:${id}`);
 }

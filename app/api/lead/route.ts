@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { leadSchema } from "@/lib/schema";
 import {
-  upsertLead, createPresupuesto,
+  upsertLead, estimatePrecio,
   appendReferralConvertido, getReferralByCode, getReferralLandingConfig,
 } from "@/lib/store";
 import { sendReferralOptInEmail, sendReferralProgressEmail } from "@/lib/referralMail";
@@ -91,16 +91,15 @@ export async function POST(request: Request) {
     consent
   );
 
-  const presupuesto = await createPresupuesto({
-    id: submissionId, leadId: id, source, producto: "salud",
-    data: {
-      codigoPostal: d.codigoPostal, inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
-      sexo: d.sexo, coberturaDental: d.coberturaDental, yaTieneSeguro: d.yaTieneSeguro,
-      seguroActualImporte: d.seguroActualImporte, seguroActualPeriodo: d.seguroActualPeriodo,
-      seguroActualServicios: d.seguroActualServicios,
-    },
-    nombre: d.nombre, telefono: d.telefono, email: d.email,
-  }).catch((err) => { console.error("[lead] presupuesto error", err); return null; });
+  // Cambio 2026-08 (salud): un lead que solo tarifica NO crea presupuesto. El
+  // presupuesto se crea cuando el usuario elige una opción ("Que te llamen",
+  // ver /api/quote/interes). Aquí solo queda el lead "que ha tarificado" (su
+  // actividad "form" ya lo refleja). El precio orientativo para ManyChat se
+  // calcula directamente, sin necesidad de un presupuesto.
+  const precioAprox = await estimatePrecio("salud", {
+    codigoPostal: d.codigoPostal, inicio, numAsegurados: d.numAsegurados, fechaNacimiento: d.fechaNacimiento,
+    sexo: d.sexo, coberturaDental: d.coberturaDental,
+  }).catch(() => null);
 
   const url = process.env.LEAD_WEBHOOK_URL;
   if (url) {
@@ -152,8 +151,8 @@ export async function POST(request: Request) {
       email: d.email,
       codigoPostal: d.codigoPostal,
       codigoPostalReal: d.codigoPostalReal,
-      precioAprox: presupuesto?.precioAprox,
-      presupuestoId: submissionId,
+      precioAprox,
+      presupuestoId: undefined,
       servicioAdicional: d.coberturaDental ? "Cobertura dental" : "Sin cobertura dental",
       utm: d.utm,
     });
@@ -193,7 +192,7 @@ export async function POST(request: Request) {
   }
 
   await notifyTeamNewLead({
-    leadId: id, source, presupuestoId: presupuesto?.id,
+    leadId: id, source, presupuestoId: undefined,
     aceptaComercial: d.aceptaComercial,
     extraNote: d.utm?.ref ? `Referido por código ${d.utm.ref}` : undefined,
   }).catch((err) => console.error("[lead] notifyTeam error", err));
@@ -219,7 +218,7 @@ export async function POST(request: Request) {
             leadId: id,
             nombre: d.nombre,
             producto: "salud",
-            presupuestoId: presupuesto?.id ?? "",
+            presupuestoId: "",
             status: "cotizado",
             cotizadoAt: new Date().toISOString(),
           });
@@ -247,10 +246,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // Exponemos el presupuestoId para que /comparativa pueda pedirle
-  // cotizaciones reales a Codeoscopic (ver app/api/quote/create y
-  // components/Comparativa.tsx). Es solo un id, no revela datos.
-  return NextResponse.json({ ok: true, id, deduped, presupuestoId: presupuesto?.id ?? "" });
+  // Exponemos el leadId para que /comparativa pueda pedir cotizaciones reales
+  // a Codeoscopic ancladas al lead (ver app/api/quote/create y
+  // components/Comparativa.tsx). Ya no hay presupuesto en este punto: se crea
+  // cuando el usuario elige una opción (/api/quote/interes).
+  return NextResponse.json({ ok: true, id, deduped });
 }
 
 export function GET() {

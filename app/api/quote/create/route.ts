@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getPresupuesto, getLead, setPresupuestoCodeoscopicSnapshot, getHiddenBrands } from "@/lib/store";
+import { getLead, setLeadCodeoscopicInsuranceId, getHiddenBrands } from "@/lib/store";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
 import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeoscopicSnapshot";
@@ -25,9 +25,13 @@ import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeosc
 // queda corta con 60s, subir a Pro y cambiar este maxDuration.
 export const maxDuration = 60;
 
+// Ancla en el LEAD, no en un presupuesto: un lead que solo tarifica no genera
+// presupuesto (ver /api/lead y /api/quote/interes). Se acepta presupuestoId
+// como alias heredado (algún enlace antiguo), pero el flujo normal manda leadId.
 const bodySchema = z.object({
-  presupuestoId: z.string().trim().min(1, "presupuestoId requerido"),
-});
+  leadId: z.string().trim().min(1).optional(),
+  presupuestoId: z.string().trim().min(1).optional(),
+}).refine((d) => d.leadId || d.presupuestoId, { message: "leadId requerido" });
 
 export async function POST(req: NextRequest) {
   const raw = await req.json().catch(() => null);
@@ -42,42 +46,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "not_configured" });
   }
 
-  const presupuesto = await getPresupuesto(parsed.data.presupuestoId);
-  if (!presupuesto) return NextResponse.json({ ok: false, reason: "presupuesto_not_found" }, { status: 404 });
+  const leadId = parsed.data.leadId || parsed.data.presupuestoId!;
+  const lead = await getLead(leadId);
+  if (!lead) return NextResponse.json({ ok: false, reason: "lead_not_found" }, { status: 404 });
 
-  // Solo Salud está soportado en Codeoscopic desde esta web (los otros ramos
-  // aún no tienen el mapper). Para vida/auto/decesos, respondemos not_supported
-  // y la comparativa cae al mock sin queja.
-  if (presupuesto.producto !== "salud") {
+  // Solo Salud está soportado en Codeoscopic desde esta web.
+  if (lead.producto !== "salud") {
     return NextResponse.json({ ok: false, reason: "producto_no_soportado" });
   }
 
   // Si ya hicimos un POST previo (p.ej. porque el usuario refrescó la
-  // comparativa), reutilizamos el insurance en vez de crear otro. Evita
-  // llenar Codeoscopic de proyectos duplicados por lead.
-  const existing = (presupuesto.data ?? {}) as Record<string, unknown>;
-  const existingId = typeof existing.codeoscopicInsuranceId === "string" ? existing.codeoscopicInsuranceId : "";
-  if (existingId) {
+  // comparativa o volvió de "Más información"), reutilizamos el insurance en
+  // vez de crear otro. Evita llenar Codeoscopic de proyectos duplicados.
+  if (lead.codeoscopicInsuranceId) {
     try {
-      const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(existingId)}`);
+      const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(lead.codeoscopicInsuranceId)}`);
       const summary = summarizeInsurance(snapshot);
-      await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
-      // El público solo ve las marcas visibles del catálogo; el summary
-      // almacenado queda completo para el back office.
       const hidden = await getHiddenBrands("salud");
-      return NextResponse.json({ ok: true, insuranceId: existingId, snapshot: filterInsuranceByHiddenBrands(snapshot, hidden), summary });
+      return NextResponse.json({ ok: true, insuranceId: lead.codeoscopicInsuranceId, snapshot: filterInsuranceByHiddenBrands(snapshot, hidden), summary });
     } catch (err) {
-      // Si Codeoscopic ya no reconoce el id (raro pero posible tras rotar
-      // credenciales entre entornos), lo tratamos como si no existiera y
-      // creamos uno nuevo abajo.
+      // Si Codeoscopic ya no reconoce el id (raro, p.ej. tras rotar
+      // credenciales entre entornos), creamos uno nuevo abajo.
       console.error("[quote/create] snapshot existente falló, creo otro:", (err as Error).message);
     }
   }
 
-  const lead = await getLead(presupuesto.leadId);
-  if (!lead) return NextResponse.json({ ok: false, reason: "lead_not_found" }, { status: 404 });
-
-  const mapped = await buildHealthPayload(lead, presupuesto);
+  const mapped = await buildHealthPayload(lead, null);
   if (!mapped.ok) return NextResponse.json({ ok: false, reason: mapped.reason });
 
   try {
@@ -89,7 +83,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: "codeoscopic_sin_id" }, { status: 502 });
     }
     const summary = summarizeInsurance(created);
-    await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
+    await setLeadCodeoscopicInsuranceId(leadId, created.id);
     const hidden = await getHiddenBrands("salud");
     return NextResponse.json({ ok: true, insuranceId: created.id, snapshot: filterInsuranceByHiddenBrands(created, hidden), summary });
   } catch (err) {

@@ -110,6 +110,11 @@ export type Lead = {
   apellido2: string;
   codigoPostalReal: string;
   aseguradosAdicionales: { fechaNacimiento: string; sexo: string }[];
+  // Cotización Codeoscopic asociada al lead (salud). Se guarda AQUÍ, en el
+  // lead, y no en un presupuesto: un lead que solo ha tarificado no genera
+  // presupuesto hasta que muestra interés en una opción concreta ("Que te
+  // llamen"). Es el ancla del sondeo de precios reales en la comparativa.
+  codeoscopicInsuranceId?: string;
   // Salud
   inicio: string;
   numAsegurados: number | null;

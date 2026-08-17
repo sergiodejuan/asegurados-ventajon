@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeoscopicSnapshot";
-import { getPresupuesto, setPresupuestoCodeoscopicSnapshot, getHiddenBrands } from "@/lib/store";
+import { getLead, getHiddenBrands } from "@/lib/store";
 import { rateLimitFail } from "@/lib/rateLimit";
 import { CLIENT_SESSION_COOKIE, verifySessionToken } from "@/lib/clientSession";
 import { resolveIdentity } from "@/lib/agentAuth";
@@ -29,44 +29,27 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
   const limited = await rateLimitFail(req, { bucket: "quote-get", limit: 60, windowSeconds: 60 });
   if (limited) return limited;
 
-  const pid = req.nextUrl.searchParams.get("pid") ?? "";
-
-  // Autorización estricta: admin O cliente-dueño del presupuesto asociado.
-  // Requerimos SIEMPRE presupuestoId (pid) para poder verificar propiedad —
-  // sin él no podemos decidir si el usuario tiene derecho a ese snapshot.
+  // Autorización estricta: admin O el cliente dueño del LEAD al que pertenece
+  // este insurance. La tarificación cuelga del lead (no de un presupuesto):
+  // se carga el lead de la sesión de cliente y se comprueba que su
+  // codeoscopicInsuranceId coincide con el que se pide. Así un id de otro
+  // cliente nunca expone su cotización (API1:2023 BOLA).
   const identity = await resolveIdentity(req).catch(() => null);
   const isAdmin = !!identity;
   if (!isAdmin) {
-    if (!pid) {
-      return NextResponse.json({ ok: false, reason: "missing_pid" }, { status: 400 });
-    }
     const clientLeadId = verifySessionToken(cookies().get(CLIENT_SESSION_COOKIE)?.value);
     if (!clientLeadId) {
       return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
     }
-    const presupuesto = await getPresupuesto(pid).catch(() => null);
-    if (!presupuesto || presupuesto.leadId !== clientLeadId) {
+    const lead = await getLead(clientLeadId).catch(() => null);
+    if (!lead || lead.codeoscopicInsuranceId !== insuranceId) {
       return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
-    }
-    const savedId = typeof presupuesto.data?.codeoscopicInsuranceId === "string"
-      ? presupuesto.data.codeoscopicInsuranceId : "";
-    if (savedId !== insuranceId) {
-      return NextResponse.json({ ok: false, reason: "insurance_not_in_presupuesto" }, { status: 403 });
     }
   }
 
   try {
     const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(insuranceId)}`);
     const summary = summarizeInsurance(snapshot);
-    // Persistir snapshot solo si pid vale y coincide con el insurance (misma
-    // regla que antes; admin puede persistir por pid arbitrario si lo pasa).
-    if (pid) {
-      const p = await getPresupuesto(pid);
-      const savedId = typeof p?.data?.codeoscopicInsuranceId === "string" ? p.data.codeoscopicInsuranceId : "";
-      if (savedId && savedId === insuranceId) {
-        await setPresupuestoCodeoscopicSnapshot(pid, summary);
-      }
-    }
     // El público solo ve las marcas visibles del catálogo; el admin ve todas.
     const snapshotOut = isAdmin ? snapshot : filterInsuranceByHiddenBrands(snapshot, await getHiddenBrands("salud"));
     return NextResponse.json({ ok: true, insuranceId, done: summary.done, snapshot: snapshotOut, summary });

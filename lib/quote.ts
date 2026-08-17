@@ -5,6 +5,9 @@ import { WHATSAPP_URL } from "./brand";
 // mientras dura la sesión del navegador, no es información persistida en servidor.
 export type QuoteProfile = {
   id: string;
+  // leadId del lead creado en el gate (salud). Ancla la tarificación real de
+  // Codeoscopic, que ahora cuelga del lead y no de un presupuesto.
+  leadId?: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   createdAt: string;
   codigoPostal?: string;
