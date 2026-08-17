@@ -359,7 +359,7 @@ function FunnelChart({ stages }: { stages: { key: string; label: string; count: 
     <div className="flex flex-col gap-2.5">
       {stages.map((s) => {
         const pct = Math.round((s.count / max) * 100);
-        const barColor = s.key === "ganado" ? "bg-emerald-500" : s.key === "perdido" ? "bg-brand-red" : "bg-navy";
+        const barColor = s.key === "ganado" ? "bg-emerald-500" : s.key === "perdido" ? "bg-brand-red" : s.key === "caducado" ? "bg-slate-300" : "bg-navy";
         return (
           <div key={s.key} className="flex items-center gap-3">
             <span className="w-28 shrink-0 text-[12px] font-medium text-slate2">{s.label}</span>

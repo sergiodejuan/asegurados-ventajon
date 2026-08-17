@@ -226,6 +226,13 @@ export const PRESUPUESTO_STATUSES = [
   "negociando",
   "ganado",
   "perdido",
+  // Estado propio (distinto de "perdido") para los presupuestos que nacieron
+  // en "nuevo" y nadie llegó a trabajar tras el plazo de caducidad: los
+  // marca automáticamente el cron de retención (ver expireStalePresupuestos
+  // en lib/store.ts). Se mantiene aparte de "perdido" a propósito, para no
+  // ensuciar la tasa de éxito (ganados/(ganados+perdidos)) con presupuestos
+  // que nunca entraron en el pipeline comercial.
+  "caducado",
 ] as const;
 export type PresupuestoStatus = (typeof PRESUPUESTO_STATUSES)[number];
 
@@ -236,6 +243,7 @@ export const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   negociando: "Negociando",
   ganado: "Ganado",
   perdido: "Perdido",
+  caducado: "Caducado",
 };
 
 export type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };

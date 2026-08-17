@@ -605,6 +605,41 @@ export async function purgeStaleLeads(olderThanDays: number): Promise<{ purged: 
   return { purged: candidatos.length, total: all.length };
 }
 
+// Auto-caducidad de presupuestos fríos: los que siguen en "nuevo" (nadie los
+// ha trabajado nunca) y llevan más de `olderThanDays` sin actividad se pasan
+// a estado "caducado". NO se borra nada —se conserva todo el histórico y la
+// analítica—: es solo higiene de pipeline, y es reversible (un agente puede
+// devolverlos a "nuevo"). A propósito NO toca los estados en progreso
+// (en_seguimiento/enviado/negociando) ni los cerrados (ganado/perdido/ya
+// caducado): "en progreso se conserva". Se mide por `updatedAt` (última
+// actividad), igual que purgeStaleLeads, así un "nuevo" reabierto/reguardado
+// hace poco no caduca. Pensada para ejecutarse desde /api/cron/retention.
+export async function expireStalePresupuestos(olderThanDays: number): Promise<{ expired: number; total: number }> {
+  const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+  const all = await listPresupuestos();
+  const candidatos = all.filter((p) => p.status === "nuevo" && Date.parse(p.updatedAt) < cutoff);
+
+  const now = new Date().toISOString();
+  for (const p of candidatos) {
+    const fresh = await jget<Presupuesto>(`presupuesto:${p.id}`);
+    if (!fresh || fresh.status !== "nuevo") continue; // pudo cambiar entre la lista y aquí
+    const nota: PresupuestoNote = {
+      id: makeSubmissionId(), at: now,
+      texto: `Caducado automáticamente: sin actividad en más de ${olderThanDays} días desde su creación.`,
+      agente: "Sistema (retención)",
+    };
+    const next: Presupuesto = {
+      ...fresh, status: "caducado", closedAt: now, closedBy: "sistema",
+      notas: [nota, ...fresh.notas], updatedAt: now,
+    };
+    await jset(`presupuesto:${p.id}`, next);
+    // No se re-puntúan los índices: el presupuesto sigue existiendo y
+    // listándose, solo cambia de estado.
+  }
+
+  return { expired: candidatos.length, total: all.length };
+}
+
 /* ---------------------------- Catálogo (productos) ------------------------- */
 // Ofertas por compañía × producto que alimentan la página de comparativa.
 // Se guardan como un único documento JSON (catálogo pequeño, no necesita índice).
