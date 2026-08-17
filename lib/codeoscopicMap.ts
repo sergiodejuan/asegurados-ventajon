@@ -32,15 +32,28 @@ function toCodeoscopicGender(sexo: string): "Male" | "Female" | null {
 // traduce a una fecha ISO real que Codeoscopic pueda usar.
 function resolveEffectiveDate(inicio: string): string {
   const today = new Date();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(inicio)) return inicio;
-  if (inicio === "proximo_mes") {
-    const d = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    return d.toISOString().slice(0, 10);
+  const todayIso = today.toISOString().slice(0, 10);
+
+  let candidate: string;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
+    // Fecha personalizada elegida por el lead.
+    candidate = inicio;
+  } else if (inicio === "proximo_mes") {
+    // Día 1 del mes que viene, construido en UTC para no irnos al último día
+    // del mes anterior al pasar de hora local a ISO.
+    candidate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+  } else {
+    // "cuanto_antes" / "comparando" / cualquier otro caso: hoy + 15 días (le
+    // damos margen a que el equipo comercial haga el contacto antes del efecto).
+    candidate = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   }
-  // "cuanto_antes" / "comparando" / cualquier otro caso: hoy + 15 días (le
-  // damos margen a que el equipo comercial haga el contacto antes del efecto).
-  const d = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
-  return d.toISOString().slice(0, 10);
+
+  // Codeoscopic rechaza fechas de efecto anteriores a hoy ("The effective
+  // date cannot be before today.", 400). Una fecha personalizada elegida hace
+  // tiempo, o un lead antiguo que se re-cotiza, puede quedar en el pasado: la
+  // subimos a hoy como mínimo. La comparación de strings ISO yyyy-mm-dd es
+  // segura por orden lexicográfico.
+  return candidate < todayIso ? todayIso : candidate;
 }
 
 // El teléfono interno viene ya normalizado a E.164 español (ver lib/phone.ts:
