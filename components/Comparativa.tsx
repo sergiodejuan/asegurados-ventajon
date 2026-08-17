@@ -69,6 +69,63 @@ type RealQuote = {
 };
 type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
 
+/* -------------------------- Filtros de salud ------------------------------ */
+// Filtros multi-selección de la comparativa de salud. Clasificamos cada opción
+// (producto manual o cotización real) por sus propiedades conocidas; cuando una
+// propiedad es DESCONOCIDA (típico en las modalidades de Codeoscopic, que no la
+// declaran en el nombre) NO se oculta la opción — solo se descarta cuando se
+// sabe con certeza que no cumple. Así el filtro es preciso con las opciones
+// negociadas (datos explícitos) y no vacía la lista con las reales.
+type SaludFilter = "copago" | "sinCopago" | "dental" | "reembolso" | "sinReembolso";
+const SALUD_FILTERS: { key: SaludFilter; label: string }[] = [
+  { key: "copago", label: "Con copago" },
+  { key: "sinCopago", label: "Sin copago" },
+  { key: "dental", label: "Con dental" },
+  { key: "reembolso", label: "Con reembolso" },
+  { key: "sinReembolso", label: "Sin reembolso" },
+];
+type OptClass = { copago: Set<"con" | "sin"> | null; dental: boolean | null; reembolso: boolean | null };
+
+function classifyText(text: string): OptClass {
+  const t = (text || "").toLowerCase();
+  const copago = new Set<"con" | "sin">();
+  if (t.includes("sin copago") || t.includes("reembolso") || t.includes("reintegro")) copago.add("sin");
+  if (t.includes("copago") && !t.includes("sin copago")) copago.add("con");
+  return {
+    copago: copago.size ? copago : null,
+    dental: t.includes("dental") ? true : null,
+    reembolso: t.includes("reembolso") || t.includes("reintegro") ? true : null,
+  };
+}
+
+// Producto manual del catálogo: datos explícitos (precios con/sin copago +
+// servicios), así que su clasificación es fiable.
+function classifyProduct(p: Product): OptClass {
+  const copago = new Set<"con" | "sin">();
+  if (p.precioConCopago != null) copago.add("con");
+  if (p.precioSinCopago != null) copago.add("sin");
+  const servicios = (p.servicios ?? []).join(" ").toLowerCase();
+  return {
+    copago: copago.size ? copago : null,
+    dental: servicios.includes("dental"),
+    reembolso: servicios.includes("reembolso") || servicios.includes("reintegro"),
+  };
+}
+
+function matchesSaludFilters(cls: OptClass, active: SaludFilter[]): boolean {
+  if (!active.length) return true;
+  const wantCon = active.includes("copago");
+  const wantSin = active.includes("sinCopago");
+  if ((wantCon || wantSin) && cls.copago) {
+    const ok = (wantCon && cls.copago.has("con")) || (wantSin && cls.copago.has("sin"));
+    if (!ok) return false;
+  }
+  if (active.includes("dental") && cls.dental === false) return false;
+  if (active.includes("reembolso") && cls.reembolso === false) return false;
+  if (active.includes("sinReembolso") && cls.reembolso === true) return false;
+  return true;
+}
+
 export function Comparativa() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -98,8 +155,13 @@ export function Comparativa() {
   const [realStatus, setRealStatus] = useState<RealStatus>("idle");
   // Orden elegido por el usuario para los precios reales.
   const [sortBy, setSortBy] = useState<"default" | "precio" | "valoracion">("default");
+  // Filtros multi-selección (salud): con/sin copago, dental, con/sin reembolso.
+  const [filters, setFilters] = useState<SaludFilter[]>([]);
+  function toggleFilter(k: SaludFilter) {
+    setFilters((prev) => prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]);
+  }
   const sortedRealQuotes = useMemo(() => {
-    const list = [...realQuotes];
+    const list = realQuotes.filter((q) => matchesSaludFilters(classifyText(`${q.producto} ${q.modalidad} ${q.categoria ?? ""}`), filters));
     if (sortBy === "precio") {
       // Precio menor primero; los que aún no tienen premium van al final.
       list.sort((a, b) => (a.premium ?? Infinity) - (b.premium ?? Infinity));
@@ -108,10 +170,15 @@ export function Comparativa() {
       list.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     }
     return list; // "default": orden tal cual llega de Codeoscopic
-  }, [realQuotes, sortBy]);
-  // Ofertas comerciales destacadas del catálogo manual (se muestran arriba
-  // del todo con badge, por encima de los precios reales de Codeoscopic).
-  const recommendedProducts = useMemo(() => products.filter((p) => p.destacado), [products]);
+  }, [realQuotes, sortBy, filters]);
+  // Opciones NEGOCIADAS por Asegurados Ventajón = catálogo manual de salud
+  // (todas las activas visibles, ordenadas destacado→orden por listProducts).
+  // Se muestran SIEMPRE arriba del todo, como recomendadas con badge, por
+  // encima de los precios reales de Codeoscopic. Se les aplican los filtros.
+  const negociadas = useMemo(
+    () => products.filter((p) => matchesSaludFilters(classifyProduct(p), filters)),
+    [products, filters],
+  );
   // insuranceId real de Codeoscopic — se muestra al pie de la sección de
   // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
   // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
@@ -513,7 +580,9 @@ export function Comparativa() {
           {firstName ? `${firstName}, esto es lo que puedes pagar` : "Esto es lo que puedes pagar"}
         </h1>
         {quote && (
-          <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>
+          // Es una COTIZACIÓN mientras el usuario no elige una opción. Solo pasa
+          // a "presupuesto" cuando pulsa "Que te llamen" (ver /api/quote/interes).
+          <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Cotización nº {quoteNumber(quote.leadId || quote.id)}</p>
         )}
         <p className="mt-3 text-[16px] leading-relaxed text-slate2">
           Hemos comparado tu perfil entre {PARTNERS_LIST} para darte el precio más ajustado.
@@ -665,17 +734,86 @@ export function Comparativa() {
                 por encima de los precios reales de Codeoscopic, con badge.
                 Solo cuando hay precios reales: en el fallback sin Codeoscopic,
                 la lista mock de abajo ya coloca los destacados primero. */}
-            {producto === "salud" && realQuotes.length > 0 && recommendedProducts.length > 0 && (
+            {/* Barra de filtros (multi-selección) + orden. Los filtros afectan
+                TANTO a las opciones negociadas como a los precios reales; el
+                orden solo aplica a los precios reales de Codeoscopic. El usuario
+                puede activar varios filtros a la vez (con/sin copago, dental,
+                con/sin reembolso). */}
+            {producto === "salud" && (negociadas.length > 0 || realQuotes.length > 0) && (
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {SALUD_FILTERS.map((f) => {
+                    const active = filters.includes(f.key);
+                    return (
+                      <button
+                        key={f.key}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => toggleFilter(f.key)}
+                        tabIndex={unlocked ? 0 : -1}
+                        className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                          active
+                            ? "border-brand-red bg-brand-red text-white"
+                            : "border-hair bg-white text-navy hover:border-navy/40 hover:bg-mist"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                  {filters.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilters([])}
+                      tabIndex={unlocked ? 0 : -1}
+                      className="text-[12px] font-semibold text-slate2 underline underline-offset-2 hover:text-brand-red"
+                    >
+                      Quitar filtros
+                    </button>
+                  )}
+                </div>
+                {realQuotes.length > 1 && (
+                  <div className="flex items-center justify-end gap-2">
+                    <label htmlFor="cmp-sort" className="text-[12px] font-semibold text-slate2">Ordenar por</label>
+                    <select
+                      id="cmp-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      tabIndex={unlocked ? 0 : -1}
+                      className="rounded-card border border-hair bg-white px-2.5 py-1.5 text-[12px] font-semibold text-navy focus:border-navy focus:outline-none"
+                    >
+                      <option value="default">Recomendado</option>
+                      <option value="precio">Precio (menor primero)</option>
+                      <option value="valoracion">Valoración</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Opciones NEGOCIADAS por Asegurados Ventajón (catálogo manual del
+                admin): van SIEMPRE arriba del todo, como recomendadas con badge
+                y borde reforzado, por encima de los precios reales de
+                Codeoscopic. Visibles aunque haya cotizaciones reales — ambas
+                listas conviven. Si los filtros activos dejan la lista vacía, se
+                indica en lugar de desaparecer sin explicación. */}
+            {producto === "salud" && negociadas.length > 0 && (
               <div className="mt-5">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="rounded-pill bg-brand-red px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Recomendado</span>
-                  <h3 className="text-[14px] font-bold text-navy">Ofertas destacadas de tu asesor</h3>
+                  <h3 className="text-[14px] font-bold text-navy">Opciones negociadas por tu asesor</h3>
                 </div>
                 <ul className="flex flex-col gap-3">
-                  {recommendedProducts.map((c) => {
-                    const precio = c.precioConCopago ?? c.precioSinCopago ?? c.precio ?? 0;
+                  {negociadas.map((c) => {
+                    const price = saludPrice(
+                      { conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 },
+                      { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental },
+                    );
+                    const hasCon = c.precioConCopago != null;
+                    const hasSin = c.precioSinCopago != null;
+                    // Precio que viaja al "interés": con copago si existe, si no
+                    // sin copago, y como último recurso el precio base.
+                    const precioInteres = hasCon ? price.conCopago : hasSin ? price.sinCopago : (c.precio ?? 0);
                     return (
-                      <li key={c.id} className="rounded-card border-2 border-brand-red bg-white p-4 shadow-card">
+                      <li key={c.id} className="rounded-card border-2 border-brand-red bg-brand-red/[0.04] p-4 shadow-card">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-2.5">
                             {c.logoUrl
@@ -683,41 +821,49 @@ export function Comparativa() {
                               : <span className="truncate text-[16px] font-bold text-ink">{c.compania}</span>}
                             <span className="shrink-0 rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>
                           </div>
-                          {precio > 0 && (
-                            <p className="shrink-0 text-right text-[14px] text-slate2">
-                              Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(precio)} €</span>/mes
-                            </p>
-                          )}
                         </div>
+                        {(hasCon || hasSin) && (
+                          <div className="mt-2 space-y-1">
+                            {hasCon && (
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Con copago</span>
+                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
+                              </div>
+                            )}
+                            {hasSin && (
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Sin copago</span>
+                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {c.servicios?.[0] && <p className="mt-1.5 text-[12px] text-slate2">{c.servicios[0]}</p>}
-                        <CompanyActions producto={producto} compania={c.compania} precio={precio} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio })} />
+                        <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: "Opción negociada" })} />
                       </li>
                     );
                   })}
                 </ul>
               </div>
             )}
+            {producto === "salud" && negociadas.length === 0 && filters.length > 0 && (
+              <p className="mt-5 rounded-card border border-hair bg-mist/40 px-4 py-3 text-[13px] text-slate2">
+                Ninguna opción negociada coincide con los filtros seleccionados.
+              </p>
+            )}
+
             {producto === "salud" && realQuotes.length > 0 && (
               <p className="mt-6 mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>
             )}
-            {producto === "salud" && realQuotes.length > 1 && (
-              <div className="mt-1 flex items-center justify-end gap-2">
-                <label htmlFor="cmp-sort" className="text-[12px] font-semibold text-slate2">Ordenar por</label>
-                <select
-                  id="cmp-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  tabIndex={unlocked ? 0 : -1}
-                  className="rounded-card border border-hair bg-white px-2.5 py-1.5 text-[12px] font-semibold text-navy focus:border-navy focus:outline-none"
-                >
-                  <option value="default">Recomendado</option>
-                  <option value="precio">Precio (menor primero)</option>
-                  <option value="valoracion">Valoración</option>
-                </select>
-              </div>
+            {producto === "salud" && realQuotes.length > 0 && sortedRealQuotes.length === 0 && (
+              <p className="mt-3 rounded-card border border-hair bg-mist/40 px-4 py-3 text-[13px] text-slate2">
+                Ninguna cotización de las aseguradoras coincide con los filtros seleccionados.
+              </p>
             )}
             {producto === "salud" && realQuotes.length > 0 && (
               <ul className="mt-3 flex flex-col gap-3">
                 {sortedRealQuotes.map((q) => (
-                  <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
+                  <li key={q.id} className="rounded-card border border-hair bg-white p-4 shadow-soft">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-2.5">
                         {q.imageUrl
@@ -776,7 +922,12 @@ export function Comparativa() {
               </ul>
             )}
             {coveragesFor && insuranceId && unlocked && (
-              <CoveragesModal insuranceId={insuranceId} quote={coveragesFor} onClose={() => setCoveragesFor(null)} />
+              <CoveragesModal
+                insuranceId={insuranceId}
+                quote={coveragesFor}
+                onClose={() => setCoveragesFor(null)}
+                onSolicitar={() => solicitarSalud({ compania: coveragesFor.compania, precio: coveragesFor.premium, quoteId: coveragesFor.id, modalidad: coveragesFor.modalidad, insuranceId: insuranceId || undefined })}
+              />
             )}
 
             {producto === "salud" && realQuotes.length > 0 && insuranceId && (
@@ -786,54 +937,37 @@ export function Comparativa() {
               </p>
             )}
 
-            <ul className={`mt-5 flex-col gap-3 ${producto === "salud" && realQuotes.length > 0 ? "hidden" : "flex"}`}>
-              {producto !== "salud"
-                ? products.map((c) => {
-                    const price = producto === "auto"
-                      ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
-                      : producto === "decesos"
-                      ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
-                      : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
-                    return (
-                      <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            {c.logoUrl
-                              ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
-                              : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
-                            {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
-                          </div>
-                          <p className="text-right text-[14px] text-slate2">
-                            Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
-                          </p>
-                        </div>
-                        <CompanyActions producto={producto} compania={c.compania} precio={price.precio} locked={!unlocked} recommended={!!c.destacado} />
-                      </li>
-                    );
-                  })
-                : products.map((c) => {
-                    const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
-                    return (
-                      <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+            {/* Catálogo orientativo para el resto de ramos (auto/vida/decesos).
+                Salud NO se renderiza aquí: sus opciones negociadas se muestran
+                siempre arriba (bloque "Opciones negociadas por tu asesor") y las
+                cotizaciones reales debajo. */}
+            {producto !== "salud" && (
+              <ul className="mt-5 flex flex-col gap-3">
+                {products.map((c) => {
+                  const price = producto === "auto"
+                    ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+                    : producto === "decesos"
+                    ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
+                    : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
+                  return (
+                    <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
+                      <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           {c.logoUrl
                             ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
                             : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
                           {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
                         </div>
-                        <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                          <span>Con copago</span>
-                          <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                          <span>Sin copago</span>
-                          <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
-                        </div>
-                        <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} locked={!unlocked} recommended={!!c.destacado} onSolicitar={() => solicitarSalud({ compania: c.compania, precio: price.conCopago })} />
-                      </li>
-                    );
-                  })}
-            </ul>
+                        <p className="text-right text-[14px] text-slate2">
+                          Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
+                        </p>
+                      </div>
+                      <CompanyActions producto={producto} compania={c.compania} precio={price.precio} locked={!unlocked} recommended={!!c.destacado} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -1138,7 +1272,7 @@ type CoveragesState =
   | { kind: "error"; message: string }
   | { kind: "ok"; grupos: CoverageGroup[] };
 
-function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; quote: RealQuote; onClose: () => void }) {
+function CoveragesModal({ insuranceId, quote, onClose, onSolicitar }: { insuranceId: string; quote: RealQuote; onClose: () => void; onSolicitar?: () => void }) {
   const [state, setState] = useState<CoveragesState>({ kind: "loading" });
 
   useEffect(() => {
@@ -1177,8 +1311,8 @@ function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; 
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
       onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
     >
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
-        <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
           <div className="flex min-w-0 items-center gap-2.5">
             {quote.imageUrl ? <CompanyLogo logoUrl={quote.imageUrl} compania={quote.compania} size="h-9 max-w-[110px]" /> : null}
             <div className="min-w-0">
@@ -1198,7 +1332,7 @@ function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; 
             ✕
           </button>
         </header>
-        <div className="max-h-[calc(90vh-72px)] overflow-y-auto px-5 pb-6 pt-4">
+        <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
           {/* Resumen de la opción: precio, valoración y condiciones. */}
           <div className="rounded-card border border-hair bg-mist/40 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -1267,6 +1401,20 @@ function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; 
             </section>
           ))}
         </div>
+        {/* CTA de conversión: registra la solicitud de llamada Y crea el
+            presupuesto de ESTA opción concreta (vía solicitarSalud → interés). */}
+        {onSolicitar && (
+          <footer className="shrink-0 border-t border-hair bg-white px-5 py-4">
+            <button
+              type="button"
+              onClick={onSolicitar}
+              className="flex w-full items-center justify-center rounded-card bg-brand-red px-5 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+            >
+              Que me llamen gratis
+            </button>
+            <p className="mt-1.5 text-center text-[11px] text-slate2">Sin compromiso · Te llamamos cuando mejor te venga</p>
+          </footer>
+        )}
       </div>
     </div>
   );
