@@ -154,13 +154,26 @@ export class CodeoscopicError extends Error {
 
 export type CodeoscopicQuote = {
   id: string;
-  product?: { name?: string; vendor?: { name?: string }; modality?: { name?: string; category?: { name?: string } } };
+  product?: {
+    name?: string;
+    vendor?: { name?: string };
+    modality?: { name?: string; category?: { name?: string }; rating?: number; ratingDescription?: string };
+    // Logo de la aseguradora/producto (SVG servido por Avant2). Es la fuente
+    // de "logos de aseguradoras" — viene ya en cada cotización, no hace falta
+    // cruzar con /insurance-vendors salvo para catálogos.
+    imageUrl?: string;
+  };
   paymentMethod?: { id?: string; name?: string };
   paymentFrequency?: { id?: string; installments?: number };
   downPayment?: number;
   premium?: number;
   termMonths?: number;
+  // Franquicia (solo en modalidades con deducible, p.ej. todo riesgo). En
+  // salud normalmente no aplica, pero lo tipamos para reutilizar el mapa.
+  deductible?: number;
   estimate?: boolean;
+  // Enlaces del producto (condicionado/IPID en PDF) que devuelve la cotización.
+  links?: { name?: string; url?: string }[];
   actions?: { id?: string; required?: boolean }[];
   policyApplicationSupported?: boolean;
   // Cuando una aseguradora aún no ha respondido, Codeoscopic devuelve un
@@ -171,8 +184,101 @@ export type CodeoscopicQuote = {
 
 export type CodeoscopicInsurance = {
   id: string;
+  insuranceLine?: { id?: string; name?: string };
+  effectiveDate?: string;
   mainQuotes?: CodeoscopicQuote[];
   addonQuotes?: CodeoscopicQuote[];
-  // La forma completa incluye insuranceLine, holder, risk, offers, etc. —
-  // por ahora no las consumimos.
+  // Ofertas pre-empaquetadas (cotización principal + complementarias
+  // compatibles). Cada oferta es la unidad sobre la que se piden coberturas,
+  // se re-tarifica (estimate→firme) y se generan informes PDF.
+  offers?: CodeoscopicOffer[];
+  // Cotizaciones que fallaron por aseguradora (timeout, credenciales, etc.).
+  errors?: { product?: { name?: string; vendor?: { name?: string } }; messages?: { type?: string; description?: string }[] }[];
+  // La forma completa incluye holder, risk, producerUser, etc. — no las
+  // consumimos server-side salvo para depurar.
 };
+
+export type CodeoscopicOffer = {
+  id: string | number;
+  mainQuote?: { id?: string | number };
+  addonQuotes?: { id?: string | number }[];
+  totalDownPayment?: number;
+  totalPremium?: number;
+};
+
+/* ------------------------- Catálogos y metadatos -------------------------- */
+// Endpoints de solo lectura que describen QUÉ se puede tarificar y con quién:
+// líneas activas, productos por línea, vendors (con logo) y compañías DGS.
+// Se usan en el back office (diagnóstico de la integración, catálogos) y
+// para enriquecer la comparativa con logos/nombres cuando haga falta.
+
+export type CodeoscopicLine = {
+  id: string;
+  path?: string;
+  name?: string;
+  active?: boolean;
+  supports?: { rating?: boolean; policyApplication?: boolean; policyApplicationsReport?: boolean };
+};
+
+export type CodeoscopicVendor = { id: string; name?: string; description?: string; imageUrl?: string };
+export type CodeoscopicCompany = { code: string; name?: string };
+export type CodeoscopicProduct = {
+  id: number;
+  name?: string;
+  description?: string;
+  imageUrl?: string;
+  configs?: { id?: number; name?: string; imageUrl?: string; favorite?: boolean }[];
+  supports?: { policyApplication?: boolean };
+};
+
+/* ---------------------------- Helpers por endpoint ------------------------ */
+// Envoltorios finos y tipados de cada operación de la API. Centralizan el
+// path y el tipo de respuesta para que las rutas /api/* no repitan strings
+// ni casts. Toda la autenticación/reintentos vive en codeoscopicFetch.
+
+/** GET /insurance-lines — líneas de seguro (Health, Car, …) y si están activas. */
+export function listInsuranceLines(onlyActive = false): Promise<CodeoscopicLine[]> {
+  return codeoscopicFetch<CodeoscopicLine[]>(`/insurance-lines${onlyActive ? "?onlyActive=true" : ""}`);
+}
+
+/** GET /insurance-lines/{id}/products — productos activos de una línea. */
+export function listInsuranceProducts(lineId: string): Promise<CodeoscopicProduct[]> {
+  return codeoscopicFetch<CodeoscopicProduct[]>(`/insurance-lines/${encodeURIComponent(lineId)}/products`);
+}
+
+/** GET /insurance-vendors — entidades que comercializan (con logo). */
+export function listInsuranceVendors(): Promise<CodeoscopicVendor[]> {
+  return codeoscopicFetch<CodeoscopicVendor[]>("/insurance-vendors");
+}
+
+/** GET /insurance-companies — aseguradoras registradas en la DGS (código + nombre). */
+export function listInsuranceCompanies(): Promise<CodeoscopicCompany[]> {
+  return codeoscopicFetch<CodeoscopicCompany[]>("/insurance-companies");
+}
+
+/** GET /insurances/{id} — recupera un proyecto con sus cotizaciones/ofertas. */
+export function getInsurance(id: string | number): Promise<CodeoscopicInsurance> {
+  return codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(String(id))}`);
+}
+
+/** POST /insurances/{id}/offers — re-tarifica una oferta (estimate → precio firme). */
+export function reRateOffer(
+  id: string | number,
+  body: { mainQuote: { id: string | number; product?: { options?: unknown[] } }; addonQuotes?: { id: string | number }[] },
+  signal?: AbortSignal,
+): Promise<CodeoscopicOffer & Record<string, unknown>> {
+  return codeoscopicFetch(`/insurances/${encodeURIComponent(String(id))}/offers`, { method: "POST", body, signal });
+}
+
+/** PATCH /insurances/{id} — completa/actualiza datos para pasar a contratación. */
+export function patchInsurance(id: string | number, body: Record<string, unknown>): Promise<void> {
+  return codeoscopicFetch<void>(`/insurances/${encodeURIComponent(String(id))}`, { method: "PATCH", body });
+}
+
+/** POST /insurances/{id}/reports — genera un informe (PDF) de ofertas/coberturas. */
+export function createInsuranceReport(
+  id: string | number,
+  body: { type: "Offers"; offerIds: (string | number)[]; includeCoverages?: boolean; includePremiumBreakdown?: boolean; includeBrokerFee?: boolean; includeIpid?: boolean },
+): Promise<{ name?: string; url?: string; creationDateTime?: string; expirationDateTime?: string }> {
+  return codeoscopicFetch(`/insurances/${encodeURIComponent(String(id))}/reports`, { method: "POST", body });
+}

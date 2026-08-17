@@ -21,6 +21,9 @@ function summarizeQuote(q: CodeoscopicQuote): CodeoscopicQuoteSummary | null {
   if (!q?.id) return null;
   const compania = q.product?.vendor?.name?.trim() || "";
   const modalidad = q.product?.modality?.name?.trim() || "";
+  // Primer enlace del producto = condicionado/IPID en PDF (cuando la
+  // cotización lo trae). La UI lo ofrece como "Ver condiciones".
+  const docUrl = q.links?.find((l) => l?.url)?.url?.trim() || "";
   return {
     id: q.id,
     compania: compania || q.product?.name?.trim() || "Compañía",
@@ -30,6 +33,11 @@ function summarizeQuote(q: CodeoscopicQuote): CodeoscopicQuoteSummary | null {
     downPayment: typeof q.downPayment === "number" ? q.downPayment : null,
     frequency: q.paymentFrequency?.id ?? "",
     estimate: !!q.estimate,
+    imageUrl: q.product?.imageUrl?.trim() || undefined,
+    categoria: q.product?.modality?.category?.name?.trim() || undefined,
+    rating: typeof q.product?.modality?.rating === "number" ? q.product.modality.rating : null,
+    deductible: typeof q.deductible === "number" ? q.deductible : null,
+    docUrl: docUrl || undefined,
   };
 }
 

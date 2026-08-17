@@ -272,9 +272,15 @@ export function CreatePresupuestoModal({
                   <li key={q.id}>
                     <button type="button" onClick={() => pickCodeoscopicQuote(q)}
                       className="flex w-full items-center justify-between gap-2 rounded-lg border border-hair bg-white px-3 py-2 text-left text-[13px] transition-colors hover:bg-mist">
-                      <span className="min-w-0 truncate text-ink">
-                        {q.compania}{q.modalidad ? ` · ${q.modalidad}` : ""}
-                        {q.estimate && <span className="ml-1 text-[11px] text-slate2">(estimado)</span>}
+                      <span className="flex min-w-0 items-center gap-2">
+                        {q.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={q.imageUrl} alt={q.compania} className="h-6 max-w-[64px] w-auto shrink-0 object-contain" />
+                        )}
+                        <span className="min-w-0 truncate text-ink">
+                          {q.compania}{q.modalidad ? ` · ${q.modalidad}` : ""}
+                          {q.estimate && <span className="ml-1 text-[11px] text-slate2">(estimado)</span>}
+                        </span>
                       </span>
                       <span className="shrink-0 tnums font-semibold text-navy">
                         {q.premium != null ? `${q.premium.toFixed(2)} €/mes` : "…"}

@@ -61,6 +61,11 @@ type RealQuote = {
   downPayment: number | null;
   frequency: string;
   estimate: boolean;
+  imageUrl?: string;
+  categoria?: string;
+  rating?: number | null;
+  deductible?: number | null;
+  docUrl?: string;
 };
 type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
 
@@ -299,11 +304,17 @@ export function Comparativa() {
           if (!raw || typeof raw !== "object") return null;
           const q = raw as {
             id?: string;
-            product?: { name?: string; vendor?: { name?: string }; modality?: { name?: string; category?: { name?: string } } };
+            product?: {
+              name?: string; vendor?: { name?: string };
+              modality?: { name?: string; category?: { name?: string }; rating?: number };
+              imageUrl?: string;
+            };
             premium?: number;
             downPayment?: number;
+            deductible?: number;
             paymentFrequency?: { id?: string };
             estimate?: boolean;
+            links?: { name?: string; url?: string }[];
           };
           if (!q.id) return null;
           const compania = q.product?.vendor?.name?.trim() || "";
@@ -317,6 +328,11 @@ export function Comparativa() {
             downPayment: typeof q.downPayment === "number" ? q.downPayment : null,
             frequency: q.paymentFrequency?.id ?? "",
             estimate: !!q.estimate,
+            imageUrl: q.product?.imageUrl?.trim() || undefined,
+            categoria: q.product?.modality?.category?.name?.trim() || undefined,
+            rating: typeof q.product?.modality?.rating === "number" ? q.product.modality.rating : null,
+            deductible: typeof q.deductible === "number" ? q.deductible : null,
+            docUrl: q.links?.find((l) => l?.url)?.url?.trim() || undefined,
           };
         })
         .filter((q): q is RealQuote => q !== null);
@@ -589,15 +605,25 @@ export function Comparativa() {
                 {realQuotes.map((q) => (
                   <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex flex-col">
-                        <span className="text-[16px] font-bold text-ink">{q.compania}</span>
-                        {(q.producto || q.modalidad) && (
-                          <span className="text-[12px] text-slate2">
-                            {[q.producto, q.modalidad].filter(Boolean).join(" · ")}
-                          </span>
-                        )}
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {q.imageUrl
+                          ? <CompanyLogo logoUrl={q.imageUrl} compania={q.compania} size="h-8 max-w-[96px]" />
+                          : null}
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-[16px] font-bold text-ink">{q.compania}</span>
+                          {(q.producto || q.modalidad || q.categoria) && (
+                            <span className="truncate text-[12px] text-slate2">
+                              {[q.modalidad || q.producto, q.categoria].filter(Boolean).join(" · ")}
+                            </span>
+                          )}
+                          {typeof q.rating === "number" && q.rating > 0 && (
+                            <span aria-label={`Valoración ${q.rating} de 5`} className="text-[12px] leading-none text-amber-500">
+                              {"★".repeat(Math.round(q.rating))}<span className="text-slate2/40">{"★".repeat(Math.max(0, 5 - Math.round(q.rating)))}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-right text-[14px] text-slate2">
+                      <p className="shrink-0 text-right text-[14px] text-slate2">
                         {q.premium != null
                           ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(q.premium)} €</span>/{q.frequency === "Monthly" ? "mes" : "año"}</>
                           : <span className="text-[13px] italic text-slate2">Calculando…</span>}
@@ -610,14 +636,25 @@ export function Comparativa() {
                     )}
                     {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCoveragesFor(q)}
-                        tabIndex={unlocked ? 0 : -1}
-                        className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
-                      >
-                        Ver coberturas
-                      </button>
+                      <span className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setCoveragesFor(q)}
+                          tabIndex={unlocked ? 0 : -1}
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
+                        >
+                          Ver coberturas
+                        </button>
+                        {q.docUrl && (
+                          <a
+                            href={q.docUrl} target="_blank" rel="noopener noreferrer"
+                            tabIndex={unlocked ? 0 : -1}
+                            className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate2 underline underline-offset-2 hover:text-navy"
+                          >
+                            Condiciones (PDF)
+                          </a>
+                        )}
+                      </span>
                       {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} />}
                     </div>
                   </li>

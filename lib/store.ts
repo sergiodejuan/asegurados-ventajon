@@ -1962,6 +1962,15 @@ export type CodeoscopicQuoteSummary = {
   downPayment: number | null;
   frequency: string;
   estimate: boolean;
+  // Enriquecido desde la cotización cruda: logo de la aseguradora, categoría
+  // (Terceros, Todo Riesgo…), valoración 1-5 del producto, franquicia y el
+  // enlace al condicionado/IPID en PDF. La UI los usa para pintar logos,
+  // estrellas y el botón "Ver condiciones"; todos son opcionales.
+  imageUrl?: string;
+  categoria?: string;
+  rating?: number | null;
+  deductible?: number | null;
+  docUrl?: string;
 };
 
 /* ------------------------- Métricas Codeoscopic --------------------------- */
