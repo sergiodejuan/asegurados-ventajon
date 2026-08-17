@@ -61,11 +61,13 @@ export type CodeoscopicHealthPayload = {
   insuranceLine: { id: "Health" };
   effectiveDate: string;
   holder: {
-    // Opcional: el DNI/NIE no hace falta para TARIFICAR (precio estimado);
-    // solo para contratar/emitir la póliza (policy-applications). Los
-    // tarificadores de la web difieren el documento a la fase de
-    // contratación, así que se incluye aquí solo si ya se conoce.
-    identificationDocument?: { type: { id: string }; id: string };
+    // OBLIGATORIO. La API real de Integra rechaza el POST /insurances sin
+    // documento del titular ("The identity document of the holder is
+    // mandatory", 400) incluso para el precio estimado — al contrario de lo
+    // que sugería el manual. Por eso el mapper lo exige y, si el lead no lo
+    // trae (flujo público del tarificador, que difiere el DNI), devuelve
+    // ok:false y la comparativa cae al catálogo sin lanzar el 400.
+    identificationDocument: { type: { id: string }; id: string };
     name: string;
     surname: string;
     surname2?: string;
@@ -86,21 +88,22 @@ export type CodeoscopicHealthPayload = {
 };
 
 // Cualquier fallo del mapper es determinístico: si faltan datos obligatorios
-// para tarificar (nombre/apellido, fecha nac., sexo, CP real), devolvemos
-// null con la razón. El endpoint la propaga al cliente para que la
-// comparativa caiga al mock sin que el usuario vea un error críptico. El
-// documento (DNI/NIE) NO está en esa lista: no se exige para cotizar.
+// para tarificar (nombre/apellido, documento DNI/NIE, fecha nac., sexo, CP
+// real), devolvemos null con la razón. El endpoint la propaga al cliente para
+// que la comparativa caiga al mock sin que el usuario vea un error críptico.
 export type MapResult =
   | { ok: true; payload: CodeoscopicHealthPayload }
   | { ok: false; reason: string };
 
 export async function buildHealthPayload(lead: Lead, presupuesto: Presupuesto | null): Promise<MapResult> {
-  // Datos mínimos del titular para TARIFICAR (precio estimado). El DNI/NIE
-  // NO es uno de ellos: el manual de Integra separa cotizar (estimate) de
-  // contratar/emitir (policy-applications, que sí exige documento). Todos
-  // los tarificadores de la web difieren el documento a la contratación, así
-  // que aquí no se exige — si está presente se envía, si no, se cotiza igual.
+  // Datos mínimos del titular para TARIFICAR (precio estimado). Confirmado
+  // contra la API real: el documento del titular (DNI/NIE) SÍ es obligatorio
+  // incluso para el estimado. Si el lead no lo trae (flujo público del
+  // tarificador, que difiere el DNI a la contratación), devolvemos ok:false
+  // con un motivo claro y la comparativa cae al catálogo — nunca se llega a
+  // enviar un POST que Codeoscopic rechazaría con 400.
   if (!lead.nombre || !lead.apellido1) return { ok: false, reason: "Sin nombre/apellido del titular." };
+  if (!lead.documento || !lead.documentoTipo) return { ok: false, reason: "Sin documento del titular (DNI/NIE), obligatorio para tarificar." };
   const holderDob = toIsoDate(lead.fechaNacimiento);
   if (!holderDob) return { ok: false, reason: "Fecha de nacimiento del titular no válida." };
   const holderGender = toCodeoscopicGender(lead.sexo);
@@ -110,11 +113,15 @@ export async function buildHealthPayload(lead: Lead, presupuesto: Presupuesto | 
   const townId = await resolveTownIdByPostalCode(lead.codigoPostalReal);
   if (townId == null) return { ok: false, reason: `Codeoscopic no reconoce el CP ${lead.codigoPostalReal}.` };
 
-  // Asegurados adicionales: aceptamos los que tengan fecha y sexo válidos;
-  // ignoramos los mal formados (podrían venir de un lead antiguo sin la
-  // migración de campos). Como mínimo, la lista puede quedar vacía si el
-  // titular es el único asegurado.
-  const insureds: CodeoscopicHealthPayload["risk"]["insureds"] = [];
+  // La lista de asegurados NO puede ir vacía (la API responde 400 "The
+  // `insureds` field cannot be null or empty."). El titular es siempre el
+  // primer asegurado del riesgo: en salud el tomador se cubre a sí mismo, y
+  // `numAsegurados` cuenta al titular + los adicionales. Añadimos primero al
+  // titular (fecha, sexo y fumador) y después los adicionales bien formados;
+  // los adicionales mal formados (leads antiguos sin la migración) se ignoran.
+  const insureds: CodeoscopicHealthPayload["risk"]["insureds"] = [
+    { birthDate: holderDob, gender: { id: holderGender }, smoker: !!lead.fumador },
+  ];
   for (const a of lead.aseguradosAdicionales ?? []) {
     const dob = toIsoDate(a.fechaNacimiento);
     const g = toCodeoscopicGender(a.sexo);
@@ -131,17 +138,14 @@ export async function buildHealthPayload(lead: Lead, presupuesto: Presupuesto | 
   // parámetro para no romper la firma cuando amplíe el modelo.
   void presupuesto;
 
-  // Documento del titular: solo si ya se conoce (fase de contratación). Para
-  // una cotización estimada desde el tarificador normalmente no está.
-  const identificationDocument = lead.documento && lead.documentoTipo
-    ? { type: { id: lead.documentoTipo }, id: lead.documento }
-    : undefined;
+  // Documento del titular: garantizado arriba (obligatorio para tarificar).
+  const identificationDocument = { type: { id: lead.documentoTipo }, id: lead.documento };
 
   const payload: CodeoscopicHealthPayload = {
     insuranceLine: { id: "Health" },
     effectiveDate,
     holder: {
-      ...(identificationDocument ? { identificationDocument } : {}),
+      identificationDocument,
       name: lead.nombre.trim(),
       surname: lead.apellido1.trim(),
       surname2: lead.apellido2?.trim() || undefined,

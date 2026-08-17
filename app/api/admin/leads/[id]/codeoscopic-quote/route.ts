@@ -1,9 +1,27 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getLead } from "@/lib/store";
 import { requireModule } from "@/lib/agentAuth";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
 import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
+
+// El documento del titular (DNI/NIE) es obligatorio para que Codeoscopic
+// tarifique (ver lib/codeoscopicMap.ts). El tarificador público NO lo pide
+// (se difiere a contratación), así que el lead casi nunca lo trae. Aquí el
+// agente puede aportarlo a mano para obtener precios reales desde la ficha.
+// Mismo formato/normalización que lib/schema.ts, sin persistirlo en el lead:
+// se usa solo para esta cotización.
+const bodySchema = z
+  .object({
+    documentoTipo: z.enum(["Dni", "Nie"]).optional(),
+    documento: z
+      .string()
+      .transform((v) => v.trim().toUpperCase().replace(/[^0-9A-Z]/g, ""))
+      .refine((v) => /^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(v), "Revisa el DNI o NIE (formato no válido).")
+      .optional(),
+  })
+  .strict();
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +48,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const lead = await getLead(params.id);
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
 
-  const mapped = await buildHealthPayload(lead, null);
+  // Documento aportado por el agente en esta petición (opcional). Si el lead
+  // ya lo tiene, se respeta el suyo; si no, se usa el del body para poder
+  // tarificar. No se persiste en el lead.
+  const raw = await request.json().catch(() => ({}));
+  const parsed = bodySchema.safeParse(raw ?? {});
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: parsed.error.issues[0]?.message ?? "Documento no válido." }, { status: 400 });
+  }
+  const leadForQuote: typeof lead = {
+    ...lead,
+    documento: lead.documento || parsed.data.documento || "",
+    documentoTipo: lead.documentoTipo || parsed.data.documentoTipo || "",
+  };
+
+  const mapped = await buildHealthPayload(leadForQuote, null);
   if (!mapped.ok) return NextResponse.json({ ok: false, reason: mapped.reason });
 
   try {

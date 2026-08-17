@@ -46,6 +46,10 @@ export function CreatePresupuestoModal({
   const [cqError, setCqError] = useState<string | null>(null);
   const [cqQuotes, setCqQuotes] = useState<CodeoscopicQuoteSummary[]>([]);
   const [cqInsuranceId, setCqInsuranceId] = useState("");
+  // Documento del titular: Codeoscopic lo exige para tarificar y el
+  // tarificador público no lo recoge, así que el agente puede aportarlo aquí.
+  const [cqDocumentoTipo, setCqDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
+  const [cqDocumento, setCqDocumento] = useState("");
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -106,7 +110,13 @@ export function CreatePresupuestoModal({
     setCqInsuranceId("");
     try {
       const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-quote`, {
-        method: "POST", headers: { "x-admin-token": token },
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify(
+          cqDocumento.trim()
+            ? { documento: cqDocumento.trim(), documentoTipo: cqDocumentoTipo }
+            : {}
+        ),
       });
       const body = await res.json();
       if (!body.ok) {
@@ -233,6 +243,28 @@ export function CreatePresupuestoModal({
                 {cqStatus === "loading" ? "Consultando…" : cqStatus === "polling" ? "Esperando aseguradoras…" : "Consultar precio real"}
               </button>
             </div>
+            {/* DNI/NIE del titular: Codeoscopic lo exige para tarificar. Si el
+                lead ya lo tiene guardado, se puede dejar vacío y se usará el
+                suyo; si no, hay que teclearlo aquí para obtener precios. */}
+            <div className="mt-2 flex items-end gap-2">
+              <label className="shrink-0">
+                <span className="mb-1 block text-[11px] font-semibold text-slate2">Tipo</span>
+                <select value={cqDocumentoTipo} onChange={(e) => setCqDocumentoTipo(e.target.value as "Dni" | "Nie")}
+                  className="rounded-card border border-hair bg-white px-2 py-1.5 text-[13px]">
+                  <option value="Dni">DNI</option>
+                  <option value="Nie">NIE</option>
+                </select>
+              </label>
+              <label className="min-w-0 flex-1">
+                <span className="mb-1 block text-[11px] font-semibold text-slate2">Documento del titular</span>
+                <input value={cqDocumento} onChange={(e) => setCqDocumento(e.target.value.toUpperCase())}
+                  placeholder="12345678Z" maxLength={9}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-1.5 text-[13px] uppercase tnums" />
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-slate2">
+              Obligatorio para tarificar. Déjalo vacío solo si el lead ya tiene DNI/NIE guardado.
+            </p>
             {cqError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqError}</p>}
             {cqQuotes.length > 0 && (
               <ul className="mt-2 flex flex-col gap-1.5">
