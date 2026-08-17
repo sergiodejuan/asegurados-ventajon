@@ -175,7 +175,19 @@ export function Comparativa() {
     // Detectar draft pendiente — significa que venimos del tarificador y
     // aún no se ha creado el lead (flujo salud/vida unificado 2026-08).
     const draft = loadLeadDraft();
-    if (draft) setHasDraft(true);
+    if (draft) {
+      setHasDraft(true);
+    } else {
+      // El lead ya existe (volvemos de "Más información" o de una opción, o
+      // recargamos con ?pid=...). No hay que volver a bloquear ni re-pedir los
+      // datos: restauramos el pid y desbloqueamos si ya se pasó el gate antes
+      // (tenemos pid en la URL, o un presupuesto/contacto guardado).
+      const restoredPid = initialPid || q?.id || "";
+      if (restoredPid && !presupuestoId) setPresupuestoId(restoredPid);
+      const yaPasoGate = !!(restoredPid || (q?.nombre && q?.telefono && q?.email));
+      if (yaPasoGate) setUnlocked(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function unlockComparativa(e: React.FormEvent) {
@@ -731,7 +743,7 @@ export function Comparativa() {
                           </a>
                         )}
                       </div>
-                      {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} />}
+                      {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} />}
                     </div>
                   </li>
                 ))}
@@ -894,22 +906,37 @@ export function CompanyLogo({
 // desbloqueada, en la opción recomendada — esa se queda en verde a
 // propósito para que siga destacando, en vez de volver a rojo como el resto.
 function CompanyActions({
-  producto, compania, precio, locked = false, recommended = false,
+  producto, compania, precio, locked = false, recommended = false, onMasInfo,
 }: {
   producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
+  // Si se pasa, "Más información" abre el detalle en la propia página (modal)
+  // en vez de navegar a /comparativa/[compania] — necesario para las opciones
+  // reales de Codeoscopic, que no existen como página de catálogo y además
+  // evita salir de la comparativa y volver a pasar por el gate.
+  onMasInfo?: () => void;
 }) {
   const green = locked || recommended;
   // En móvil los botones se apilan a ancho completo (evita que "Que te llamen
   // gratis" desborde la tarjeta); en ≥sm van en fila repartiendo el ancho.
   return (
     <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-      <a
-        href={`/comparativa/${slugify(compania)}?producto=${producto}`}
-        tabIndex={locked ? -1 : 0}
-        className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
-      >
-        Más información
-      </a>
+      {onMasInfo ? (
+        <button
+          type="button" onClick={onMasInfo}
+          tabIndex={locked ? -1 : 0}
+          className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+        >
+          Más información
+        </button>
+      ) : (
+        <a
+          href={`/comparativa/${slugify(compania)}?producto=${producto}`}
+          tabIndex={locked ? -1 : 0}
+          className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+        >
+          Más información
+        </a>
+      )}
       <a
         href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
         tabIndex={locked ? -1 : 0}
@@ -1107,20 +1134,23 @@ function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; 
 
   return (
     <div
-      role="dialog" aria-modal="true" aria-label={`Coberturas de ${quote.compania}`}
+      role="dialog" aria-modal="true" aria-label={`Detalle de ${quote.compania}`}
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
       onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
     >
       <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
         <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate2">Coberturas</p>
-            <h3 className="truncate text-[17px] font-extrabold text-navy">{quote.compania}</h3>
-            {(quote.producto || quote.modalidad) && (
-              <p className="truncate text-[12px] text-slate2">
-                {[quote.producto, quote.modalidad].filter(Boolean).join(" · ")}
-              </p>
-            )}
+          <div className="flex min-w-0 items-center gap-2.5">
+            {quote.imageUrl ? <CompanyLogo logoUrl={quote.imageUrl} compania={quote.compania} size="h-9 max-w-[110px]" /> : null}
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate2">Detalle de la opción</p>
+              <h3 className="truncate text-[17px] font-extrabold text-navy">{quote.compania}</h3>
+              {(quote.modalidad || quote.producto || quote.categoria) && (
+                <p className="truncate text-[12px] text-slate2">
+                  {[quote.modalidad || quote.producto, quote.categoria].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
           </div>
           <button
             type="button" onClick={onClose} aria-label="Cerrar"
@@ -1130,6 +1160,34 @@ function CoveragesModal({ insuranceId, quote, onClose }: { insuranceId: string; 
           </button>
         </header>
         <div className="max-h-[calc(90vh-72px)] overflow-y-auto px-5 pb-6 pt-4">
+          {/* Resumen de la opción: precio, valoración y condiciones. */}
+          <div className="rounded-card border border-hair bg-mist/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {typeof quote.rating === "number" && quote.rating > 0 && (
+                  <span aria-label={`Valoración ${quote.rating} de 5`} className="text-[13px] leading-none text-amber-500">
+                    {"★".repeat(Math.round(quote.rating))}<span className="text-slate2/40">{"★".repeat(Math.max(0, 5 - Math.round(quote.rating)))}</span>
+                  </span>
+                )}
+                {quote.docUrl && (
+                  <a href={quote.docUrl} target="_blank" rel="noopener noreferrer"
+                    className="mt-1 block text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red">
+                    Condiciones del producto (PDF)
+                  </a>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                {quote.premium != null
+                  ? <p className="text-[14px] text-slate2">Desde <span className="text-[19px] font-extrabold tnums text-navy">{euros(quote.premium)} €</span>/{quote.frequency === "Monthly" ? "mes" : "año"}</p>
+                  : <p className="text-[13px] italic text-slate2">Precio en cálculo…</p>}
+                {quote.downPayment != null && quote.downPayment > 0 && quote.downPayment !== quote.premium && (
+                  <p className="mt-0.5 text-[12px] text-slate2">Primera prima: <span className="font-semibold tnums text-ink">{euros(quote.downPayment)} €</span></p>
+                )}
+                {quote.estimate && <p className="mt-0.5 text-[11px] italic text-slate2">Precio orientativo</p>}
+              </div>
+            </div>
+          </div>
+          <h4 className="mt-5 mb-1 text-[13px] font-bold uppercase tracking-wide text-slate2">Coberturas</h4>
           {state.kind === "loading" && (
             <p className="py-8 text-center text-[13px] text-slate2">Cargando coberturas…</p>
           )}
