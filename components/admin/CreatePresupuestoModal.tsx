@@ -50,6 +50,9 @@ export function CreatePresupuestoModal({
   // tarificador público no lo recoge, así que el agente puede aportarlo aquí.
   const [cqDocumentoTipo, setCqDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
   const [cqDocumento, setCqDocumento] = useState("");
+  // Segundo apellido: Codeoscopic exige los dos. Si el lead no lo tiene, el
+  // agente lo aporta aquí para poder tarificar.
+  const [cqApellido2, setCqApellido2] = useState("");
   // Acciones por cotización: afinar a precio firme (re-rate) y generar el PDF.
   const [cqBusyId, setCqBusyId] = useState<string | null>(null);
   const [cqActionError, setCqActionError] = useState<string | null>(null);
@@ -115,11 +118,10 @@ export function CreatePresupuestoModal({
       const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-token": token },
-        body: JSON.stringify(
-          cqDocumento.trim()
-            ? { documento: cqDocumento.trim(), documentoTipo: cqDocumentoTipo }
-            : {}
-        ),
+        body: JSON.stringify({
+          ...(cqDocumento.trim() ? { documento: cqDocumento.trim(), documentoTipo: cqDocumentoTipo } : {}),
+          ...(cqApellido2.trim() ? { apellido2: cqApellido2.trim() } : {}),
+        }),
       });
       const body = await res.json();
       if (!body.ok) {
@@ -305,8 +307,14 @@ export function CreatePresupuestoModal({
                   className="w-full rounded-card border border-hair bg-white px-3 py-1.5 text-[13px] uppercase tnums" />
               </label>
             </div>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-[11px] font-semibold text-slate2">Segundo apellido del titular</span>
+              <input value={cqApellido2} onChange={(e) => setCqApellido2(e.target.value)}
+                placeholder="Solo si el lead no lo tiene ya"
+                className="w-full rounded-card border border-hair bg-white px-3 py-1.5 text-[13px]" />
+            </label>
             <p className="mt-1 text-[11px] leading-snug text-slate2">
-              Obligatorio para tarificar. Déjalo vacío solo si el lead ya tiene DNI/NIE guardado.
+              Obligatorio para tarificar (DNI/NIE + los dos apellidos). Déjalo vacío solo si el lead ya los tiene guardados.
             </p>
             {cqError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqError}</p>}
             {cqActionError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqActionError}</p>}

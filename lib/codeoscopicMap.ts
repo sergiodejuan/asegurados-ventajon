@@ -116,6 +116,9 @@ export async function buildHealthPayload(lead: Lead, presupuesto: Presupuesto | 
   // con un motivo claro y la comparativa cae al catálogo — nunca se llega a
   // enviar un POST que Codeoscopic rechazaría con 400.
   if (!lead.nombre || !lead.apellido1) return { ok: false, reason: "Sin nombre/apellido del titular." };
+  // Codeoscopic exige nombre + DOS apellidos para el titular ("The name and
+  // surnames of the holder are not valid." si falta el segundo).
+  if (!lead.apellido2 || !lead.apellido2.trim()) return { ok: false, reason: "Falta el segundo apellido del titular (Codeoscopic exige los dos apellidos)." };
   if (!lead.documento || !lead.documentoTipo) return { ok: false, reason: "Sin documento del titular (DNI/NIE), obligatorio para tarificar." };
   const holderDob = toIsoDate(lead.fechaNacimiento);
   if (!holderDob) return { ok: false, reason: "Fecha de nacimiento del titular no válida." };

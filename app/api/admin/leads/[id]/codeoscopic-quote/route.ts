@@ -20,6 +20,9 @@ const bodySchema = z
       .transform((v) => v.trim().toUpperCase().replace(/[^0-9A-Z]/g, ""))
       .refine((v) => /^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(v), "Revisa el DNI o NIE (formato no válido).")
       .optional(),
+    // Segundo apellido: Codeoscopic exige los dos. El lead puede no tenerlo
+    // (leads antiguos o de otros flujos); el agente lo aporta aquí.
+    apellido2: z.string().trim().min(2).max(60).optional(),
   })
   .strict();
 
@@ -60,6 +63,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     ...lead,
     documento: lead.documento || parsed.data.documento || "",
     documentoTipo: lead.documentoTipo || parsed.data.documentoTipo || "",
+    apellido2: lead.apellido2 || parsed.data.apellido2 || "",
   };
 
   const mapped = await buildHealthPayload(leadForQuote, null);

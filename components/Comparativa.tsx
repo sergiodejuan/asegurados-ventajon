@@ -134,6 +134,9 @@ export function Comparativa() {
   const [unlocked, setUnlocked] = useState(false);
   const [gateNombre, setGateNombre] = useState("");
   const [gateApellido1, setGateApellido1] = useState("");
+  // Segundo apellido: Codeoscopic exige nombre + DOS apellidos para el titular
+  // con DNI ("The name and surnames of the holder are not valid." si falta).
+  const [gateApellido2, setGateApellido2] = useState("");
   // DNI/NIE del titular: obligatorio en salud para que Codeoscopic tarifique
   // con precios reales (no de catálogo).
   const [gateDocumentoTipo, setGateDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
@@ -182,6 +185,9 @@ export function Comparativa() {
     if (producto === "salud" && (!gateApellido1.trim() || gateApellido1.trim().length < 2)) {
       setGateError("Dinos tu primer apellido."); return;
     }
+    if (producto === "salud" && (!gateApellido2.trim() || gateApellido2.trim().length < 2)) {
+      setGateError("Dinos tu segundo apellido."); return;
+    }
     if (producto === "salud") {
       const doc = gateDocumento.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
       if (!/^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(doc)) {
@@ -215,7 +221,7 @@ export function Comparativa() {
           ...draft.data,
           nombre: gateNombre,
           ...(producto === "salud"
-            ? { apellido1: gateApellido1, documentoTipo: gateDocumentoTipo, documento: gateDocumento.trim().toUpperCase() }
+            ? { apellido1: gateApellido1, apellido2: gateApellido2, documentoTipo: gateDocumentoTipo, documento: gateDocumento.trim().toUpperCase() }
             : {}),
           telefono: gateTelefono,
           email: gateEmail,
@@ -856,6 +862,7 @@ export function Comparativa() {
           mustGate={mustGate}
           nombre={gateNombre} onNombre={setGateNombre}
           apellido1={gateApellido1} onApellido1={setGateApellido1}
+          apellido2={gateApellido2} onApellido2={setGateApellido2}
           documentoTipo={gateDocumentoTipo} onDocumentoTipo={setGateDocumentoTipo}
           documento={gateDocumento} onDocumento={setGateDocumento}
           telefono={gateTelefono} onTelefono={setGateTelefono}
@@ -921,7 +928,7 @@ function CompanyActions({
 // completar" para no romper el flujo antiguo.
 function ComparativaGate({
   producto, isHealthLike, mustGate,
-  nombre, onNombre, apellido1, onApellido1,
+  nombre, onNombre, apellido1, onApellido1, apellido2, onApellido2,
   documentoTipo, onDocumentoTipo, documento, onDocumento,
   telefono, onTelefono, email, onEmail,
   aceptaEsencial, onAceptaEsencial,
@@ -933,6 +940,7 @@ function ComparativaGate({
   mustGate: boolean;
   nombre: string; onNombre: (v: string) => void;
   apellido1: string; onApellido1: (v: string) => void;
+  apellido2: string; onApellido2: (v: string) => void;
   documentoTipo: "Dni" | "Nie"; onDocumentoTipo: (v: "Dni" | "Nie") => void;
   documento: string; onDocumento: (v: string) => void;
   telefono: string; onTelefono: (v: string) => void;
@@ -978,11 +986,18 @@ function ComparativaGate({
             className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
           />
           {producto === "salud" && (
-            <input
-              type="text" value={apellido1} onChange={(e) => onApellido1(e.target.value)}
-              placeholder="Primer apellido" autoComplete="family-name"
-              className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
-            />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text" value={apellido1} onChange={(e) => onApellido1(e.target.value)}
+                placeholder="Primer apellido" autoComplete="family-name"
+                className="w-full min-w-0 flex-1 rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+              <input
+                type="text" value={apellido2} onChange={(e) => onApellido2(e.target.value)}
+                placeholder="Segundo apellido" autoComplete="additional-name"
+                className="w-full min-w-0 flex-1 rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+            </div>
           )}
           {producto === "salud" && (
             <div className="flex gap-2">

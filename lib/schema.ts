@@ -159,7 +159,9 @@ export const leadSchema = z.object({
   ...seguroActual,
   nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
   apellido1: z.string().trim().min(2, "Dinos tu primer apellido.").max(60),
-  apellido2: z.string().trim().max(60).optional().default(""),
+  // Codeoscopic exige nombre + DOS apellidos para el titular con DNI, así que
+  // en salud el segundo apellido es obligatorio (se recoge en el gate).
+  apellido2: z.string().trim().min(2, "Dinos tu segundo apellido.").max(60),
   telefono: phoneField,
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
