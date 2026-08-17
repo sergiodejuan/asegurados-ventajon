@@ -108,6 +108,9 @@ export function Comparativa() {
     }
     return list; // "default": orden tal cual llega de Codeoscopic
   }, [realQuotes, sortBy]);
+  // Ofertas comerciales destacadas del catálogo manual (se muestran arriba
+  // del todo con badge, por encima de los precios reales de Codeoscopic).
+  const recommendedProducts = useMemo(() => products.filter((p) => p.destacado), [products]);
   // insuranceId real de Codeoscopic — se muestra al pie de la sección de
   // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
   // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
@@ -613,8 +616,48 @@ export function Comparativa() {
               </p>
             </div>
 
+            {/* Ofertas comerciales cerradas por el asesor (productos del
+                catálogo marcados como destacado). Van SIEMPRE arriba del todo,
+                por encima de los precios reales de Codeoscopic, con badge.
+                Solo cuando hay precios reales: en el fallback sin Codeoscopic,
+                la lista mock de abajo ya coloca los destacados primero. */}
+            {producto === "salud" && realQuotes.length > 0 && recommendedProducts.length > 0 && (
+              <div className="mt-5">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="rounded-pill bg-brand-red px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Recomendado</span>
+                  <h3 className="text-[14px] font-bold text-navy">Ofertas destacadas de tu asesor</h3>
+                </div>
+                <ul className="flex flex-col gap-3">
+                  {recommendedProducts.map((c) => {
+                    const precio = c.precioConCopago ?? c.precioSinCopago ?? c.precio ?? 0;
+                    return (
+                      <li key={c.id} className="rounded-card border-2 border-brand-red bg-white p-4 shadow-card">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            {c.logoUrl
+                              ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                              : <span className="truncate text-[16px] font-bold text-ink">{c.compania}</span>}
+                            <span className="shrink-0 rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>
+                          </div>
+                          {precio > 0 && (
+                            <p className="shrink-0 text-right text-[14px] text-slate2">
+                              Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(precio)} €</span>/mes
+                            </p>
+                          )}
+                        </div>
+                        {c.servicios?.[0] && <p className="mt-1.5 text-[12px] text-slate2">{c.servicios[0]}</p>}
+                        <CompanyActions producto={producto} compania={c.compania} precio={precio} locked={!unlocked} recommended />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {producto === "salud" && realQuotes.length > 0 && (
+              <p className="mt-6 mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>
+            )}
             {producto === "salud" && realQuotes.length > 1 && (
-              <div className="mt-4 flex items-center justify-end gap-2">
+              <div className="mt-1 flex items-center justify-end gap-2">
                 <label htmlFor="cmp-sort" className="text-[12px] font-semibold text-slate2">Ordenar por</label>
                 <select
                   id="cmp-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
@@ -662,8 +705,8 @@ export function Comparativa() {
                       </p>
                     )}
                     {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-3">
+                    <div className="mt-3 flex flex-col gap-2.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                         <button
                           type="button"
                           onClick={() => setCoveragesFor(q)}
@@ -681,7 +724,7 @@ export function Comparativa() {
                             Condiciones (PDF)
                           </a>
                         )}
-                      </span>
+                      </div>
                       {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} />}
                     </div>
                   </li>
@@ -849,19 +892,21 @@ function CompanyActions({
   producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
 }) {
   const green = locked || recommended;
+  // En móvil los botones se apilan a ancho completo (evita que "Que te llamen
+  // gratis" desborde la tarjeta); en ≥sm van en fila repartiendo el ancho.
   return (
-    <div className="mt-3 flex gap-2">
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
       <a
         href={`/comparativa/${slugify(compania)}?producto=${producto}`}
         tabIndex={locked ? -1 : 0}
-        className="flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+        className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
       >
         Más información
       </a>
       <a
         href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
         tabIndex={locked ? -1 : 0}
-        className={`flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
+        className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
       >
         Que te llamen gratis
       </a>

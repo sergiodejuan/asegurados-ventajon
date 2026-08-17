@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError } from "@/lib/codeoscopic";
+import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, getInsurance } from "@/lib/codeoscopic";
 import { rateLimitFail } from "@/lib/rateLimit";
 
 // Endpoint público (rate-limited): dado un insuranceId y un quoteId,
@@ -7,19 +7,15 @@ import { rateLimitFail } from "@/lib/rateLimit";
 // de coberturas. La comparativa lo consume desde el modal "Ver coberturas"
 // de cada tarjeta real.
 //
-// Codeoscopic requiere dos llamadas: primero listar /insurances/{id}/offers
-// para encontrar el offer que agrupa la cotización pedida (los offers son
-// combinaciones "cotización principal + complementarios"), luego llamar a
-// /insurances/{id}/offers/{offerId}/coverages con el offer resuelto.
-// Encapsulando esto en un solo endpoint server-side ahorramos una petición
-// desde el navegador y evitamos exponer el mapping interno a la vista.
+// Codeoscopic requiere dos llamadas: primero recuperar el proyecto con
+// GET /insurances/{id} y leer su array `offers` para encontrar el offer que
+// agrupa la cotización pedida (los offers son combinaciones "cotización
+// principal + complementarios"; ese path NO admite GET a /offers, solo POST
+// para re-tarificar), luego llamar a /insurances/{id}/offers/{offerId}/coverages
+// con el offer resuelto. Encapsulando esto en un solo endpoint server-side
+// ahorramos una petición desde el navegador y evitamos exponer el mapping
+// interno a la vista.
 export const maxDuration = 20;
-
-type CodeoscopicOffer = {
-  id: string;
-  mainQuote?: { id?: string };
-  addonQuotes?: { id?: string }[];
-};
 
 type CodeoscopicCoverageItem = {
   name?: string;
@@ -89,13 +85,13 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
   if (limited) return limited;
 
   try {
-    // 1) offers del insurance
-    const offersRaw = await codeoscopicFetch<CodeoscopicOffer[] | { items?: CodeoscopicOffer[] }>(
-      `/insurances/${encodeURIComponent(insuranceId)}/offers`
-    );
-    const offers: CodeoscopicOffer[] = Array.isArray(offersRaw) ? offersRaw : Array.isArray(offersRaw.items) ? offersRaw.items : [];
-    const offer = offers.find(
-      (o) => o.mainQuote?.id === quoteId || (o.addonQuotes ?? []).some((a) => a?.id === quoteId)
+    // 1) offers del insurance — vienen embebidos en el proyecto (GET /insurances/{id});
+    //    el path /insurances/{id}/offers no admite GET (solo POST para re-tarificar).
+    const insurance = await getInsurance(insuranceId);
+    const offer = (insurance.offers ?? []).find(
+      (o) =>
+        String(o.mainQuote?.id ?? "") === quoteId ||
+        (o.addonQuotes ?? []).some((a) => String(a?.id ?? "") === quoteId)
     );
     if (!offer?.id) {
       return NextResponse.json({ ok: false, reason: "offer_not_found" }, { status: 404 });
@@ -103,7 +99,7 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
 
     // 2) coberturas del offer
     const coveragesRaw = await codeoscopicFetch<CodeoscopicCoveragesResponse>(
-      `/insurances/${encodeURIComponent(insuranceId)}/offers/${encodeURIComponent(offer.id)}/coverages`
+      `/insurances/${encodeURIComponent(insuranceId)}/offers/${encodeURIComponent(String(offer.id))}/coverages`
     );
     const grupos = normalizeGroups(extractItems(coveragesRaw));
     return NextResponse.json({ ok: true, insuranceId, quoteId, offerId: offer.id, grupos });
