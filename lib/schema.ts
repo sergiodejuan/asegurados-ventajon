@@ -145,13 +145,12 @@ export const leadSchema = z.object({
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
-  // Plus5 (auditoría consultora): documento de identidad (DNI/NIE) NO se
-  // pide en el tarificador — se solicita en el flujo post-elección, cuando
-  // el cliente ya ha visto precios y quiere avanzar a contratación. Aquí
-  // se aceptan opcionalmente por compatibilidad con integraciones antiguas
-  // (Codeoscopic prefiere tenerlo pero funciona sin).
-  documentoTipo: documentoTipoField.optional(),
-  documento: documentoField.optional(),
+  // Documento de identidad (DNI/NIE) del titular: OBLIGATORIO. La API de
+  // Codeoscopic lo exige para tarificar (no solo para contratar), así que se
+  // recoge en el gate de /comparativa antes de crear el lead. Sin él, la
+  // comparativa solo podría mostrar precios de catálogo, no reales.
+  documentoTipo: documentoTipoField,
+  documento: documentoField,
   codigoPostalReal: codigoPostalRealField,
   fumador: z.boolean(),
   aseguradosAdicionales: z.array(aseguradoAdicionalSchema).max(8).optional().default([]),

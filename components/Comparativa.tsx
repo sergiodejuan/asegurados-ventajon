@@ -113,6 +113,10 @@ export function Comparativa() {
   const [unlocked, setUnlocked] = useState(false);
   const [gateNombre, setGateNombre] = useState("");
   const [gateApellido1, setGateApellido1] = useState("");
+  // DNI/NIE del titular: obligatorio en salud para que Codeoscopic tarifique
+  // con precios reales (no de catálogo).
+  const [gateDocumentoTipo, setGateDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
+  const [gateDocumento, setGateDocumento] = useState("");
   const [gateTelefono, setGateTelefono] = useState("");
   const [gateEmail, setGateEmail] = useState("");
   // Un único check cubre privacidad + autorización de contacto + (si aplica)
@@ -157,6 +161,12 @@ export function Comparativa() {
     if (producto === "salud" && (!gateApellido1.trim() || gateApellido1.trim().length < 2)) {
       setGateError("Dinos tu primer apellido."); return;
     }
+    if (producto === "salud") {
+      const doc = gateDocumento.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
+      if (!/^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(doc)) {
+        setGateError("Revisa tu DNI o NIE (p. ej. 12345678Z)."); return;
+      }
+    }
     if (!/^[6-9]\d{8}$/.test(normalizePhone(gateTelefono))) { setGateError("Introduce un móvil español válido (9 dígitos)."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim())) { setGateError("Revisa tu correo electrónico."); return; }
     if (!gateAceptaEsencial) {
@@ -183,7 +193,9 @@ export function Comparativa() {
         const payload = {
           ...draft.data,
           nombre: gateNombre,
-          ...(producto === "salud" ? { apellido1: gateApellido1 } : {}),
+          ...(producto === "salud"
+            ? { apellido1: gateApellido1, documentoTipo: gateDocumentoTipo, documento: gateDocumento.trim().toUpperCase() }
+            : {}),
           telefono: gateTelefono,
           email: gateEmail,
           aceptaPrivacidad: true,
@@ -737,6 +749,8 @@ export function Comparativa() {
           mustGate={mustGate}
           nombre={gateNombre} onNombre={setGateNombre}
           apellido1={gateApellido1} onApellido1={setGateApellido1}
+          documentoTipo={gateDocumentoTipo} onDocumentoTipo={setGateDocumentoTipo}
+          documento={gateDocumento} onDocumento={setGateDocumento}
           telefono={gateTelefono} onTelefono={setGateTelefono}
           email={gateEmail} onEmail={setGateEmail}
           aceptaEsencial={gateAceptaEsencial} onAceptaEsencial={setGateAceptaEsencial}
@@ -799,6 +813,7 @@ function CompanyActions({
 function ComparativaGate({
   producto, isHealthLike, mustGate,
   nombre, onNombre, apellido1, onApellido1,
+  documentoTipo, onDocumentoTipo, documento, onDocumento,
   telefono, onTelefono, email, onEmail,
   aceptaEsencial, onAceptaEsencial,
   aceptaComercial, onAceptaComercial,
@@ -809,6 +824,8 @@ function ComparativaGate({
   mustGate: boolean;
   nombre: string; onNombre: (v: string) => void;
   apellido1: string; onApellido1: (v: string) => void;
+  documentoTipo: "Dni" | "Nie"; onDocumentoTipo: (v: "Dni" | "Nie") => void;
+  documento: string; onDocumento: (v: string) => void;
   telefono: string; onTelefono: (v: string) => void;
   email: string; onEmail: (v: string) => void;
   aceptaEsencial: boolean; onAceptaEsencial: (v: boolean) => void;
@@ -857,6 +874,25 @@ function ComparativaGate({
               placeholder="Primer apellido" autoComplete="family-name"
               className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
             />
+          )}
+          {producto === "salud" && (
+            <div className="flex gap-2">
+              <select
+                value={documentoTipo} onChange={(e) => onDocumentoTipo(e.target.value as "Dni" | "Nie")}
+                aria-label="Tipo de documento"
+                className="shrink-0 rounded-[12px] border border-hair bg-white px-3 py-3 text-[15px] text-ink focus:border-navy focus:outline-none"
+              >
+                <option value="Dni">DNI</option>
+                <option value="Nie">NIE</option>
+              </select>
+              <input
+                type="text" value={documento}
+                onChange={(e) => onDocumento(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 9))}
+                placeholder={documentoTipo === "Nie" ? "X1234567L" : "12345678Z"}
+                inputMode="text" autoComplete="off" maxLength={9}
+                className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] uppercase tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+            </div>
           )}
           <input
             type="tel" inputMode="tel" value={telefono} onChange={(e) => onTelefono(e.target.value)}
