@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
+import { ComparativaHelpBar } from "./ComparativaHelpBar";
 import { Check } from "./icons";
 import { PriceMatchForm } from "./PriceMatchForm";
 import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
@@ -1047,7 +1048,8 @@ export function Comparativa() {
           onSkip={skipGate}
         />
       )}
-      {!gateBlocking && <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
+      {!gateBlocking && <WhatsAppHelpWidget raised message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
+      {!gateBlocking && <ComparativaHelpBar quote={quote} producto={producto} />}
     </>
   );
 }
