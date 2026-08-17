@@ -140,6 +140,33 @@ export async function codeoscopicFetch<T = unknown>(path: string, opts: Codeosco
   return res.json() as Promise<T>;
 }
 
+// Descarga autenticada de un fichero devuelto por la API (p.ej. la url de un
+// informe de POST /insurances/{id}/reports, que exige el header Authorization
+// para bajarse). Devuelve los bytes crudos y el content-type para poder
+// hacer de proxy desde una ruta /api/* (el navegador nunca ve el token).
+// Solo se aceptan urls del propio host de Codeoscopic — evita que un valor
+// inesperado en la respuesta convierta esto en un SSRF a un tercero.
+export async function codeoscopicDownload(fileUrl: string): Promise<{ bytes: ArrayBuffer; contentType: string }> {
+  if (!codeoscopicConfigured()) throw new Error("[codeoscopic] no configurado.");
+  const base = process.env.CODESCOPIC_BASE_URL!.replace(/\/+$/, "");
+  const allowedHost = new URL(base).host;
+  const target = new URL(fileUrl, base);
+  if (target.host !== allowedHost) throw new CodeoscopicError(400, `host no permitido: ${target.host}`);
+
+  const token = await getAccessToken();
+  const doFetch = (bearer: string) => fetch(target.toString(), {
+    headers: {
+      "Authorization": `Bearer ${bearer}`,
+      "X-Client-App": process.env.CODESCOPIC_APP_HEADER!,
+      ...(process.env.CODESCOPIC_USER_EMAIL ? { "X-User-Email": process.env.CODESCOPIC_USER_EMAIL } : {}),
+    },
+  });
+  let res = await doFetch(token);
+  if (res.status === 401) { _cachedToken = null; res = await doFetch(await getAccessToken()); }
+  if (!res.ok) throw new CodeoscopicError(res.status, await res.text().catch(() => ""));
+  return { bytes: await res.arrayBuffer(), contentType: res.headers.get("content-type") || "application/pdf" };
+}
+
 export class CodeoscopicError extends Error {
   constructor(public status: number, public bodySnippet: string) {
     super(`[codeoscopic] ${status}: ${bodySnippet.slice(0, 300)}`);

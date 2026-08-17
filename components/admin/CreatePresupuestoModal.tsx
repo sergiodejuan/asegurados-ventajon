@@ -50,6 +50,9 @@ export function CreatePresupuestoModal({
   // tarificador público no lo recoge, así que el agente puede aportarlo aquí.
   const [cqDocumentoTipo, setCqDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
   const [cqDocumento, setCqDocumento] = useState("");
+  // Acciones por cotización: afinar a precio firme (re-rate) y generar el PDF.
+  const [cqBusyId, setCqBusyId] = useState<string | null>(null);
+  const [cqActionError, setCqActionError] = useState<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -142,6 +145,46 @@ export function CreatePresupuestoModal({
     setMode("custom");
     setCompania(q.compania);
     if (q.premium != null) setPrecio(String(q.premium));
+  }
+
+  // Afina el precio estimado a firme (POST /offers vía backend) y refleja el
+  // nuevo importe en la propia tarjeta de la cotización.
+  async function afinarPrecio(q: CodeoscopicQuoteSummary) {
+    if (!leadId || !cqInsuranceId) return;
+    setCqBusyId(q.id);
+    setCqActionError(null);
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-rerate`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ insuranceId: cqInsuranceId, quoteId: q.id }),
+      });
+      const body = await res.json();
+      if (!body.ok) { setCqActionError("No se pudo afinar el precio ahora mismo."); return; }
+      setCqQuotes((prev) => prev.map((x) => x.id === q.id
+        ? { ...x, premium: typeof body.premium === "number" ? body.premium : x.premium, downPayment: typeof body.downPayment === "number" ? body.downPayment : x.downPayment, estimate: !!body.estimate }
+        : x));
+    } catch { setCqActionError("Error de conexión al afinar el precio."); }
+    finally { setCqBusyId(null); }
+  }
+
+  // Genera el informe PDF y lo abre en una pestaña nueva (el backend hace de
+  // proxy autenticado del fichero de Codeoscopic).
+  async function generarInforme(q: CodeoscopicQuoteSummary) {
+    if (!leadId || !cqInsuranceId) return;
+    setCqBusyId(q.id);
+    setCqActionError(null);
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-report`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ insuranceId: cqInsuranceId, quoteId: q.id }),
+      });
+      if (!res.ok) { setCqActionError("No se pudo generar el informe."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch { setCqActionError("Error de conexión al generar el informe."); }
+    finally { setCqBusyId(null); }
   }
 
   async function submit() {
@@ -266,12 +309,13 @@ export function CreatePresupuestoModal({
               Obligatorio para tarificar. Déjalo vacío solo si el lead ya tiene DNI/NIE guardado.
             </p>
             {cqError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqError}</p>}
+            {cqActionError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqActionError}</p>}
             {cqQuotes.length > 0 && (
               <ul className="mt-2 flex flex-col gap-1.5">
                 {cqQuotes.map((q) => (
-                  <li key={q.id}>
+                  <li key={q.id} className="rounded-lg border border-hair bg-white">
                     <button type="button" onClick={() => pickCodeoscopicQuote(q)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-hair bg-white px-3 py-2 text-left text-[13px] transition-colors hover:bg-mist">
+                      className="flex w-full items-center justify-between gap-2 rounded-t-lg px-3 py-2 text-left text-[13px] transition-colors hover:bg-mist">
                       <span className="flex min-w-0 items-center gap-2">
                         {q.imageUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -279,13 +323,27 @@ export function CreatePresupuestoModal({
                         )}
                         <span className="min-w-0 truncate text-ink">
                           {q.compania}{q.modalidad ? ` · ${q.modalidad}` : ""}
-                          {q.estimate && <span className="ml-1 text-[11px] text-slate2">(estimado)</span>}
+                          {q.estimate
+                            ? <span className="ml-1 text-[11px] text-slate2">(estimado)</span>
+                            : <span className="ml-1 text-[11px] font-semibold text-emerald-700">(firme)</span>}
                         </span>
                       </span>
                       <span className="shrink-0 tnums font-semibold text-navy">
                         {q.premium != null ? `${q.premium.toFixed(2)} €/mes` : "…"}
                       </span>
                     </button>
+                    <div className="flex items-center gap-3 border-t border-hair px-3 py-1.5">
+                      {q.estimate && (
+                        <button type="button" onClick={() => afinarPrecio(q)} disabled={cqBusyId === q.id}
+                          className="text-[11px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red disabled:opacity-50">
+                          {cqBusyId === q.id ? "Afinando…" : "Afinar a precio firme"}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => generarInforme(q)} disabled={cqBusyId === q.id}
+                        className="text-[11px] font-semibold text-slate2 underline underline-offset-2 hover:text-navy disabled:opacity-50">
+                        {cqBusyId === q.id ? "Generando…" : "Informe PDF"}
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
