@@ -72,6 +72,7 @@ const NAV: NavNode[] = [
     kind: "group", label: "Productos", key: "grp-productos", icon: "box",
     children: [
       leaf("/admin/productos", "Catálogo de productos", "productos", "productos"),
+      leaf("/admin/aseguradoras", "Aseguradoras (comparativa)", "aseguradoras", "productos"),
     ],
   },
   {
@@ -147,7 +148,7 @@ function ancestorsOfActive(nodes: NavNode[], active: string, trail: string[] = [
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "productos" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "productos" | "aseguradoras" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
   | "exitintents" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"

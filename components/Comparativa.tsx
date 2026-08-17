@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
@@ -95,6 +95,19 @@ export function Comparativa() {
   // etc.). Ver app/api/quote/create y app/api/quote/[insuranceId].
   const [realQuotes, setRealQuotes] = useState<RealQuote[]>([]);
   const [realStatus, setRealStatus] = useState<RealStatus>("idle");
+  // Orden elegido por el usuario para los precios reales.
+  const [sortBy, setSortBy] = useState<"default" | "precio" | "valoracion">("default");
+  const sortedRealQuotes = useMemo(() => {
+    const list = [...realQuotes];
+    if (sortBy === "precio") {
+      // Precio menor primero; los que aún no tienen premium van al final.
+      list.sort((a, b) => (a.premium ?? Infinity) - (b.premium ?? Infinity));
+    } else if (sortBy === "valoracion") {
+      // Mayor valoración primero; sin valoración al final.
+      list.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    }
+    return list; // "default": orden tal cual llega de Codeoscopic
+  }, [realQuotes, sortBy]);
   // insuranceId real de Codeoscopic — se muestra al pie de la sección de
   // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
   // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
@@ -600,9 +613,23 @@ export function Comparativa() {
               </p>
             </div>
 
+            {producto === "salud" && realQuotes.length > 1 && (
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <label htmlFor="cmp-sort" className="text-[12px] font-semibold text-slate2">Ordenar por</label>
+                <select
+                  id="cmp-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  tabIndex={unlocked ? 0 : -1}
+                  className="rounded-card border border-hair bg-white px-2.5 py-1.5 text-[12px] font-semibold text-navy focus:border-navy focus:outline-none"
+                >
+                  <option value="default">Recomendado</option>
+                  <option value="precio">Precio (menor primero)</option>
+                  <option value="valoracion">Valoración</option>
+                </select>
+              </div>
+            )}
             {producto === "salud" && realQuotes.length > 0 && (
-              <ul className="mt-5 flex flex-col gap-3">
-                {realQuotes.map((q) => (
+              <ul className="mt-3 flex flex-col gap-3">
+                {sortedRealQuotes.map((q) => (
                   <li key={q.id} className="rounded-card border border-brand-red bg-white p-4 shadow-soft">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-2.5">

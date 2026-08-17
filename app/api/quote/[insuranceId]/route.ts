@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
-import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
-import { getPresupuesto, setPresupuestoCodeoscopicSnapshot } from "@/lib/store";
+import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeoscopicSnapshot";
+import { getPresupuesto, setPresupuestoCodeoscopicSnapshot, getHiddenBrands } from "@/lib/store";
 import { rateLimitFail } from "@/lib/rateLimit";
 import { CLIENT_SESSION_COOKIE, verifySessionToken } from "@/lib/clientSession";
 import { resolveIdentity } from "@/lib/agentAuth";
@@ -67,7 +67,9 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
         await setPresupuestoCodeoscopicSnapshot(pid, summary);
       }
     }
-    return NextResponse.json({ ok: true, insuranceId, done: summary.done, snapshot, summary });
+    // El público solo ve las marcas visibles del catálogo; el admin ve todas.
+    const snapshotOut = isAdmin ? snapshot : filterInsuranceByHiddenBrands(snapshot, await getHiddenBrands("salud"));
+    return NextResponse.json({ ok: true, insuranceId, done: summary.done, snapshot: snapshotOut, summary });
   } catch (err) {
     const status = err instanceof CodeoscopicError ? err.status : 502;
     console.error("[quote/get] Codeoscopic falló:", (err as Error).message);

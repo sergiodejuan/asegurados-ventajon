@@ -12,6 +12,7 @@ import {
 import { hashPassword } from "./password";
 import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
+import { normalizeBrand, type Ramo } from "./brands";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
@@ -718,6 +719,41 @@ export async function deleteProduct(id: string): Promise<boolean> {
   if (next.length === all.length) return false;
   await jset(PRODUCTS_KEY, next);
   return true;
+}
+
+/* --------------------- Catálogo de aseguradoras por ramo -------------------- */
+// Control unificado de qué marcas se muestran en la comparativa (precios
+// reales de Codeoscopic + catálogo manual). Lista negra por ramo, keyeada por
+// nombre normalizado — ver lib/brands.ts. Por defecto no hay nada oculto.
+
+function hiddenBrandsKey(ramo: Ramo): string { return `brand_hidden:${ramo}`; }
+
+export async function getHiddenBrands(ramo: Ramo): Promise<string[]> {
+  return (await jget<string[]>(hiddenBrandsKey(ramo))) ?? [];
+}
+
+// Oculta/muestra una marca. Devuelve la lista de claves ocultas resultante.
+export async function setBrandHidden(ramo: Ramo, brandName: string, hidden: boolean): Promise<string[]> {
+  const key = normalizeBrand(brandName);
+  if (!key) return getHiddenBrands(ramo);
+  const current = new Set(await getHiddenBrands(ramo));
+  if (hidden) current.add(key); else current.delete(key);
+  const next = Array.from(current);
+  await jset(hiddenBrandsKey(ramo), next);
+  return next;
+}
+
+// Nombres de compañía distintos que hay hoy en el catálogo manual de un ramo,
+// para sembrar la UI de admin con las marcas ya conocidas.
+export async function listCatalogCompanies(ramo: Ramo): Promise<string[]> {
+  const all = await readProducts();
+  const names = new Map<string, string>(); // clave normalizada → primer nombre visto
+  for (const p of all) {
+    if (p.producto !== ramo) continue;
+    const key = normalizeBrand(p.compania);
+    if (key && !names.has(key)) names.set(key, p.compania.trim());
+  }
+  return Array.from(names.values()).sort((a, b) => a.localeCompare(b, "es"));
 }
 
 /* -------------------------- Blog ("Actualidad") ----------------------------- */

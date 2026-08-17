@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getPresupuesto, getLead, setPresupuestoCodeoscopicSnapshot } from "@/lib/store";
+import { getPresupuesto, getLead, setPresupuestoCodeoscopicSnapshot, getHiddenBrands } from "@/lib/store";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
-import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
+import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeoscopicSnapshot";
 
 // Endpoint que la comparativa llama al montarse para pedir cotizaciones
 // reales a Codeoscopic. Flujo:
@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
       const snapshot = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(existingId)}`);
       const summary = summarizeInsurance(snapshot);
       await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
-      return NextResponse.json({ ok: true, insuranceId: existingId, snapshot, summary });
+      // El público solo ve las marcas visibles del catálogo; el summary
+      // almacenado queda completo para el back office.
+      const hidden = await getHiddenBrands("salud");
+      return NextResponse.json({ ok: true, insuranceId: existingId, snapshot: filterInsuranceByHiddenBrands(snapshot, hidden), summary });
     } catch (err) {
       // Si Codeoscopic ya no reconoce el id (raro pero posible tras rotar
       // credenciales entre entornos), lo tratamos como si no existiera y
@@ -87,7 +90,8 @@ export async function POST(req: NextRequest) {
     }
     const summary = summarizeInsurance(created);
     await setPresupuestoCodeoscopicSnapshot(presupuesto.id, summary);
-    return NextResponse.json({ ok: true, insuranceId: created.id, snapshot: created, summary });
+    const hidden = await getHiddenBrands("salud");
+    return NextResponse.json({ ok: true, insuranceId: created.id, snapshot: filterInsuranceByHiddenBrands(created, hidden), summary });
   } catch (err) {
     const status = err instanceof CodeoscopicError ? err.status : 502;
     console.error("[quote/create] Codeoscopic falló:", (err as Error).message);

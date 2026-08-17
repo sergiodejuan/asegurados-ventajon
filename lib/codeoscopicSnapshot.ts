@@ -10,6 +10,21 @@
 
 import type { CodeoscopicInsurance, CodeoscopicQuote } from "./codeoscopic";
 import type { CodeoscopicQuoteSummary } from "./store";
+import { isBrandVisible } from "./brands";
+
+// Quita del snapshot crudo las cotizaciones de marcas ocultas en el catálogo
+// de aseguradoras por ramo (lib/brands.ts). Se aplica SOLO al snapshot que ve
+// el público en la comparativa; el back office sigue viendo todas las
+// aseguradoras. Devuelve el mismo objeto si no hay nada oculto.
+export function filterInsuranceByHiddenBrands(snapshot: CodeoscopicInsurance, hidden: string[]): CodeoscopicInsurance {
+  if (!hidden.length) return snapshot;
+  const visible = (q: CodeoscopicQuote) => isBrandVisible(q?.product?.vendor?.name || q?.product?.name || "", hidden);
+  return {
+    ...snapshot,
+    mainQuotes: (snapshot.mainQuotes ?? []).filter(visible),
+    addonQuotes: (snapshot.addonQuotes ?? []).filter(visible),
+  };
+}
 
 export type CodeoscopicSnapshotSummary = {
   insuranceId: string;
