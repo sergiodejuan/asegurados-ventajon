@@ -14,7 +14,8 @@ import { ZONA_OPTIONS } from "@/lib/forms";
 import { normalizePhone } from "@/lib/schema";
 import type { Product } from "@/lib/catalog";
 import {
-  loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
+  loadQuote, updateQuote, saludPriceAdvanced, resolveBasePrecio, applyNumInsuredDiscount,
+  vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
   loadLeadDraft, clearLeadDraft,
 } from "@/lib/quote";
@@ -805,15 +806,20 @@ export function Comparativa() {
                   </div>
                   <ul className="flex flex-col gap-3">
                     {negociadas.map((c) => {
-                      const price = saludPrice(
-                        { conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 },
-                        { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental },
-                      );
-                      const hasCon = c.precioConCopago != null;
-                      const hasSin = c.precioSinCopago != null;
+                      // Precio con tramos de edad + zona + descuento por nº de
+                      // asegurados si están configurados en /admin/productos;
+                      // si no, cae al precio plano de siempre.
+                      const price = saludPriceAdvanced(c, {
+                        numAsegurados: quote?.numAsegurados,
+                        coberturaDental: quote?.coberturaDental,
+                        codigoPostal: quote?.codigoPostal,
+                        edad: age,
+                      });
+                      const hasCon = c.precioConCopago != null || (c.pricing?.tramos?.some((t) => Object.values(t.porZona).some((z) => z?.conCopago != null)) ?? false);
+                      const hasSin = c.precioSinCopago != null || (c.pricing?.tramos?.some((t) => Object.values(t.porZona).some((z) => z?.sinCopago != null)) ?? false);
                       const precioInteres = hasCon ? price.conCopago : hasSin ? price.sinCopago : (c.precio ?? 0);
                       return (
-                        <li key={c.id} className="rounded-card border-2 border-brand-red bg-brand-red/[0.04] p-4 shadow-card">
+                        <li key={c.id} className="rounded-card border-2 border-brand-red bg-white p-4 shadow-card">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-2.5">
                               {c.logoUrl
@@ -963,11 +969,16 @@ export function Comparativa() {
             </p>
             <ul className="mt-5 flex flex-col gap-3">
               {products.map((c) => {
-                const price = producto === "auto"
-                  ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+                // Base por zona/edad si hay pricing avanzado configurado; si no,
+                // el precio plano. Luego el multiplicador propio del ramo y el
+                // descuento por nº de asegurados.
+                const base = resolveBasePrecio(c, { codigoPostal: quote?.codigoPostal, edad: age });
+                const raw = producto === "auto"
+                  ? autoPrice({ precio: base }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
                   : producto === "decesos"
-                  ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
-                  : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
+                  ? decesosPrice({ precio: base }, { numAsegurados: quote?.numAsegurados })
+                  : vidaPrice({ precio: base }, { fumador: quote?.fumador });
+                const price = { precio: applyNumInsuredDiscount(raw.precio, Math.max(1, quote?.numAsegurados ?? 1), c.pricing?.descuentos) };
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">

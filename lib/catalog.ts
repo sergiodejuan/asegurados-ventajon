@@ -3,6 +3,44 @@
 // (lib/store.ts). Los valores por defecto son ILUSTRATIVOS (ver lib/brand.ts
 // histórico) hasta que se sustituyan por datos/precios reales desde el admin.
 
+// Zonas de tarificación. Los tarificadores guardan la zona como etiqueta
+// ("Islas Canarias" / "Islas Baleares" / "Península", ver lib/forms.ts); aquí
+// usamos claves cortas y estables para los precios configurados en el admin.
+export type PricingZona = "canarias" | "baleares" | "peninsula";
+export const PRICING_ZONAS: { key: PricingZona; label: string }[] = [
+  { key: "canarias", label: "Canarias" },
+  { key: "baleares", label: "Baleares" },
+  { key: "peninsula", label: "Península" },
+];
+
+// Precio de un tramo para una zona concreta. En salud se usan con/sin copago;
+// en el resto de ramos, el precio único.
+export type TramoPrecio = { conCopago?: number; sinCopago?: number; precio?: number };
+
+// Tramo de edad [min, max] (ambos inclusive) con su precio por zona. Permite
+// tarifas que suben con la edad, distintas por comunidad.
+export type TramoEdad = {
+  min: number;
+  max: number;
+  porZona: Partial<Record<PricingZona, TramoPrecio>>;
+};
+
+// Descuento por nº de asegurados: a partir de `desde` personas se aplica el
+// descuento, en euros (sobre la prima mensual total) o en porcentaje.
+export type DescuentoAsegurados = {
+  desde: number;
+  tipo: "eur" | "pct";
+  valor: number;
+};
+
+// Configuración de precios avanzada, opcional. Si no está definida (o sus
+// listas están vacías) se usa el precio plano de siempre (precioConCopago /
+// precioSinCopago / precio).
+export type ProductPricing = {
+  tramos: TramoEdad[];
+  descuentos: DescuentoAsegurados[];
+};
+
 export type Product = {
   id: string;
   producto: "salud" | "vida" | "auto" | "decesos";
@@ -16,6 +54,9 @@ export type Product = {
   precioSinCopago?: number;
   // Vida, auto y decesos (precio único de partida)
   precio?: number;
+  // Precios avanzados por tramo de edad y zona + descuento por nº de
+  // asegurados. Opcional: si falta, se usa el precio plano de arriba.
+  pricing?: ProductPricing;
   condiciones: string;
   servicios: string[];
   updatedAt: string;

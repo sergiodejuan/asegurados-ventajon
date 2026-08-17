@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { PRICING_ZONAS, type ProductPricing, type TramoEdad, type DescuentoAsegurados, type PricingZona } from "@/lib/catalog";
 
 type Product = {
   id: string;
@@ -14,6 +15,7 @@ type Product = {
   precioConCopago?: number;
   precioSinCopago?: number;
   precio?: number;
+  pricing?: ProductPricing;
   condiciones: string;
   servicios: string[];
   updatedAt: string;
@@ -201,6 +203,7 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
   const [orden, setOrden] = useState(String(product.orden ?? 1));
   const [condiciones, setCondiciones] = useState(product.condiciones ?? "");
   const [servicios, setServicios] = useState(product.servicios.join("\n"));
+  const [pricing, setPricing] = useState<ProductPricing>(product.pricing ?? { tramos: [], descuentos: [] });
   const [logoUrl, setLogoUrl] = useState(product.logoUrl ?? "");
   const [processingLogo, setProcessingLogo] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -229,6 +232,9 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
     patch.condiciones = condiciones;
     patch.servicios = servicios.split("\n").map((s) => s.trim()).filter(Boolean);
     patch.logoUrl = logoUrl;
+    // Guardamos siempre el objeto pricing (aunque venga vacío): con listas
+    // vacías la comparativa cae al precio plano de arriba.
+    patch.pricing = pricing;
     const ok = await onSave(patch);
     setSaving(false);
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1800); }
@@ -277,6 +283,8 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
         </label>
       )}
 
+      <AdvancedPricingEditor producto={product.producto} pricing={pricing} onChange={setPricing} />
+
       <label>
         <span className="mb-1 block text-[12px] font-semibold text-ink">Orden en la comparativa (menor = primero)</span>
         <input inputMode="numeric" value={orden} onChange={(e) => setOrden(e.target.value.replace(/\D/g, ""))}
@@ -299,6 +307,133 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
         className="flex items-center justify-center rounded-card bg-navy px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40">
         {saving ? "Guardando…" : saved ? "Guardado ✓" : "Guardar cambios"}
       </button>
+    </div>
+  );
+}
+
+// Configurador de precios por tramo de edad + zona (Canarias/Baleares/
+// Península) y de descuentos por nº de asegurados. Todo opcional: sin tramos
+// se usa el precio plano; los cambios se reflejan en la comparativa.
+function AdvancedPricingEditor({
+  producto, pricing, onChange,
+}: {
+  producto: "salud" | "vida" | "auto" | "decesos";
+  pricing: ProductPricing;
+  onChange: (p: ProductPricing) => void;
+}) {
+  const tramos = pricing.tramos ?? [];
+  const descuentos = pricing.descuentos ?? [];
+  const esSalud = producto === "salud";
+
+  const updateTramos = (next: TramoEdad[]) => onChange({ ...pricing, tramos: next });
+  const updateDescuentos = (next: DescuentoAsegurados[]) => onChange({ ...pricing, descuentos: next });
+
+  function setTramoEdad(i: number, field: "min" | "max", v: string) {
+    updateTramos(tramos.map((t, k) => (k === i ? { ...t, [field]: Number(v.replace(/\D/g, "")) || 0 } : t)));
+  }
+  function setZonaPrecio(i: number, zona: PricingZona, field: "conCopago" | "sinCopago" | "precio", v: string) {
+    const num = v === "" ? undefined : Number(v.replace(/[^\d.]/g, ""));
+    updateTramos(tramos.map((t, k) => {
+      if (k !== i) return t;
+      return { ...t, porZona: { ...t.porZona, [zona]: { ...(t.porZona[zona] ?? {}), [field]: num } } };
+    }));
+  }
+  function setDescuento(i: number, patch: Partial<DescuentoAsegurados>) {
+    updateDescuentos(descuentos.map((d, k) => (k === i ? { ...d, ...patch } : d)));
+  }
+
+  return (
+    <div className="rounded-card border border-hair bg-white p-3">
+      <p className="text-[13px] font-bold text-navy">Precios por tramo de edad y zona</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-slate2">
+        Opcional. Si no defines tramos, se usa el precio de arriba para todas las edades y zonas.
+        La comparativa elige el tramo según la edad del titular y su zona (Canarias / Baleares / Península).
+      </p>
+
+      <div className="mt-3 flex flex-col gap-3">
+        {tramos.map((t, i) => (
+          <div key={i} className="rounded-card border border-hair bg-mist/40 p-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-ink">Edad desde</span>
+                <input inputMode="numeric" value={String(t.min)} onChange={(e) => setTramoEdad(i, "min", e.target.value)}
+                  className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-ink">hasta</span>
+                <input inputMode="numeric" value={String(t.max)} onChange={(e) => setTramoEdad(i, "max", e.target.value)}
+                  className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+              </label>
+              <button type="button" onClick={() => updateTramos(tramos.filter((_, k) => k !== i))}
+                className="ml-auto rounded-pill px-2.5 py-1 text-[12px] font-semibold text-brand-red hover:bg-brand-red/10">
+                Eliminar tramo
+              </button>
+            </div>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {PRICING_ZONAS.map((z) => (
+                <div key={z.key} className="flex flex-wrap items-center gap-2">
+                  <span className="w-20 shrink-0 text-[12px] font-semibold text-ink">{z.label}</span>
+                  {esSalud ? (
+                    <>
+                      <label className="flex items-center gap-1">
+                        <span className="text-[11px] text-slate2">con</span>
+                        <input inputMode="decimal" value={t.porZona[z.key]?.conCopago ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "conCopago", e.target.value)}
+                          className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <span className="text-[11px] text-slate2">sin</span>
+                        <input inputMode="decimal" value={t.porZona[z.key]?.sinCopago ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "sinCopago", e.target.value)}
+                          className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                      </label>
+                    </>
+                  ) : (
+                    <label className="flex items-center gap-1">
+                      <span className="text-[11px] text-slate2">precio</span>
+                      <input inputMode="decimal" value={t.porZona[z.key]?.precio ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "precio", e.target.value)}
+                        className="w-24 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={() => updateTramos([...tramos, { min: 0, max: 120, porZona: {} }])}
+          className="self-start rounded-card border border-dashed border-hair px-3 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+          + Añadir tramo de edad
+        </button>
+      </div>
+
+      <p className="mt-4 text-[13px] font-bold text-navy">Descuento por nº de asegurados</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-slate2">
+        Opcional. Se aplica a la prima mensual total cuando el nº de asegurados alcanza el umbral.
+        Si defines varios, se aplica el de umbral más alto que no supere el nº de asegurados.
+      </p>
+      <div className="mt-2 flex flex-col gap-2">
+        {descuentos.map((d, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] text-slate2">A partir de</span>
+            <input inputMode="numeric" value={String(d.desde)} onChange={(e) => setDescuento(i, { desde: Number(e.target.value.replace(/\D/g, "")) || 1 })}
+              className="w-16 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+            <span className="text-[12px] text-slate2">asegurados:</span>
+            <input inputMode="decimal" value={String(d.valor)} onChange={(e) => setDescuento(i, { valor: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })}
+              className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+            <select value={d.tipo} onChange={(e) => setDescuento(i, { tipo: e.target.value as "eur" | "pct" })}
+              className="rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] font-semibold">
+              <option value="pct">% de descuento</option>
+              <option value="eur">€ de descuento</option>
+            </select>
+            <button type="button" onClick={() => updateDescuentos(descuentos.filter((_, k) => k !== i))}
+              className="ml-auto rounded-pill px-2.5 py-1 text-[12px] font-semibold text-brand-red hover:bg-brand-red/10">
+              Eliminar
+            </button>
+          </div>
+        ))}
+        <button type="button" onClick={() => updateDescuentos([...descuentos, { desde: 2, tipo: "pct", valor: 0 }])}
+          className="self-start rounded-card border border-dashed border-hair px-3 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+          + Añadir descuento
+        </button>
+      </div>
     </div>
   );
 }

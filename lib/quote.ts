@@ -1,4 +1,5 @@
 import { WHATSAPP_URL } from "./brand";
+import type { PricingZona, ProductPricing, TramoEdad, DescuentoAsegurados } from "./catalog";
 
 // Perfil resumido que viaja del tarificador a la página de comparativa (y de
 // ahí a la página de cada compañía). Se guarda en sessionStorage: vive solo
@@ -114,6 +115,66 @@ export function saludPrice(base: { conCopago: number; sinCopago: number }, profi
     conCopago: (base.conCopago + dentalExtra) * n,
     sinCopago: (base.sinCopago + dentalExtra) * n,
   };
+}
+
+/* --------------------- Precios avanzados (tramos/zona/descuento) ---------- */
+// La zona viaja en el perfil como etiqueta del tarificador ("Islas Canarias"…);
+// la traducimos a la clave estable con la que se guardan los precios.
+export function pricingZonaFromLabel(codigoPostal?: string): PricingZona {
+  const s = (codigoPostal || "").toLowerCase();
+  if (s.includes("canaria")) return "canarias";
+  if (s.includes("balear")) return "baleares";
+  return "peninsula";
+}
+
+// Tramo de edad que cubre la edad dada (o null si no hay configuración/edad).
+export function resolveTramo(pricing: ProductPricing | undefined, edad: number | null): TramoEdad | null {
+  if (!pricing?.tramos?.length || edad == null) return null;
+  return pricing.tramos.find((t) => edad >= t.min && edad <= t.max) ?? null;
+}
+
+// Aplica el descuento por nº de asegurados a una prima total: se coge el de
+// mayor `desde` que no supere el nº de asegurados. En € resta de la prima
+// mensual total; en % la reduce.
+export function applyNumInsuredDiscount(total: number, numAsegurados: number, descuentos?: DescuentoAsegurados[]): number {
+  if (!descuentos?.length) return total;
+  const aplicable = descuentos
+    .filter((d) => numAsegurados >= d.desde)
+    .sort((a, b) => b.desde - a.desde)[0];
+  if (!aplicable) return total;
+  const out = aplicable.tipo === "pct" ? total * (1 - aplicable.valor / 100) : total - aplicable.valor;
+  return Math.max(0, Math.round(out * 100) / 100);
+}
+
+// Precio de salud de una opción NEGOCIADA teniendo en cuenta, si están
+// configurados, los tramos de edad + zona y el descuento por nº de asegurados.
+// Si no hay pricing avanzado, se comporta como saludPrice (precio plano).
+export function saludPriceAdvanced(
+  product: { precioConCopago?: number; precioSinCopago?: number; pricing?: ProductPricing },
+  profile: Pick<QuoteProfile, "numAsegurados" | "coberturaDental" | "codigoPostal"> & { edad?: number | null },
+): { conCopago: number; sinCopago: number } {
+  const zona = pricingZonaFromLabel(profile.codigoPostal);
+  const tramo = resolveTramo(product.pricing, profile.edad ?? null);
+  const zonaPrecio = tramo?.porZona?.[zona];
+  const baseCon = zonaPrecio?.conCopago ?? product.precioConCopago ?? 0;
+  const baseSin = zonaPrecio?.sinCopago ?? product.precioSinCopago ?? 0;
+  const n = Math.max(1, Math.min(9, profile.numAsegurados ?? 1));
+  const dentalExtra = profile.coberturaDental ? 4 : 0;
+  return {
+    conCopago: applyNumInsuredDiscount((baseCon + dentalExtra) * n, n, product.pricing?.descuentos),
+    sinCopago: applyNumInsuredDiscount((baseSin + dentalExtra) * n, n, product.pricing?.descuentos),
+  };
+}
+
+// Precio base por zona/edad para ramos de precio único (vida/auto/decesos).
+// Devuelve el precio del tramo+zona si existe, o el precio plano del producto.
+export function resolveBasePrecio(
+  product: { precio?: number; pricing?: ProductPricing },
+  profile: { codigoPostal?: string; edad?: number | null },
+): number {
+  const zona = pricingZonaFromLabel(profile.codigoPostal);
+  const tramo = resolveTramo(product.pricing, profile.edad ?? null);
+  return tramo?.porZona?.[zona]?.precio ?? product.precio ?? 0;
 }
 
 export function vidaPrice(base: { precio: number }, profile: Pick<QuoteProfile, "fumador">) {
