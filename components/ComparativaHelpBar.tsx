@@ -12,7 +12,7 @@ import { saveCallResult, type QuoteProfile } from "@/lib/quote";
 import { saveClientProfile } from "@/lib/clientArea";
 
 // Umbral de scroll a partir del cual aparece la barra sticky de ayuda.
-const SHOW_AT = 0.4;
+const SHOW_AT = 0.1;
 
 // Turnstile se activa por env; si está configurado NO enviamos en línea desde
 // la barra (no queremos meter el widget en la barra roja): mandamos al modal,
@@ -175,19 +175,18 @@ export function ComparativaHelpBar({ quote, producto }: { quote: QuoteProfile | 
       {visible && <div aria-hidden className="h-32 sm:h-20" />}
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-40 bg-brand-red text-white shadow-[0_-6px_24px_rgba(0,0,0,0.18)] transition-transform duration-300 ${
+        className={`fixed inset-x-0 bottom-0 z-40 rounded-t-[20px] bg-brand-red text-white shadow-[0_-16px_40px_-16px_rgba(18,32,79,0.45)] transition-transform duration-300 md:rounded-t-[24px] pb-[env(safe-area-inset-bottom)] ${
           visible ? "translate-y-0" : "translate-y-full"
         }`}
         aria-hidden={!visible}
       >
-        <div className="mx-auto max-w-app px-4 py-3">
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 shrink-0">
-              <p className="text-[16px] font-extrabold leading-tight">¿Necesitas ayuda?</p>
-              <p className="hidden text-[13px] text-white/85 sm:block">Un asesor te llama gratis, cuando mejor te venga.</p>
-            </div>
+        <div className="mx-auto flex max-w-6xl flex-col gap-2.5 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-8 md:py-4">
+          <div className="min-w-0 shrink-0">
+            <p className="text-[16px] font-extrabold leading-tight">¿Necesitas ayuda?</p>
+            <p className="hidden text-[13px] text-white/85 sm:block">Un asesor te llama gratis, cuando mejor te venga.</p>
+          </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {/* Campo rápido "Llamadme gratis" — blanco para contrastar con el rojo. */}
               <form onSubmit={onQuickSubmit} className="flex flex-col gap-1">
                 <div className="flex items-stretch gap-1.5 rounded-pill bg-white p-1 shadow-sm">
@@ -227,7 +226,6 @@ export function ComparativaHelpBar({ quote, producto }: { quote: QuoteProfile | 
               >
                 Solicitar llamada
               </button>
-            </div>
           </div>
         </div>
       </div>
