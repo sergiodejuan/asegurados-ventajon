@@ -14,6 +14,8 @@ import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import { GeneralExitIntentModal } from "@/components/GeneralExitIntentModal";
 import { InactivityModal } from "@/components/InactivityModal";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -129,6 +131,10 @@ export default async function RootLayout({
           <GeneralExitIntentModal />
           <InactivityModal />
           <CookieConsentBanner />
+          {/* Analítica de Vercel (solo reporta al desplegar en Vercel; en un
+              servidor propio es inerte, no molesta). */}
+          <VercelAnalytics />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
