@@ -169,18 +169,43 @@ function ModalInactividadAdmin() {
               <textarea value={cfg.descripcion} onChange={(e) => set("descripcion", e.target.value)} rows={2}
                 className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
             </label>
+            <label className="flex items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3">
+              <span className="min-w-0">
+                <span className="block text-[14px] font-semibold text-ink">Capturar teléfono en el modal</span>
+                <span className="block text-[12px] text-slate2">Muestra un campo de teléfono + botón (registra la llamada). Si lo desactivas, el botón es solo un enlace.</span>
+              </span>
+              <input type="checkbox" checked={cfg.capturaTelefono} onChange={(e) => set("capturaTelefono", e.target.checked)} className="h-5 w-5 shrink-0 accent-navy" />
+            </label>
+
             <div className="flex gap-3">
               <label className="flex-1">
                 <span className="mb-1 block text-[12px] font-semibold text-ink">Texto del botón</span>
                 <input value={cfg.ctaTexto} onChange={(e) => set("ctaTexto", e.target.value)}
                   className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
               </label>
-              <label className="flex-1">
-                <span className="mb-1 block text-[12px] font-semibold text-ink">Enlace del botón</span>
-                <input value={cfg.ctaHref} onChange={(e) => set("ctaHref", e.target.value)} placeholder="/tarificador"
-                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
-              </label>
+              {!cfg.capturaTelefono && (
+                <label className="flex-1">
+                  <span className="mb-1 block text-[12px] font-semibold text-ink">Enlace del botón</span>
+                  <input value={cfg.ctaHref} onChange={(e) => set("ctaHref", e.target.value)} placeholder="/tarificador"
+                    className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
+                </label>
+              )}
             </div>
+
+            <label>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Páginas donde se muestra (una por línea)</span>
+              <textarea
+                value={cfg.paginas.join("\n")}
+                onChange={(e) => set("paginas", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))}
+                rows={4}
+                placeholder={"/comparativa\n/seguro-de-salud\n/lp/*"}
+                className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[13px] tnums"
+              />
+              <span className="mt-1 block text-[11px] leading-relaxed text-slate2">
+                Rutas exactas (p.ej. <code>/comparativa</code>) o con comodín de prefijo acabando en <code>*</code> (p.ej. <code>/lp/*</code> para todas las landings).
+                Déjalo vacío para mostrarlo en todas las páginas (nunca en admin ni en el área de cliente).
+              </span>
+            </label>
 
             <button onClick={save} disabled={saving}
               className="flex items-center justify-center rounded-card bg-navy px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40">
@@ -202,9 +227,16 @@ function ModalInactividadAdmin() {
                   {cfg.eyebrow && <p className="mt-3 text-[12px] font-bold uppercase tracking-wide text-white/70">{cfg.eyebrow}</p>}
                   {cfg.precioTexto && <p className="mt-0.5 text-[28px] font-extrabold leading-tight text-white">{cfg.precioTexto}</p>}
                   {cfg.descripcion && <p className="mt-3 text-[15px] leading-relaxed text-white/85">{cfg.descripcion}</p>}
-                  <div className="mt-5 flex w-full items-center justify-center rounded-pill bg-brand-red px-5 py-4 text-[16px] font-bold text-white">
-                    {cfg.ctaTexto || "Ver mi precio"}
-                  </div>
+                  {cfg.capturaTelefono ? (
+                    <div className="mt-5 flex items-stretch gap-1.5 rounded-pill bg-white p-1">
+                      <span className="min-w-0 flex-1 px-3 py-2.5 text-[15px] text-slate2/60">Tu teléfono</span>
+                      <span className="shrink-0 rounded-pill bg-brand-red px-4 py-2.5 text-[14px] font-bold text-white">{cfg.ctaTexto || "Que me llamen gratis"}</span>
+                    </div>
+                  ) : (
+                    <div className="mt-5 flex w-full items-center justify-center rounded-pill bg-brand-red px-5 py-4 text-[16px] font-bold text-white">
+                      {cfg.ctaTexto || "Ver mi precio"}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

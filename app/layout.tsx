@@ -13,6 +13,7 @@ import { PageTransitionLoader } from "@/components/PageTransitionLoader";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import { GeneralExitIntentModal } from "@/components/GeneralExitIntentModal";
+import { InactivityModal } from "@/components/InactivityModal";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -126,6 +127,7 @@ export default async function RootLayout({
           <AssistantWidget extraExcludedPaths={assistantExtraExcluded} />
           <AccessibilityWidget />
           <GeneralExitIntentModal />
+          <InactivityModal />
           <CookieConsentBanner />
         </ThemeProvider>
       </body>
