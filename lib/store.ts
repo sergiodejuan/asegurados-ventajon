@@ -19,6 +19,7 @@ import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./te
 import { SEED_EMAIL_TEMPLATES, type EmailTemplate, type EmailTemplateDraft } from "./leadEmailTemplates";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
+import { DEFAULT_INACTIVITY_MODAL, type InactivityModalConfig } from "./inactivityModal";
 import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto, type LandingDevice, type LandingDaypart } from "./landings";
 import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
 import { DEFAULT_REFERRAL_LANDING, type ReferralLandingConfig } from "./referralLanding";
@@ -1853,6 +1854,23 @@ export async function saveExitIntentConfig(patch: Partial<ExitIntentConfig>): Pr
   const current = await getExitIntentConfig();
   const next: ExitIntentConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(EXIT_INTENT_KEY, next);
+  return next;
+}
+
+/* -------------------- Modal de inactividad de la comparativa ---------------- */
+
+const INACTIVITY_MODAL_KEY = "inactivity_modal:comparativa";
+
+export async function getInactivityModalConfig(): Promise<InactivityModalConfig> {
+  const stored = await jget<InactivityModalConfig>(INACTIVITY_MODAL_KEY);
+  if (!stored) return DEFAULT_INACTIVITY_MODAL;
+  return { ...DEFAULT_INACTIVITY_MODAL, ...stored };
+}
+
+export async function saveInactivityModalConfig(patch: Partial<InactivityModalConfig>): Promise<InactivityModalConfig> {
+  const current = await getInactivityModalConfig();
+  const next: InactivityModalConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  await jset(INACTIVITY_MODAL_KEY, next);
   return next;
 }
 

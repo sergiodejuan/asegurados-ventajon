@@ -55,11 +55,18 @@ const config: Config = {
           "50%": { transform: "scale(1.05)", opacity: "0.85" },
         },
         spin: { to: { transform: "rotate(360deg)" } },
+        "pop-in": {
+          from: { opacity: "0", transform: "translateY(12px) scale(0.96)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
       },
       animation: {
         "fade-up": "fade-up 260ms cubic-bezier(0.22,1,0.36,1)",
         "slide-in-left": "slide-in-left 300ms cubic-bezier(0.22,1,0.36,1)",
         "loader-pulse": "loader-pulse 1.6s ease-in-out infinite",
+        "pop-in": "pop-in 320ms cubic-bezier(0.22,1,0.36,1)",
+        "fade-in": "fade-in 200ms ease-out",
       },
     },
   },

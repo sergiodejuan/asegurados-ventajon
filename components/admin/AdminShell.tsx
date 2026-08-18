@@ -56,6 +56,7 @@ const NAV: NavNode[] = [
       leaf("/admin/promociones?tab=campana", "Campaña home", "campana", "campana"),
       leaf("/admin/campanas/referidos", "Programa referidos", "lp-referral", "campana"),
       leaf("/admin/exit-intents", "Exit-intent", "exitintents", "exitintents"),
+      leaf("/admin/marketing/modal-inactividad", "Modal de inactividad", "modal-inactividad", "exitintents"),
     ],
   },
   {
@@ -149,7 +150,7 @@ function ancestorsOfActive(nodes: NavNode[], active: string, trail: string[] = [
 
 export type AdminActiveKey =
   | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "productos" | "aseguradoras" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
-  | "exitintents" | "promociones" | "testimonios"
+  | "exitintents" | "modal-inactividad" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
   | "integraciones" | "integraciones-codescopic" | "integraciones-tremendous" | "integraciones-api" | "integraciones-webhooks"
