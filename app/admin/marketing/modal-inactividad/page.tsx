@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
-import { DEFAULT_INACTIVITY_MODAL, type InactivityModalConfig } from "@/lib/inactivityModal";
+import { DEFAULT_INACTIVITY_MODAL, personalizeInactivityText, type InactivityModalConfig } from "@/lib/inactivityModal";
+
+const SAMPLE_NAME = "María";
 
 const MAX_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_WIDTH = 900;
@@ -158,6 +160,9 @@ function ModalInactividadAdmin() {
               <span className="mb-1 block text-[12px] font-semibold text-ink">Título</span>
               <input value={cfg.titulo} onChange={(e) => set("titulo", e.target.value)}
                 className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
+              <span className="mt-1 block text-[11px] leading-relaxed text-slate2">
+                Puedes usar <code>{"{nombre}"}</code> en cualquier texto para incluir el nombre del usuario que ha tarificado. Si no lo conocemos, la variable se omite de forma limpia.
+              </span>
             </label>
             <label>
               <span className="mb-1 block text-[12px] font-semibold text-ink">Precio / titular grande</span>
@@ -215,7 +220,7 @@ function ModalInactividadAdmin() {
 
           {/* Vista previa */}
           <div className="lg:sticky lg:top-6">
-            <p className="mb-2 text-[12px] font-semibold text-slate2">Vista previa</p>
+            <p className="mb-2 text-[12px] font-semibold text-slate2">Vista previa <span className="font-normal text-slate2/70">(nombre de ejemplo: {SAMPLE_NAME})</span></p>
             <div className="mx-auto w-full max-w-sm overflow-hidden rounded-[24px] bg-navy shadow-card">
               <div
                 className="relative flex min-h-[420px] flex-col justify-end p-6"
@@ -223,10 +228,10 @@ function ModalInactividadAdmin() {
               >
                 <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
                 <div className="relative">
-                  {cfg.titulo && <h3 className="text-[26px] font-extrabold leading-tight text-white">{cfg.titulo}</h3>}
-                  {cfg.eyebrow && <p className="mt-3 text-[12px] font-bold uppercase tracking-wide text-white/70">{cfg.eyebrow}</p>}
-                  {cfg.precioTexto && <p className="mt-0.5 text-[28px] font-extrabold leading-tight text-white">{cfg.precioTexto}</p>}
-                  {cfg.descripcion && <p className="mt-3 text-[15px] leading-relaxed text-white/85">{cfg.descripcion}</p>}
+                  {cfg.titulo && <h3 className="text-[26px] font-extrabold leading-tight text-white">{personalizeInactivityText(cfg.titulo, SAMPLE_NAME)}</h3>}
+                  {cfg.eyebrow && <p className="mt-3 text-[12px] font-bold uppercase tracking-wide text-white/70">{personalizeInactivityText(cfg.eyebrow, SAMPLE_NAME)}</p>}
+                  {cfg.precioTexto && <p className="mt-0.5 text-[28px] font-extrabold leading-tight text-white">{personalizeInactivityText(cfg.precioTexto, SAMPLE_NAME)}</p>}
+                  {cfg.descripcion && <p className="mt-3 text-[15px] leading-relaxed text-white/85">{personalizeInactivityText(cfg.descripcion, SAMPLE_NAME)}</p>}
                   {cfg.capturaTelefono ? (
                     <div className="mt-5 flex items-stretch gap-1.5 rounded-pill bg-white p-1">
                       <span className="min-w-0 flex-1 px-3 py-2.5 text-[15px] text-slate2/60">Tu teléfono</span>

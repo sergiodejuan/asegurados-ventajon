@@ -35,20 +35,35 @@ export type InactivityModalConfig = {
 };
 
 export const DEFAULT_INACTIVITY_MODAL: InactivityModalConfig = {
-  activo: false,
+  activo: true,
   segundos: 15,
   maxPorSesion: 1,
   imagenUrl: "",
-  eyebrow: "DESDE",
-  titulo: "Salud Especialistas",
-  precioTexto: "35 €/mes y sin copagos",
-  descripcion: "Acceso directo a consultas médicas y pruebas diagnósticas.",
+  eyebrow: "¿NECESITAS AYUDA?",
+  titulo: "{nombre}, ¿lo vemos juntos?",
+  precioTexto: "Te llamamos gratis",
+  descripcion: "Un asesor de Asegurados Ventajón resuelve tus dudas y te ayuda a elegir la mejor opción para ti, sin compromiso.",
   ctaTexto: "Que me llamen gratis",
   ctaHref: "/tarificador",
   capturaTelefono: true,
   paginas: ["/comparativa"],
   updatedAt: "",
 };
+
+// Sustituye la variable {nombre} por el nombre del usuario que ha tarificado.
+// Si no hay nombre, elimina limpiamente la variable (y una coma/espacio que la
+// siga) y recapitaliza la primera letra para que la frase siga leyéndose bien.
+export function personalizeInactivityText(text: string, nombre?: string): string {
+  if (!text) return text;
+  if (nombre && nombre.trim()) return text.replace(/\{nombre\}/gi, nombre.trim());
+  const out = text
+    .replace(/\{nombre\}\s*,\s*/gi, "")
+    .replace(/\{nombre\}\s*/gi, "")
+    .replace(/\{nombre\}/gi, "")
+    .trim();
+  // Recapitaliza tras posibles signos de apertura (¿ ¡ " ').
+  return out.replace(/^(\s*[¿¡"'“]*)(\p{Ll})/u, (_m, pre, ch) => pre + ch.toUpperCase());
+}
 
 // ¿La ruta actual entra dentro de la lista de páginas configurada? Lista vacía
 // = todas. Un patrón que acaba en "*" hace de comodín de prefijo.

@@ -7,7 +7,7 @@ import { TurnstileWidget } from "./TurnstileWidget";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { getAttribution } from "@/lib/attribution";
 import { loadQuote } from "@/lib/quote";
-import { matchesInactivityPage, type InactivityModalConfig } from "@/lib/inactivityModal";
+import { matchesInactivityPage, personalizeInactivityText, type InactivityModalConfig } from "@/lib/inactivityModal";
 
 // Modal de inactividad configurable (admin → Marketing → Modal de inactividad).
 // Aparece cuando el usuario pasa `segundos` sin interacción (ratón, teclado,
@@ -162,6 +162,9 @@ export function InactivityModal() {
   if (!open || !config) return null;
 
   const tieneImagen = !!config.imagenUrl;
+  // Nombre del usuario que ha tarificado (para personalizar los textos).
+  const firstName = (loadQuote()?.nombre || "").trim().split(/\s+/)[0] || "";
+  const px = (t: string) => personalizeInactivityText(t, firstName);
 
   return (
     <div
@@ -207,10 +210,10 @@ export function InactivityModal() {
               </div>
             ) : (
               <>
-                {config.titulo && <h3 className="text-[26px] font-extrabold leading-tight text-white">{config.titulo}</h3>}
-                {config.eyebrow && <p className="mt-3 text-[12px] font-bold uppercase tracking-wide text-white/70">{config.eyebrow}</p>}
-                {config.precioTexto && <p className="mt-0.5 text-[28px] font-extrabold leading-tight text-white">{config.precioTexto}</p>}
-                {config.descripcion && <p className="mt-3 text-[15px] leading-relaxed text-white/85">{config.descripcion}</p>}
+                {config.titulo && <h3 className="text-[26px] font-extrabold leading-tight text-white">{px(config.titulo)}</h3>}
+                {config.eyebrow && <p className="mt-3 text-[12px] font-bold uppercase tracking-wide text-white/70">{px(config.eyebrow)}</p>}
+                {config.precioTexto && <p className="mt-0.5 text-[28px] font-extrabold leading-tight text-white">{px(config.precioTexto)}</p>}
+                {config.descripcion && <p className="mt-3 text-[15px] leading-relaxed text-white/85">{px(config.descripcion)}</p>}
 
                 {config.capturaTelefono ? (
                   <form onSubmit={submitPhone} className="mt-5">
