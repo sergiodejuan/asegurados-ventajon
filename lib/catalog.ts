@@ -45,6 +45,10 @@ export type Product = {
   id: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
+  // Título/modalidad del producto que se muestra en la tarjeta de la
+  // comparativa bajo la compañía (p.ej. "Salud Completa Plus"), igual que las
+  // opciones de Codeoscopic muestran su modalidad ("Adeslas GO 2026").
+  titulo?: string;
   activo: boolean; // se muestra en la comparativa pública
   destacado: boolean; // insignia "Recomendado" + se ordena primero
   orden: number;
@@ -56,6 +60,9 @@ export type Product = {
   // copago (lo habitual en las negociadas de Asegurados Ventajón), o ambas.
   // Decide qué precio(s) se muestran y el texto dinámico de la tarjeta.
   modalidadCopago?: CopagoModo;
+  // Si el producto incluye cobertura dental. Alimenta los filtros "Con dental"
+  // / "Sin dental" de la comparativa.
+  dental?: boolean;
   // Vida, auto y decesos (precio único de partida)
   precio?: number;
   // Precios avanzados por tramo de edad y zona + descuento por nº de

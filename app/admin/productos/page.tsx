@@ -8,6 +8,7 @@ type Product = {
   id: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
+  titulo?: string;
   activo: boolean;
   destacado: boolean;
   orden: number;
@@ -15,6 +16,7 @@ type Product = {
   precioConCopago?: number;
   precioSinCopago?: number;
   modalidadCopago?: CopagoModo;
+  dental?: boolean;
   precio?: number;
   pricing?: ProductPricing;
   condiciones: string;
@@ -150,7 +152,7 @@ function ProductsAdmin() {
               <div className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {p.logoUrl && <img src={p.logoUrl} alt="" className="h-7 w-auto max-w-[80px] object-contain" />}
-                <p className="text-[16px] font-bold text-ink">{p.compania}</p>
+                <p className="text-[16px] font-bold text-ink">{p.compania}{p.titulo ? <span className="font-medium text-slate2"> · {p.titulo}</span> : null}</p>
                 {p.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[11px] font-bold text-brand-red">Recomendado</span>}
                 {!p.activo && <span className="rounded-pill bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">Oculto</span>}
               </div>
@@ -198,9 +200,11 @@ function ProductsAdmin() {
 }
 
 function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: Partial<Product>) => Promise<boolean> }) {
+  const [titulo, setTitulo] = useState(product.titulo ?? "");
   const [conCopago, setConCopago] = useState(String(product.precioConCopago ?? ""));
   const [sinCopago, setSinCopago] = useState(String(product.precioSinCopago ?? ""));
   const [modalidadCopago, setModalidadCopago] = useState<CopagoModo>(product.modalidadCopago ?? "sin");
+  const [dental, setDental] = useState<boolean>(product.dental ?? false);
   const [precio, setPrecio] = useState(String(product.precio ?? ""));
   const [orden, setOrden] = useState(String(product.orden ?? 1));
   const [condiciones, setCondiciones] = useState(product.condiciones ?? "");
@@ -228,8 +232,9 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
     setSaving(true); setSaved(false);
     const patch: Partial<Product> =
       product.producto === "salud"
-        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0, modalidadCopago }
+        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0, modalidadCopago, dental }
         : { precio: Number(precio) || 0 };
+    patch.titulo = titulo.trim();
     patch.orden = Number(orden) || 1;
     patch.condiciones = condiciones;
     patch.servicios = servicios.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -264,8 +269,22 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
         </p>
       </label>
 
+      <label>
+        <span className="mb-1 block text-[12px] font-semibold text-ink">Título / modalidad (se muestra en la tarjeta)</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="p.ej. Salud Completa Plus"
+          className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
+        <span className="mt-1 block text-[11px] leading-relaxed text-slate2">Aparece bajo la compañía en la comparativa, como la modalidad de las opciones de Codeoscopic.</span>
+      </label>
+
       {product.producto === "salud" ? (
         <div className="flex flex-col gap-3">
+          <label className="flex items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-ink">Incluye cobertura dental</span>
+              <span className="block text-[11px] text-slate2">Marca esta opción si el producto lleva dental; alimenta los filtros "Con dental" / "Sin dental".</span>
+            </span>
+            <input type="checkbox" checked={dental} onChange={(e) => setDental(e.target.checked)} className="h-5 w-5 shrink-0 accent-navy" />
+          </label>
           <label>
             <span className="mb-1 block text-[12px] font-semibold text-ink">Modalidad de copago</span>
             <select value={modalidadCopago} onChange={(e) => setModalidadCopago(e.target.value as CopagoModo)}

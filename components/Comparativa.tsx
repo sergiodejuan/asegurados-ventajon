@@ -78,11 +78,12 @@ type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
 // declaran en el nombre) NO se oculta la opción — solo se descarta cuando se
 // sabe con certeza que no cumple. Así el filtro es preciso con las opciones
 // negociadas (datos explícitos) y no vacía la lista con las reales.
-type SaludFilter = "copago" | "sinCopago" | "dental" | "reembolso" | "sinReembolso";
+type SaludFilter = "copago" | "sinCopago" | "dental" | "sinDental" | "reembolso" | "sinReembolso";
 const SALUD_FILTERS: { key: SaludFilter; label: string }[] = [
   { key: "copago", label: "Con copago" },
   { key: "sinCopago", label: "Sin copago" },
   { key: "dental", label: "Con dental" },
+  { key: "sinDental", label: "Sin dental" },
   { key: "reembolso", label: "Con reembolso" },
   { key: "sinReembolso", label: "Sin reembolso" },
 ];
@@ -103,13 +104,18 @@ function classifyText(text: string): OptClass {
 // Producto manual del catálogo: datos explícitos (precios con/sin copago +
 // servicios), así que su clasificación es fiable.
 function classifyProduct(p: Product): OptClass {
+  // Copago según la modalidad configurada (no según qué campo de precio tenga
+  // valor), coherente con lo que muestra la tarjeta.
+  const modo = copagoModoDe(p);
   const copago = new Set<"con" | "sin">();
-  if (p.precioConCopago != null) copago.add("con");
-  if (p.precioSinCopago != null) copago.add("sin");
+  if (modo === "con" || modo === "ambas") copago.add("con");
+  if (modo === "sin" || modo === "ambas") copago.add("sin");
   const servicios = (p.servicios ?? []).join(" ").toLowerCase();
+  // Dental: campo explícito si está definido; si no, se infiere de servicios.
+  const dental = typeof p.dental === "boolean" ? p.dental : servicios.includes("dental");
   return {
     copago: copago.size ? copago : null,
-    dental: servicios.includes("dental"),
+    dental,
     reembolso: servicios.includes("reembolso") || servicios.includes("reintegro"),
   };
 }
@@ -123,6 +129,7 @@ function matchesSaludFilters(cls: OptClass, active: SaludFilter[]): boolean {
     if (!ok) return false;
   }
   if (active.includes("dental") && cls.dental === false) return false;
+  if (active.includes("sinDental") && cls.dental === true) return false;
   if (active.includes("reembolso") && cls.reembolso === false) return false;
   if (active.includes("sinReembolso") && cls.reembolso === true) return false;
   return true;
@@ -831,6 +838,8 @@ export function Comparativa() {
                             {/* Modalidad reforzada (sin copagos por defecto). */}
                             <span className="shrink-0 rounded-pill bg-emerald-600/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{copagoChip(modo)}</span>
                           </div>
+                          {/* Título/modalidad del producto (como "Adeslas GO 2026"). */}
+                          {c.titulo && <p className="mt-1 text-[13px] font-semibold text-ink">{c.titulo}</p>}
                           {modo === "ambas" ? (
                             <div className="mt-2 space-y-1">
                               <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
@@ -853,7 +862,7 @@ export function Comparativa() {
                           {/* Texto dinámico según la modalidad elegida. */}
                           <p className="mt-1.5 text-[12px] leading-relaxed text-slate2">{copagoTexto(modo)}</p>
                           {c.servicios?.[0] && <p className="mt-1 text-[12px] font-medium text-ink">{c.servicios[0]}</p>}
-                          <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: `Opción negociada (${copagoChip(modo)})` })} />
+                          <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended masInfoHref={`/comparativa/${slugify(c.compania)}?producto=${producto}&pid=${encodeURIComponent(c.id)}`} onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: `Opción negociada (${copagoChip(modo)})` })} />
                         </li>
                       );
                     })}
@@ -1190,7 +1199,7 @@ export function CompanyLogo({
 // desbloqueada, en la opción recomendada — esa se queda en verde a
 // propósito para que siga destacando, en vez de volver a rojo como el resto.
 function CompanyActions({
-  producto, compania, precio, locked = false, recommended = false, onMasInfo, onSolicitar,
+  producto, compania, precio, locked = false, recommended = false, onMasInfo, onSolicitar, masInfoHref,
 }: {
   producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
   // Si se pasa, "Más información" abre el detalle en la propia página (modal)
@@ -1198,6 +1207,10 @@ function CompanyActions({
   // reales de Codeoscopic, que no existen como página de catálogo y además
   // evita salir de la comparativa y volver a pasar por el gate.
   onMasInfo?: () => void;
+  // Destino del enlace "Más información" (si no se usa onMasInfo). Permite
+  // apuntar a un producto concreto por su id (?pid=) cuando hay varios de la
+  // misma compañía; si no se pasa, se usa el slug de la compañía.
+  masInfoHref?: string;
   // Si se pasa, "Que te llamen gratis" ejecuta este handler (crear presupuesto
   // por interés + navegar) en vez de ser un simple enlace. Se usa en salud.
   onSolicitar?: () => void;
@@ -1217,7 +1230,7 @@ function CompanyActions({
         </button>
       ) : (
         <a
-          href={`/comparativa/${slugify(compania)}?producto=${producto}`}
+          href={masInfoHref ?? `/comparativa/${slugify(compania)}?producto=${producto}`}
           tabIndex={locked ? -1 : 0}
           className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
         >

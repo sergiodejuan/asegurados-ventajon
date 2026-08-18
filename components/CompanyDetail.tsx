@@ -42,7 +42,11 @@ export function CompanyDetail() {
       .finally(() => setLoaded(true));
   }, [producto]);
 
-  const entry = products.find((c) => slugify(c.compania) === params.compania);
+  // Se resuelve por id (?pid=) si viene — permite distinguir varios productos
+  // de la misma compañía (p.ej. dos "Mapfre", con y sin copago); si no, por el
+  // slug de la compañía (enlaces antiguos).
+  const pid = searchParams.get("pid");
+  const entry = (pid && products.find((c) => c.id === pid)) || products.find((c) => slugify(c.compania) === params.compania);
 
   if (loaded && !entry) {
     return (
@@ -108,6 +112,7 @@ export function CompanyDetail() {
           <CompanyLogo logoUrl={entry.logoUrl} compania={entry.compania} />
           {entry.compania}
         </h1>
+        {entry.titulo && <p className="mt-0.5 text-[15px] font-semibold text-slate2">{entry.titulo}</p>}
         {/* Es una COTIZACIÓN mientras el usuario no elige/solicita; el nº que
             se muestra es el de la comparativa (leadId), no "Presupuesto nº". */}
         {quote && <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Cotización nº {quoteNumber(quote.leadId || quote.id)}</p>}
