@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
-import { PRICING_ZONAS, type ProductPricing, type TramoEdad, type DescuentoAsegurados, type PricingZona } from "@/lib/catalog";
+import { PRICING_ZONAS, copagoTexto, type ProductPricing, type TramoEdad, type DescuentoAsegurados, type PricingZona, type CopagoModo } from "@/lib/catalog";
 
 type Product = {
   id: string;
@@ -14,6 +14,7 @@ type Product = {
   logoUrl?: string;
   precioConCopago?: number;
   precioSinCopago?: number;
+  modalidadCopago?: CopagoModo;
   precio?: number;
   pricing?: ProductPricing;
   condiciones: string;
@@ -199,6 +200,7 @@ function ProductsAdmin() {
 function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: Partial<Product>) => Promise<boolean> }) {
   const [conCopago, setConCopago] = useState(String(product.precioConCopago ?? ""));
   const [sinCopago, setSinCopago] = useState(String(product.precioSinCopago ?? ""));
+  const [modalidadCopago, setModalidadCopago] = useState<CopagoModo>(product.modalidadCopago ?? "sin");
   const [precio, setPrecio] = useState(String(product.precio ?? ""));
   const [orden, setOrden] = useState(String(product.orden ?? 1));
   const [condiciones, setCondiciones] = useState(product.condiciones ?? "");
@@ -226,7 +228,7 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
     setSaving(true); setSaved(false);
     const patch: Partial<Product> =
       product.producto === "salud"
-        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0 }
+        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0, modalidadCopago }
         : { precio: Number(precio) || 0 };
     patch.orden = Number(orden) || 1;
     patch.condiciones = condiciones;
@@ -263,17 +265,33 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
       </label>
 
       {product.producto === "salud" ? (
-        <div className="flex gap-3">
-          <label className="flex-1">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Precio con copago (€/mes)</span>
-            <input inputMode="decimal" value={conCopago} onChange={(e) => setConCopago(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+        <div className="flex flex-col gap-3">
+          <label>
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Modalidad de copago</span>
+            <select value={modalidadCopago} onChange={(e) => setModalidadCopago(e.target.value as CopagoModo)}
+              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] font-semibold">
+              <option value="sin">Sin copago (recomendado para negociadas)</option>
+              <option value="con">Con copago</option>
+              <option value="ambas">Con y sin copago (ambas)</option>
+            </select>
+            <span className="mt-1 block text-[11px] leading-relaxed text-slate2">{copagoTexto(modalidadCopago)}</span>
           </label>
-          <label className="flex-1">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Precio sin copago (€/mes)</span>
-            <input inputMode="decimal" value={sinCopago} onChange={(e) => setSinCopago(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
-          </label>
+          <div className="flex gap-3">
+            {(modalidadCopago === "con" || modalidadCopago === "ambas") && (
+              <label className="flex-1">
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Precio con copago (€/mes)</span>
+                <input inputMode="decimal" value={conCopago} onChange={(e) => setConCopago(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+              </label>
+            )}
+            {(modalidadCopago === "sin" || modalidadCopago === "ambas") && (
+              <label className="flex-1">
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Precio sin copago (€/mes)</span>
+                <input inputMode="decimal" value={sinCopago} onChange={(e) => setSinCopago(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+              </label>
+            )}
+          </div>
         </div>
       ) : (
         <label>

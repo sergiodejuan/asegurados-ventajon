@@ -52,6 +52,10 @@ export type Product = {
   // Salud
   precioConCopago?: number;
   precioSinCopago?: number;
+  // Modalidad de copago de la opción negociada: solo con copago, solo sin
+  // copago (lo habitual en las negociadas de Asegurados Ventajón), o ambas.
+  // Decide qué precio(s) se muestran y el texto dinámico de la tarjeta.
+  modalidadCopago?: CopagoModo;
   // Vida, auto y decesos (precio único de partida)
   precio?: number;
   // Precios avanzados por tramo de edad y zona + descuento por nº de
@@ -63,6 +67,26 @@ export type Product = {
 };
 
 export type ProductDraft = Partial<Omit<Product, "id" | "updatedAt">>;
+
+// Modalidad de copago. Por defecto "sin": las opciones negociadas por
+// Asegurados Ventajón son, por norma, sin copago.
+export type CopagoModo = "con" | "sin" | "ambas";
+
+export function copagoModoDe(p: { modalidadCopago?: CopagoModo }): CopagoModo {
+  return p.modalidadCopago ?? "sin";
+}
+
+// Etiqueta corta (chip) según la modalidad.
+export function copagoChip(modo: CopagoModo): string {
+  return modo === "sin" ? "Sin copagos" : modo === "con" ? "Con copago" : "Con y sin copago";
+}
+
+// Texto dinámico explicativo según la modalidad elegida.
+export function copagoTexto(modo: CopagoModo): string {
+  if (modo === "sin") return "Sin copagos: pagas solo tu cuota mensual, sin abonar nada por cada visita o prueba.";
+  if (modo === "con") return "Con copago: cuota mensual más baja a cambio de un pequeño pago por cada visita o prueba.";
+  return "Disponible con y sin copago: elige pagar menos al mes (con copago) o no pagar por cada visita (sin copago).";
+}
 
 const now = new Date().toISOString();
 

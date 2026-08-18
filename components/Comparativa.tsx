@@ -12,7 +12,7 @@ import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialC
 import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import { normalizePhone } from "@/lib/schema";
-import type { Product } from "@/lib/catalog";
+import { copagoModoDe, copagoChip, copagoTexto, type Product } from "@/lib/catalog";
 import {
   loadQuote, updateQuote, saludPriceAdvanced, resolveBasePrecio, applyNumInsuredDiscount,
   vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
@@ -815,37 +815,42 @@ export function Comparativa() {
                         codigoPostal: quote?.codigoPostal,
                         edad: age,
                       });
-                      const hasCon = c.precioConCopago != null || (c.pricing?.tramos?.some((t) => Object.values(t.porZona).some((z) => z?.conCopago != null)) ?? false);
-                      const hasSin = c.precioSinCopago != null || (c.pricing?.tramos?.some((t) => Object.values(t.porZona).some((z) => z?.sinCopago != null)) ?? false);
-                      const precioInteres = hasCon ? price.conCopago : hasSin ? price.sinCopago : (c.precio ?? 0);
+                      const modo = copagoModoDe(c);
+                      const showCon = modo === "con" || modo === "ambas";
+                      const showSin = modo === "sin" || modo === "ambas";
+                      // Precio que viaja al "interés": el de la modalidad mostrada
+                      // (sin copago por defecto en las negociadas).
+                      const precioInteres = modo === "con" ? price.conCopago : price.sinCopago;
                       return (
                         <li key={c.id} className="rounded-card border-2 border-brand-red bg-white p-4 shadow-card">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-2.5">
                               {c.logoUrl
                                 ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
                                 : <span className="truncate text-[16px] font-bold text-ink">{c.compania}</span>}
                               <span className="shrink-0 rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>
                             </div>
+                            {/* Modalidad reforzada (sin copagos por defecto). */}
+                            <span className="shrink-0 rounded-pill bg-emerald-600/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{copagoChip(modo)}</span>
                           </div>
-                          {(hasCon || hasSin) && (
-                            <div className="mt-2 space-y-1">
-                              {hasCon && (
-                                <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
-                                  <span>Con copago</span>
-                                  <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
-                                </div>
-                              )}
-                              {hasSin && (
-                                <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
-                                  <span>Sin copago</span>
-                                  <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {c.servicios?.[0] && <p className="mt-1.5 text-[12px] text-slate2">{c.servicios[0]}</p>}
-                          <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: "Opción negociada" })} />
+                          <div className="mt-2 space-y-1">
+                            {showCon && (
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Con copago</span>
+                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
+                              </div>
+                            )}
+                            {showSin && (
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Sin copago</span>
+                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
+                              </div>
+                            )}
+                          </div>
+                          {/* Texto dinámico según la modalidad elegida. */}
+                          <p className="mt-1.5 text-[12px] leading-relaxed text-slate2">{copagoTexto(modo)}</p>
+                          {c.servicios?.[0] && <p className="mt-1 text-[12px] font-medium text-ink">{c.servicios[0]}</p>}
+                          <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: `Opción negociada (${copagoChip(modo)})` })} />
                         </li>
                       );
                     })}
@@ -896,14 +901,16 @@ export function Comparativa() {
                           </div>
                         </div>
                         <p className="shrink-0 text-right text-[14px] text-slate2">
-                          {q.premium != null
-                            ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(q.premium)} €</span>/{q.frequency === "Monthly" ? "mes" : "año"}</>
+                          {(q.downPayment != null && q.downPayment > 0) || q.premium != null
+                            ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros((q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0))} €</span>/mes</>
                             : <span className="text-[13px] italic text-slate2">Calculando…</span>}
                         </p>
                       </div>
-                      {q.downPayment != null && q.downPayment > 0 && q.downPayment !== q.premium && (
+                      {/* La primera prima (downPayment) es el precio mensual; la
+                          prima total pasa a mostrarse como referencia anual. */}
+                      {q.premium != null && q.downPayment != null && q.downPayment > 0 && q.premium !== q.downPayment && (
                         <p className="mt-1 text-[12px] text-slate2">
-                          Primera prima: <span className="font-semibold tnums text-ink">{euros(q.downPayment)} €</span>
+                          Prima anual: <span className="font-semibold tnums text-ink">{euros(q.premium)} €</span>
                         </p>
                       )}
                       {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
@@ -927,7 +934,10 @@ export function Comparativa() {
                             </a>
                           )}
                         </div>
-                        {q.premium != null && <CompanyActions producto={producto} compania={q.compania} precio={q.premium} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} onSolicitar={() => solicitarSalud({ compania: q.compania, precio: q.premium, quoteId: q.id, modalidad: q.modalidad, insuranceId: insuranceId || undefined })} />}
+                        {((q.downPayment != null && q.downPayment > 0) || q.premium != null) && (() => {
+                          const precioMes = (q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0);
+                          return <CompanyActions producto={producto} compania={q.compania} precio={precioMes} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} onSolicitar={() => solicitarSalud({ compania: q.compania, precio: precioMes, quoteId: q.id, modalidad: q.modalidad, insuranceId: insuranceId || undefined })} />;
+                        })()}
                       </div>
                     </li>
                     {/* Bloque de llamada cada 3 opciones (no tras la última). */}
@@ -956,7 +966,7 @@ export function Comparativa() {
                 insuranceId={insuranceId}
                 quote={coveragesFor}
                 onClose={() => setCoveragesFor(null)}
-                onSolicitar={() => solicitarSalud({ compania: coveragesFor.compania, precio: coveragesFor.premium, quoteId: coveragesFor.id, modalidad: coveragesFor.modalidad, insuranceId: insuranceId || undefined })}
+                onSolicitar={() => solicitarSalud({ compania: coveragesFor.compania, precio: (coveragesFor.downPayment != null && coveragesFor.downPayment > 0) ? coveragesFor.downPayment : coveragesFor.premium, quoteId: coveragesFor.id, modalidad: coveragesFor.modalidad, insuranceId: insuranceId || undefined })}
               />
             )}
           </div>
@@ -1461,11 +1471,11 @@ function CoveragesModal({ insuranceId, quote, onClose, onSolicitar }: { insuranc
                 )}
               </div>
               <div className="shrink-0 text-right">
-                {quote.premium != null
-                  ? <p className="text-[14px] text-slate2">Desde <span className="text-[19px] font-extrabold tnums text-navy">{euros(quote.premium)} €</span>/{quote.frequency === "Monthly" ? "mes" : "año"}</p>
+                {(quote.downPayment != null && quote.downPayment > 0) || quote.premium != null
+                  ? <p className="text-[14px] text-slate2">Desde <span className="text-[19px] font-extrabold tnums text-navy">{euros((quote.downPayment != null && quote.downPayment > 0) ? quote.downPayment : (quote.premium ?? 0))} €</span>/mes</p>
                   : <p className="text-[13px] italic text-slate2">Precio en cálculo…</p>}
-                {quote.downPayment != null && quote.downPayment > 0 && quote.downPayment !== quote.premium && (
-                  <p className="mt-0.5 text-[12px] text-slate2">Primera prima: <span className="font-semibold tnums text-ink">{euros(quote.downPayment)} €</span></p>
+                {quote.premium != null && quote.downPayment != null && quote.downPayment > 0 && quote.premium !== quote.downPayment && (
+                  <p className="mt-0.5 text-[12px] text-slate2">Prima anual: <span className="font-semibold tnums text-ink">{euros(quote.premium)} €</span></p>
                 )}
                 {quote.estimate && <p className="mt-0.5 text-[11px] italic text-slate2">Precio orientativo</p>}
               </div>
