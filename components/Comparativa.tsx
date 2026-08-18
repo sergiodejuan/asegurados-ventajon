@@ -816,8 +816,6 @@ export function Comparativa() {
                         edad: age,
                       });
                       const modo = copagoModoDe(c);
-                      const showCon = modo === "con" || modo === "ambas";
-                      const showSin = modo === "sin" || modo === "ambas";
                       // Precio que viaja al "interés": el de la modalidad mostrada
                       // (sin copago por defecto en las negociadas).
                       const precioInteres = modo === "con" ? price.conCopago : price.sinCopago;
@@ -833,20 +831,25 @@ export function Comparativa() {
                             {/* Modalidad reforzada (sin copagos por defecto). */}
                             <span className="shrink-0 rounded-pill bg-emerald-600/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{copagoChip(modo)}</span>
                           </div>
-                          <div className="mt-2 space-y-1">
-                            {showCon && (
+                          {modo === "ambas" ? (
+                            <div className="mt-2 space-y-1">
                               <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
                                 <span>Con copago</span>
-                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
+                                <span className="text-[20px] font-extrabold tnums text-navy">{euros(price.conCopago)} €<span className="text-[13px] font-semibold text-slate2">/mes</span></span>
                               </div>
-                            )}
-                            {showSin && (
                               <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
                                 <span>Sin copago</span>
-                                <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
+                                <span className="text-[20px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €<span className="text-[13px] font-semibold text-slate2">/mes</span></span>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          ) : (
+                            /* Modalidad única: la etiqueta ya la da el badge verde,
+                               así que aquí solo va el precio, más grande. */
+                            <p className="mt-2 text-right">
+                              <span className="text-[28px] font-extrabold tnums text-navy">{euros(modo === "con" ? price.conCopago : price.sinCopago)} €</span>
+                              <span className="text-[15px] font-semibold text-slate2">/mes</span>
+                            </p>
+                          )}
                           {/* Texto dinámico según la modalidad elegida. */}
                           <p className="mt-1.5 text-[12px] leading-relaxed text-slate2">{copagoTexto(modo)}</p>
                           {c.servicios?.[0] && <p className="mt-1 text-[12px] font-medium text-ink">{c.servicios[0]}</p>}
@@ -902,7 +905,7 @@ export function Comparativa() {
                         </div>
                         <p className="shrink-0 text-right text-[14px] text-slate2">
                           {(q.downPayment != null && q.downPayment > 0) || q.premium != null
-                            ? <>Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros((q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0))} €</span>/mes</>
+                            ? <><span className="text-[17px] font-extrabold tnums text-navy">{euros((q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0))} €</span>/mes</>
                             : <span className="text-[13px] italic text-slate2">Calculando…</span>}
                         </p>
                       </div>
@@ -1472,7 +1475,7 @@ function CoveragesModal({ insuranceId, quote, onClose, onSolicitar }: { insuranc
               </div>
               <div className="shrink-0 text-right">
                 {(quote.downPayment != null && quote.downPayment > 0) || quote.premium != null
-                  ? <p className="text-[14px] text-slate2">Desde <span className="text-[19px] font-extrabold tnums text-navy">{euros((quote.downPayment != null && quote.downPayment > 0) ? quote.downPayment : (quote.premium ?? 0))} €</span>/mes</p>
+                  ? <p className="text-[14px] text-slate2"><span className="text-[19px] font-extrabold tnums text-navy">{euros((quote.downPayment != null && quote.downPayment > 0) ? quote.downPayment : (quote.premium ?? 0))} €</span>/mes</p>
                   : <p className="text-[13px] italic text-slate2">Precio en cálculo…</p>}
                 {quote.premium != null && quote.downPayment != null && quote.downPayment > 0 && quote.premium !== quote.downPayment && (
                   <p className="mt-0.5 text-[12px] text-slate2">Prima anual: <span className="font-semibold tnums text-ink">{euros(quote.premium)} €</span></p>
