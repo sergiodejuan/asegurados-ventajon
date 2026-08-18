@@ -122,9 +122,24 @@ export default function Legal() {
         <H3>3.2 Finalidades y base jurídica del tratamiento</H3>
         <P>Tratamos los datos que nos facilitas a través de los formularios de esta web para:</P>
         <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-relaxed text-slate2">
-          <li>Elaborar y enviarte una comparativa o presupuesto de seguros — base jurídica: ejecución de medidas precontractuales a tu solicitud (art. 6.1.b RGPD).</li>
-          <li>Contactarte por teléfono, WhatsApp o correo electrónico para asesorarte sobre tu solicitud, incluida la programación de una llamada — base jurídica: tu consentimiento expreso (art. 6.1.a RGPD), que se solicita de forma separada e independiente de la aceptación de la política de privacidad.</li>
-          <li>Enviarte comunicaciones comerciales sobre productos de seguros — base jurídica: tu consentimiento expreso, opcional y revocable en cualquier momento.</li>
+          <li>
+            Elaborar y enviarte una comparativa o presupuesto de seguros, y contactarte por teléfono,
+            WhatsApp o correo electrónico para atender esa misma solicitud (confirmarte el precio,
+            resolver dudas, programar una llamada) — base jurídica: ejecución de medidas
+            precontractuales a tu solicitud (art. 6.1.b RGPD). Te informamos de ello, junto con esta
+            política de privacidad, en la casilla obligatoria de cada formulario: al no ser una
+            finalidad distinta de la que tú mismo inicias, no exige un consentimiento separado, aunque
+            igualmente requiere una acción afirmativa expresa (marcar la casilla) antes de poder
+            enviar el formulario.
+          </li>
+          <li>
+            Cuando el seguro que solicitas trata datos de salud (salud, vida — el hábito de fumar o el
+            motivo de la contratación cuentan como datos de salud a estos efectos), calcular y comparar
+            tu tarifa a partir de esos datos — base jurídica: tu consentimiento explícito y separado
+            para categorías especiales de datos (art. 9.2.a RGPD), recogido en una casilla propia,
+            distinta de la anterior y nunca premarcada.
+          </li>
+          <li>Enviarte comunicaciones comerciales sobre productos de seguros — base jurídica: tu consentimiento expreso, opcional, desmarcado por defecto y revocable en cualquier momento.</li>
           <li>Gestionar tu área de cliente, tus llamadas programadas y tus notificaciones, si te registras — base jurídica: ejecución de la relación contractual o precontractual.</li>
           <li>Medir el rendimiento y la seguridad de la web (analítica, prevención de abuso) — base jurídica: interés legítimo y, para las cookies no esenciales, tu consentimiento a través del panel de cookies.</li>
         </ul>
@@ -278,8 +293,10 @@ export default function Legal() {
         {/* 6. COMUNICACIONES COMERCIALES */}
         <H2 id="comunicaciones">6. Comunicaciones comerciales y llamadas telefónicas</H2>
         <P>
-          Solo te llamamos o te escribimos por WhatsApp si has autorizado expresamente el contacto en el
-          formulario correspondiente. Puedes revocar esta autorización en cualquier momento indicándolo
+          Solo te llamamos o te escribimos por WhatsApp para atender una solicitud que tú mismo nos has
+          enviado (por ejemplo, confirmarte un presupuesto) o si nos has dado tu consentimiento expreso
+          para comunicaciones comerciales; en ambos casos te lo indicamos con claridad en el propio
+          formulario antes de enviarlo. Puedes revocar tu autorización en cualquier momento indicándolo
           en la propia llamada, respondiendo "BAJA" por WhatsApp, o escribiendo a{" "}
           <Pendiente>email para darte de baja del contacto comercial</Pendiente>. En cumplimiento de la
           Ley General de Telecomunicaciones, las llamadas comerciales se realizan desde numeración

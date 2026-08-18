@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/retention",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/referral/process-payouts",
+      "schedule": "0 4 * * *"
     }
   ]
 }

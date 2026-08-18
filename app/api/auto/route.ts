@@ -10,8 +10,10 @@ import { sendAreaClienteVerificationEmail } from "@/lib/clientVerification";
 import { sendComparativaSummaryEmail } from "@/lib/comparativaEmail";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
 import { ageFromDob } from "@/lib/quote";
-import { callTriggerRateLimitFail } from "@/lib/rateLimit";
+import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +30,9 @@ export async function POST(request: Request) {
   const d = parsed.data;
   if (d.company) return NextResponse.json({ ok: true });
 
+  const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
+  if (!humano) return NextResponse.json({ ok: false, error: "No hemos podido verificar la solicitud. Recarga la página e inténtalo de nuevo." }, { status: 403 });
+
   const limited = await callTriggerRateLimitFail(request, "tarificador-auto", d.telefono);
   if (limited) return limited;
 
@@ -35,7 +40,9 @@ export async function POST(request: Request) {
   // la página normal: se distingue en el source para poder medirlo aparte.
   // Si viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
   const source = promotionSourceFromUtm(d.utm) ??
-    (d.origen === "asistente" ? "tarificador-auto-widget" : "tarificador-auto");
+    (d.origen === "asistente" ? "tarificador-auto-widget"
+    : d.origen === "lp" ? "tarificador-auto-lp"
+    : "tarificador-auto");
 
   const consent = buildConsent(request, source, "/tarificador-auto",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
@@ -52,7 +59,7 @@ export async function POST(request: Request) {
       seguroActualPeriodo: d.seguroActualPeriodo, seguroActualServicios: d.seguroActualServicios,
       producto: "auto",
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
-      utm: d.utm,
+      utm: d.utm, landingSlug: d.landingSlug,
     },
     source,
     consent
@@ -144,6 +151,12 @@ export async function POST(request: Request) {
   // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, presupuestoId: presupuesto?.id,
+    aceptaComercial: d.aceptaComercial,
+  }).catch((err) => console.error("[auto] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IconByName, Close } from "./icons";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { withUtmParams } from "@/lib/attribution";
+import { safeHref } from "@/lib/safeHref";
 import { useSiteTheme } from "@/lib/useTheme";
 
 // Widget flotante de captación para el seguro de auto en la home (solo
@@ -29,7 +30,7 @@ export function AutoWidget() {
 
   if (!config.enabled || !visible || dismissed) return null;
 
-  const ctaHref = withUtmParams(config.ctaHref || "/tarificador-auto", {
+  const ctaHref = withUtmParams(safeHref(config.ctaHref, "/tarificador-auto"), {
     source: "web", medium: "widget", campaign: "auto-widget-home",
   });
 

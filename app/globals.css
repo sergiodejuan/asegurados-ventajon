@@ -118,6 +118,65 @@ html[data-a11y-cursor="true"] [role="button"] {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M4 2l14 8-6 2 4 6-3 2-4-6-4 4z' fill='black' stroke='white' stroke-width='1'/%3E%3C/svg%3E") 4 4, auto !important;
 }
 
+/* --------------------------- Modo oscuro (admin) ---------------------------
+   Solo aplica dentro del panel: el atributo vive en #admin-root
+   (app/admin/layout.tsx), nunca en <html>, así el sitio público no se ve
+   afectado. Mismo mecanismo que el modo alto contraste de arriba: se
+   redefinen las variables --color-* para el subárbol. El admin es casi todo
+   variables CSS, con dos escapes hardcodeados (bg-white, bg-navy y sus
+   variantes) que se remapean aquí con overrides puntuales.
+
+   Nota sobre navy: en claro, --color-navy hace de "tinta fuerte" (títulos,
+   enlaces) Y de relleno de botón. En oscuro esos dos usos se separan:
+   --color-navy pasa a ser un azul CLARO (para que text-navy sea legible
+   sobre fondo oscuro), y el relleno bg-navy se fija a un azul saturado con
+   texto blanco vía override de la utilidad. */
+[data-admin-theme="dark"] {
+  color-scheme: dark;
+  --color-mist: #0e1626;       /* fondo de página */
+  --color-ink: #e8ecf4;        /* texto principal */
+  --color-slate2: #9aa6be;     /* texto atenuado */
+  --color-hair: #273350;       /* bordes */
+  --color-navy: #c3d2ef;       /* text-navy / border-navy → claro */
+  --color-navy-deep: #dbe5f8;
+  --color-navy-soft: #9fb3e0;
+  --color-brand-red: #f16d67;  /* legible como texto y como relleno */
+  --color-brand-red-deep: #d85049;
+  --color-surface: #17223c;    /* tarjetas/superficies (reemplaza bg-white) */
+}
+
+/* Superficies: bg-white → superficie oscura (solo los usos sólidos; las
+   variantes translúcidas /70 y /15 sobre fondos de color se dejan tal cual). */
+[data-admin-theme="dark"] .bg-white,
+[data-admin-theme="dark"] .bg-white\/95 {
+  background-color: var(--color-surface);
+}
+
+/* Rellenos de marca: se desacoplan de --color-navy (que ahora es claro). */
+[data-admin-theme="dark"] .bg-navy,
+[data-admin-theme="dark"] .bg-navy\/90,
+[data-admin-theme="dark"] .hover\:bg-navy:hover { background-color: #3f63c4; }
+[data-admin-theme="dark"] .bg-navy-deep,
+[data-admin-theme="dark"] .hover\:bg-navy-deep:hover { background-color: #33539f; }
+[data-admin-theme="dark"] .bg-navy\/10 { background-color: rgba(120, 150, 235, 0.16); }
+
+/* Sombras teñidas de navy → sombras neutras que sí se ven sobre oscuro. */
+[data-admin-theme="dark"] .shadow-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.55); }
+[data-admin-theme="dark"] .shadow-soft { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+
+/* Controles de formulario: texto legible sobre la superficie oscura. */
+[data-admin-theme="dark"] input,
+[data-admin-theme="dark"] textarea,
+[data-admin-theme="dark"] select { color: var(--color-ink); }
+
+/* El logo (pensado para fondo claro) se apoya en un chip claro sutil para
+   seguir siendo legible sobre el sidebar oscuro. En claro no lleva fondo. */
+[data-admin-theme="dark"] .admin-logo-wrap {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 3px 6px;
+}
+
 /* Respeta prefers-reduced-motion en toda la app */
 @media (prefers-reduced-motion: reduce) {
   *,

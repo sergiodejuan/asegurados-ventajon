@@ -3,10 +3,52 @@
 // (lib/store.ts). Los valores por defecto son ILUSTRATIVOS (ver lib/brand.ts
 // histórico) hasta que se sustituyan por datos/precios reales desde el admin.
 
+// Zonas de tarificación. Los tarificadores guardan la zona como etiqueta
+// ("Islas Canarias" / "Islas Baleares" / "Península", ver lib/forms.ts); aquí
+// usamos claves cortas y estables para los precios configurados en el admin.
+export type PricingZona = "canarias" | "baleares" | "peninsula";
+export const PRICING_ZONAS: { key: PricingZona; label: string }[] = [
+  { key: "canarias", label: "Canarias" },
+  { key: "baleares", label: "Baleares" },
+  { key: "peninsula", label: "Península" },
+];
+
+// Precio de un tramo para una zona concreta. En salud se usan con/sin copago;
+// en el resto de ramos, el precio único.
+export type TramoPrecio = { conCopago?: number; sinCopago?: number; precio?: number };
+
+// Tramo de edad [min, max] (ambos inclusive) con su precio por zona. Permite
+// tarifas que suben con la edad, distintas por comunidad.
+export type TramoEdad = {
+  min: number;
+  max: number;
+  porZona: Partial<Record<PricingZona, TramoPrecio>>;
+};
+
+// Descuento por nº de asegurados: a partir de `desde` personas se aplica el
+// descuento, en euros (sobre la prima mensual total) o en porcentaje.
+export type DescuentoAsegurados = {
+  desde: number;
+  tipo: "eur" | "pct";
+  valor: number;
+};
+
+// Configuración de precios avanzada, opcional. Si no está definida (o sus
+// listas están vacías) se usa el precio plano de siempre (precioConCopago /
+// precioSinCopago / precio).
+export type ProductPricing = {
+  tramos: TramoEdad[];
+  descuentos: DescuentoAsegurados[];
+};
+
 export type Product = {
   id: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
+  // Título/modalidad del producto que se muestra en la tarjeta de la
+  // comparativa bajo la compañía (p.ej. "Salud Completa Plus"), igual que las
+  // opciones de Codeoscopic muestran su modalidad ("Adeslas GO 2026").
+  titulo?: string;
   activo: boolean; // se muestra en la comparativa pública
   destacado: boolean; // insignia "Recomendado" + se ordena primero
   orden: number;
@@ -14,14 +56,44 @@ export type Product = {
   // Salud
   precioConCopago?: number;
   precioSinCopago?: number;
+  // Modalidad de copago de la opción negociada: solo con copago, solo sin
+  // copago (lo habitual en las negociadas de Asegurados Ventajón), o ambas.
+  // Decide qué precio(s) se muestran y el texto dinámico de la tarjeta.
+  modalidadCopago?: CopagoModo;
+  // Si el producto incluye cobertura dental. Alimenta los filtros "Con dental"
+  // / "Sin dental" de la comparativa.
+  dental?: boolean;
   // Vida, auto y decesos (precio único de partida)
   precio?: number;
+  // Precios avanzados por tramo de edad y zona + descuento por nº de
+  // asegurados. Opcional: si falta, se usa el precio plano de arriba.
+  pricing?: ProductPricing;
   condiciones: string;
   servicios: string[];
   updatedAt: string;
 };
 
 export type ProductDraft = Partial<Omit<Product, "id" | "updatedAt">>;
+
+// Modalidad de copago. Por defecto "sin": las opciones negociadas por
+// Asegurados Ventajón son, por norma, sin copago.
+export type CopagoModo = "con" | "sin" | "ambas";
+
+export function copagoModoDe(p: { modalidadCopago?: CopagoModo }): CopagoModo {
+  return p.modalidadCopago ?? "sin";
+}
+
+// Etiqueta corta (chip) según la modalidad.
+export function copagoChip(modo: CopagoModo): string {
+  return modo === "sin" ? "Sin copagos" : modo === "con" ? "Con copago" : "Con y sin copago";
+}
+
+// Texto dinámico explicativo según la modalidad elegida.
+export function copagoTexto(modo: CopagoModo): string {
+  if (modo === "sin") return "Sin copagos: pagas solo tu cuota mensual, sin abonar nada por cada visita o prueba.";
+  if (modo === "con") return "Con copago: cuota mensual más baja a cambio de un pequeño pago por cada visita o prueba.";
+  return "Disponible con y sin copago: elige pagar menos al mes (con copago) o no pagar por cada visita (sin copago).";
+}
 
 const now = new Date().toISOString();
 

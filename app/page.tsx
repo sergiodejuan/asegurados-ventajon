@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CoverageTabs } from "@/components/CoverageTabs";
@@ -11,24 +12,38 @@ import { InsuranceQuoteCta } from "@/components/InsuranceQuoteCta";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
-import { PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
+import { BRAND_NAME, SITE_URL, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
+import { safeJsonLd } from "@/lib/safeJsonLd";
+import { safeHref } from "@/lib/safeHref";
+
+const HOME_TITLE = `${BRAND_NAME} | Compara seguros y paga menos`;
+const HOME_DESCRIPTION =
+  "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña. Calcula tu precio.";
+
+export const metadata: Metadata = {
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: { title: HOME_TITLE, description: HOME_DESCRIPTION, url: SITE_URL, locale: "es_ES", type: "website" },
+};
 
 const PRODUCT_BLURBS: Record<string, string> = {
-  salud: "Con o sin copago. Calcula tu precio al instante.",
-  vida: "Protege a los tuyos y tu hipoteca.",
-  decesos: "Tranquilidad para tu familia, sin tabúes.",
-  hogar: "Tu vivienda cubierta al mejor precio.",
-  auto: "A terceros o a todo riesgo, comparado por un experto.",
+  salud: "Con copago o sin él, calcula tu precio al instante y elige tu cuadro médico.",
+  vida: "Protege a tu familia y tu hipoteca desde una cuota ajustada a tu edad real.",
+  decesos: "Resuelto para tu familia, sin tabúes y sin sorpresas de última hora.",
+  hogar: "Continente, contenido y responsabilidad civil al precio justo.",
+  auto: "A terceros o a todo riesgo, comparado por un experto, no por un algoritmo.",
 };
 
 const FAQ_GENERAL = [
-  { q: "¿Sois una aseguradora?", a: "No. Somos correduría de seguros: comparamos entre varias compañías para encontrar la que mejor se ajusta a ti, no vendemos un único producto." },
-  { q: "¿Cuánto cuesta compararse con vosotros?", a: "Nada. La comparativa y el asesoramiento son 100% gratuitos y sin compromiso de contratación." },
-  { q: "¿Qué seguros comparáis?", a: "Salud, vida, decesos, hogar y auto, entre las principales aseguradoras del país: Mapfre, Adeslas, Asisa, Zurich y Generali." },
-  { q: "¿Cómo me contactáis?", a: "Como prefieras: por teléfono, WhatsApp o completando el formulario online. Tú eliges cuándo y cómo." },
-  { q: "¿En qué zonas trabajáis?", a: "Trabajamos en toda España, con atención especialmente cercana en Canarias y Baleares." },
+  { q: "¿Sois una aseguradora?", a: "No, somos correduría de seguros: comparamos entre varias aseguradoras para encontrar tu mejor opción, no vendemos un producto propio." },
+  { q: "¿Cuánto cuesta compararse con vosotros?", a: "Nada. Comparar es gratis y sin compromiso, cobremos o no una póliza al final." },
+  { q: "¿Qué seguros comparáis?", a: "Salud, vida, decesos, hogar y auto, con las principales aseguradoras de España." },
+  { q: "¿Cómo me contactáis?", a: "Por teléfono o WhatsApp, en el horario que nos indiques; nunca sin que lo pidas." },
+  { q: "¿En qué zonas trabajáis?", a: "En toda España, con atención especial a Canarias y Baleares." },
 ];
 
 export default async function Home() {
@@ -36,8 +51,36 @@ export default async function Home() {
   const heroImage = theme.heroImages.home;
   const hero = theme.homeHero;
   const headlineLines = hero.headline.split("\n");
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "InsuranceAgency",
+        name: BRAND_NAME,
+        url: SITE_URL,
+        description: HOME_DESCRIPTION,
+        areaServed: [
+          { "@type": "AdministrativeArea", name: "Islas Canarias" },
+          { "@type": "AdministrativeArea", name: "Islas Baleares" },
+          { "@type": "Country", name: "España" },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: FAQ_GENERAL.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+    ],
+  };
+
   return (
     <>
+      {/* eslint-disable-next-line react/no-danger */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <Header />
 
       <main id="contenido">
@@ -79,7 +122,7 @@ export default async function Home() {
 
             <div id="home-hero-ctas" className="mt-6 flex flex-col gap-3 sm:flex-row md:col-start-1 md:row-start-2 md:mt-0">
               {hero.ctaPrimaryHref ? (
-                <a href={hero.ctaPrimaryHref}
+                <a href={safeHref(hero.ctaPrimaryHref)}
                   className="flex items-center justify-center rounded-card bg-brand-red px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep sm:flex-1">
                   {hero.ctaPrimaryLabel}
                 </a>
@@ -88,13 +131,13 @@ export default async function Home() {
                   {hero.ctaPrimaryLabel}
                 </InsuranceQuoteCta>
               )}
-              <a href={hero.ctaSecondaryHref}
+              <a href={safeHref(hero.ctaSecondaryHref)}
                 className="flex items-center justify-center rounded-card bg-navy px-5 py-4 text-[16px] font-semibold text-white transition-colors hover:bg-navy-deep sm:flex-1">
                 {hero.ctaSecondaryLabel}
               </a>
             </div>
             <p className="mt-3 text-[12px] font-medium text-slate2 md:col-start-1 md:row-start-3">
-              Sin coste · Sin compromiso · {ECOSYSTEM_MEMBERS} en el ecosistema Ventajon
+              Sin coste · Sin compromiso · Respuesta en menos de 24h
             </p>
           </div>
         </section>
@@ -166,6 +209,22 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-6 md:mx-auto md:max-w-2xl"><CoverageTabs /></div>
+
+          {/* Cross-sell del flujo "igualación de precio" — enlace discreto
+              para el usuario que ya tiene presupuesto de otra compañía.
+              Es un canal de conversión distinto al del tarificador. */}
+          <div className="mt-8 md:mx-auto md:max-w-2xl">
+            <a href="/precio-mejor-garantizado"
+              className="flex items-center justify-between gap-3 rounded-[16px] border border-hair bg-mist/60 p-4 transition-colors hover:border-navy/40 hover:bg-mist">
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-navy">¿Ya tienes un precio?</p>
+                <p className="mt-0.5 text-[12px] leading-relaxed text-slate2">
+                  Envíanos tu presupuesto y estudiamos la mejor alternativa del mercado sin compromiso.
+                </p>
+              </div>
+              <span className="shrink-0 text-[13px] font-semibold text-navy">Enviar →</span>
+            </a>
+          </div>
         </section>
 
         {/* CONFIANZA + COMPAÑÍAS */}
@@ -205,7 +264,7 @@ export default async function Home() {
             <div>
               <h2 className="text-[22px] font-extrabold leading-tight md:text-[28px]">¿Empezamos?</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-white/80 md:text-[16px]">
-                Calcula tu precio en 1 minuto o deja que te llamemos. Sin compromiso.
+                Calcula tu precio en menos de 2 minutos, o pide que te llamemos. Sin compromiso.
               </p>
             </div>
             <div className="mt-5 flex flex-col gap-3 md:mt-0 md:flex-row md:shrink-0">

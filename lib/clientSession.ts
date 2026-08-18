@@ -16,7 +16,23 @@ export const CLIENT_SESSION_COOKIE = "ventajon_client_session";
 export const CLIENT_SESSION_MAX_AGE = 60 * 60 * 24 * 180; // 180 días
 
 function secret(): string {
-  return process.env.CLIENT_SESSION_SECRET || process.env.ADMIN_TOKEN || "ventajon-dev-secret-change-me";
+  // Estricta separación de responsabilidades: el secreto de firma de las
+  // cookies de CLIENTE no puede compartirse con el token master del admin
+  // ni con el de agentes. Compromiso de uno = compromiso aislado; rotar
+  // uno no invalida los demás. En prod, CLIENT_SESSION_SECRET es OBLIGATORIO
+  // (ADMIN_TOKEN NO es un fallback aceptable — auditoría consultora Meta-A).
+  const configured = process.env.CLIENT_SESSION_SECRET;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[clientSession] Falta CLIENT_SESSION_SECRET en producción. " +
+      "Configura una cadena larga aleatoria (32+ bytes base64) en Vercel → Environment Variables. " +
+      "No se acepta reusar ADMIN_TOKEN como fallback (aislamiento de dominios)."
+    );
+  }
+  // Solo en dev: fallback conocido, no rota nada de la experiencia local
+  // pero deja un secreto no-secreto para no perder tokens al reiniciar Node.
+  return "ventajon-dev-client-secret-change-me";
 }
 
 function sign(value: string): string {

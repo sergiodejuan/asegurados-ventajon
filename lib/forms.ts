@@ -10,6 +10,29 @@ export type Step =
   | { type: "seguroActual"; key: string; title: string; helper?: string; servicios: string[]; phase: number; showIf?: (d: FormData) => boolean }
   | { type: "matricula"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
   | { type: "vehiculo"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
+  // Dos preguntas de una sola opción en la misma pantalla — para fusionar
+  // pasos afines (p.ej. carnet + cobertura en auto) sin perder ninguno de
+  // los dos datos, solo la página/avance de progreso que ocupaban por
+  // separado. Ver nota en AUTO_CONFIG.
+  | {
+      type: "choice2"; key: string; title: string; helper?: string; phase: number;
+      groupA: { field: string; label: string; options: Option[] };
+      groupB: { field: string; label: string; options: Option[] };
+      showIf?: (d: FormData) => boolean;
+    }
+  // Documento de identidad + código postal real del titular — preparación
+  // para la futura integración con Codescopic (ver lib/schema.ts). No se
+  // pide dirección completa, solo el CP.
+  | { type: "identificacion"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean }
+  // Tarjetas compactas (fecha de nacimiento + sexo) para cada asegurado
+  // adicional al titular — solo lo mínimo que pide Codescopic por persona en
+  // este primer contacto; el resto de sus datos se completan más adelante.
+  // `countField` apunta al campo con el nº total de personas (p.ej.
+  // "numAsegurados"): se muestran countField-1 tarjetas.
+  | {
+      type: "aseguradosExtra"; key: string; title: string; helper?: string; countField: string; phase: number;
+      showIf?: (d: FormData) => boolean;
+    }
   | { type: "contact"; key: string; title: string; helper?: string; phase: number; showIf?: (d: FormData) => boolean };
 
 export type FormData = Record<string, unknown>;
@@ -57,6 +80,22 @@ export const SALUD_CONFIG: FormConfig = {
     { type: "choice", key: "zona", field: "codigoPostal", phase: 0, title: "¿Dónde vives?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "numbergrid", key: "asegurados", field: "numAsegurados", phase: 0, title: "¿Cuántas personas queréis aseguraros?", helper: "Cuéntalas incluyéndote a ti." },
     { type: "dobsex", key: "titular", phase: 1, title: "Datos de la persona titular", helper: "Solo la titular; a las demás las añadimos después." },
+    // Plus5 (auditoría consultora): retirado el paso "identificacion" (DNI/NIE).
+    // Se pide después de que el cliente elija su compañía en la comparativa —
+    // principio de minimización RGPD art. 5.1.c: no recabar datos que aún no
+    // hacen falta. Solo dejamos el código postal, que sí influye en tarifa.
+    {
+      type: "identificacion", key: "identificacion", phase: 1,
+      title: "¿En qué código postal vives?",
+      helper: "Nos ayuda a ajustar tu comparativa a tu zona. No pedimos tu dirección.",
+    },
+    { type: "yesno", key: "fumador", field: "fumador", phase: 1, title: "¿Fuma la persona titular?", helper: "Es un dato clave para calcular tu seguro de salud." },
+    {
+      type: "aseguradosExtra", key: "aseguradosExtra", phase: 1, countField: "numAsegurados",
+      title: "Datos de los demás asegurados",
+      helper: "Solo necesitamos su fecha de nacimiento y su sexo para ajustar el precio; el resto lo completamos más adelante.",
+      showIf: (d) => Number(d.numAsegurados) > 1,
+    },
     { type: "yesno", key: "dental", field: "coberturaDental", phase: 1, title: "¿Quieres que incluya cobertura dental?", helper: "Puedes cambiarlo luego con tu asesor." },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes un seguro de salud?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de salud actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_SALUD, showIf: (d) => d.yaTieneSeguro === true },
@@ -145,26 +184,31 @@ export const AUTO_CONFIG: FormConfig = {
     },
     { type: "choice", key: "zona", field: "codigoPostal", phase: 1, title: "¿Dónde se guarda habitualmente?", helper: "Para ajustar la comparativa a tu zona.", options: ZONA_OPTIONS },
     { type: "dobsex", key: "titular", phase: 1, title: "Datos del conductor principal", helper: "La edad influye en el precio del seguro de auto." },
+    // Antes eran 2 pasos ("carnet" y "cobertura") — se fusionan en una sola
+    // pantalla porque el tarificador de auto tenía notablemente más pasos
+    // que el resto (hasta 10 frente a 6-8), sin dejar de pedir ninguno de
+    // los dos datos.
     {
-      type: "choice", key: "carnet", field: "antiguedadCarnet", phase: 1,
-      title: "¿Cuánto tiempo llevas con el carnet?",
-      helper: "Es uno de los factores que más influyen en el precio.",
-      options: [
-        { value: "menos_2", label: "Menos de 2 años" },
-        { value: "2_5", label: "Entre 2 y 5 años" },
-        { value: "mas_5", label: "Más de 5 años" },
-      ],
-    },
-    {
-      type: "choice", key: "cobertura", field: "coberturaDeseada", phase: 1,
-      title: "¿Qué cobertura te interesa?",
-      helper: "Si no lo tienes claro, tu asesor te ayuda a elegir.",
-      options: [
-        { value: "terceros", label: "Terceros" },
-        { value: "terceros_ampliado", label: "Terceros ampliado" },
-        { value: "todo_riesgo", label: "Todo riesgo" },
-        { value: "no_lo_tengo_claro", label: "No lo tengo claro" },
-      ],
+      type: "choice2", key: "carnetYcobertura", phase: 1,
+      title: "Tu carnet y la cobertura que buscas",
+      helper: "Dos datos que influyen mucho en el precio de tu seguro de auto.",
+      groupA: {
+        field: "antiguedadCarnet", label: "¿Cuánto tiempo llevas con el carnet?",
+        options: [
+          { value: "menos_2", label: "Menos de 2 años" },
+          { value: "2_5", label: "Entre 2 y 5 años" },
+          { value: "mas_5", label: "Más de 5 años" },
+        ],
+      },
+      groupB: {
+        field: "coberturaDeseada", label: "¿Qué cobertura te interesa?",
+        options: [
+          { value: "terceros", label: "Terceros" },
+          { value: "terceros_ampliado", label: "Terceros ampliado" },
+          { value: "todo_riesgo", label: "Todo riesgo" },
+          { value: "no_lo_tengo_claro", label: "No lo tengo claro" },
+        ],
+      },
     },
     { type: "yesno", key: "tiene", field: "yaTieneSeguro", phase: 1, title: "¿Ya tienes seguro de auto?", helper: "Nos ayuda a compararlo con lo que ya pagas." },
     { type: "seguroActual", key: "actual", phase: 1, title: "Tu seguro de auto actual", helper: "Para poder compararlo y ajustar el presupuesto.", servicios: SERVICIOS_AUTO, showIf: (d) => d.yaTieneSeguro === true },

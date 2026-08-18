@@ -171,7 +171,12 @@ async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise
   return created;
 }
 
-async function setCustomField(subscriberId: string, fieldName: string, fieldValue: string): Promise<void> {
+async function setCustomField(subscriberId: string, fieldName: string, fieldValue: string | number): Promise<void> {
+  // ManyChat valida el tipo del campo: a un campo "number" hay que mandarle un
+  // número JSON (no un string), o responde 400 "Value for number custom field
+  // should be integer or float". Por eso field_value acepta string | number y
+  // los campos numéricos (telefono, codigo_postal, precio_aprox) se envían ya
+  // como número desde syncManychatLead.
   const result = await manychatFetch("/fb/subscriber/setCustomFieldByName", {
     subscriber_id: subscriberId,
     field_name: fieldName,
@@ -246,7 +251,8 @@ export async function syncManychatLead(opts: {
   source: string; // p.ej. "tarificador-salud", "quiero-que-me-llamen"
   producto?: string;
   email?: string;
-  codigoPostal?: string;
+  codigoPostal?: string; // etiqueta de zona (p.ej. "Islas Canarias") — NO es el CP
+  codigoPostalReal?: string; // CP real de 5 dígitos, el que va al campo numérico
   precioAprox?: number | null;
   presupuestoId?: string | null;
   servicioAdicional?: string;
@@ -258,13 +264,21 @@ export async function syncManychatLead(opts: {
   if (!created.ok || !created.subscriberId) return { ok: false, error: created.error };
   const id = created.subscriberId;
 
-  const fields: [string, string | undefined][] = [
+  // Campos numéricos de ManyChat (telefono, codigo_postal, precio_aprox) van
+  // como número. El teléfono se manda en 9 dígitos españoles (sin +34, que no
+  // es entero); el CP real de 5 dígitos (no la etiqueta de zona). Aviso: un CP
+  // con cero inicial (Baleares 07xxx) pierde el cero al ser numérico — si
+  // necesitas el CP exacto, cambia ese campo a "Texto" en ManyChat.
+  const telDigits = toE164Spain(opts.toNumber).replace(/\D/g, "").replace(/^34/, "");
+  const telefonoNum = /^[0-9]{9}$/.test(telDigits) ? Number(telDigits) : undefined;
+  const cpNum = opts.codigoPostalReal && /^[0-9]{5}$/.test(opts.codigoPostalReal) ? Number(opts.codigoPostalReal) : undefined;
+  const fields: [string, string | number | undefined][] = [
     ["nombre", opts.nombre],
-    ["telefono", toE164Spain(opts.toNumber)],
+    ["telefono", telefonoNum],
     ["producto", opts.producto],
     ["email", opts.email],
-    ["codigo_postal", opts.codigoPostal],
-    ["precio_aprox", opts.precioAprox != null ? String(Math.round(opts.precioAprox)) : undefined],
+    ["codigo_postal", cpNum],
+    ["precio_aprox", opts.precioAprox != null ? Math.round(opts.precioAprox) : undefined],
     ["id_presupuesto", opts.presupuestoId ? quoteNumber(opts.presupuestoId) : undefined],
     ["servicio_adicional", opts.servicioAdicional],
     ["utm_source", opts.utm?.source],
@@ -279,7 +293,7 @@ export async function syncManychatLead(opts: {
     console.error(`[manychat] precio_aprox no disponible para source=${opts.source} — revisa que haya un producto activo con precio en /admin/productos.`);
   }
   for (const [name, value] of fields) {
-    if (value) await setCustomField(id, name, value);
+    if (value !== undefined && value !== "") await setCustomField(id, name, value);
   }
 
   await addTag(id, `web-${opts.source}`);

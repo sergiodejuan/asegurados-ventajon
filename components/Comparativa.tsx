@@ -1,22 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MinimalTopBar } from "./MinimalTopBar";
 import { NextSteps } from "./NextSteps";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
-import { Check } from "./icons";
-import { BRAND_NAME } from "@/lib/brand";
+import { ComparativaHelpBar } from "./ComparativaHelpBar";
+import { Check, Phone } from "./icons";
+import { PriceMatchForm } from "./PriceMatchForm";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
+import { BRAND_NAME, PARTNERS } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
-import type { Product } from "@/lib/catalog";
+import { normalizePhone } from "@/lib/schema";
+import { copagoModoDe, copagoChip, copagoTexto, type Product } from "@/lib/catalog";
 import {
-  loadQuote, updateQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
+  loadQuote, updateQuote, saludPriceAdvanced, resolveBasePrecio, applyNumInsuredDiscount,
+  vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
+  loadLeadDraft, clearLeadDraft,
 } from "@/lib/quote";
+import { saveClientProfile, addClientQuote } from "@/lib/clientArea";
+import { pushDataLayerEvent } from "@/lib/dataLayer";
 
 function euros(n: number) {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+// "Mapfre, Adeslas, Asisa, Zurich y Generali" — nombrar las aseguradoras
+// reales pesa más como prueba de que se ha comparado de verdad que un
+// genérico "las principales compañías".
+function naturalList(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+const PARTNERS_LIST = naturalList(PARTNERS);
 
 function tarificadorHref(producto: string) {
   if (producto === "vida") return "/tarificador-vida";
@@ -32,10 +49,103 @@ const COBERTURA_LABELS: Record<string, string> = {
   no_lo_tengo_claro: "Sin decidir",
 };
 
+// Precios REALES devueltos por Codeoscopic (motor Avant2). Sólo se pide el
+// snapshot para ramo salud (los otros aún no tienen mapper server-side, ver
+// lib/codeoscopicMap.ts). Si Codeoscopic no está configurado, el endpoint
+// responde { ok:false, reason:"not_configured" } y la comparativa se queda
+// con el catálogo mock — degradación silenciosa documentada.
+type RealQuote = {
+  id: string;
+  compania: string;
+  producto: string;
+  modalidad: string;
+  premium: number | null;
+  downPayment: number | null;
+  frequency: string;
+  estimate: boolean;
+  imageUrl?: string;
+  categoria?: string;
+  rating?: number | null;
+  deductible?: number | null;
+  docUrl?: string;
+};
+type RealStatus = "idle" | "loading" | "done" | "unavailable" | "error";
+
+/* -------------------------- Filtros de salud ------------------------------ */
+// Filtros multi-selección de la comparativa de salud. Clasificamos cada opción
+// (producto manual o cotización real) por sus propiedades conocidas; cuando una
+// propiedad es DESCONOCIDA (típico en las modalidades de Codeoscopic, que no la
+// declaran en el nombre) NO se oculta la opción — solo se descarta cuando se
+// sabe con certeza que no cumple. Así el filtro es preciso con las opciones
+// negociadas (datos explícitos) y no vacía la lista con las reales.
+type SaludFilter = "copago" | "sinCopago" | "dental" | "sinDental" | "reembolso" | "sinReembolso";
+const SALUD_FILTERS: { key: SaludFilter; label: string }[] = [
+  { key: "copago", label: "Con copago" },
+  { key: "sinCopago", label: "Sin copago" },
+  { key: "dental", label: "Con dental" },
+  { key: "sinDental", label: "Sin dental" },
+  { key: "reembolso", label: "Con reembolso" },
+  { key: "sinReembolso", label: "Sin reembolso" },
+];
+type OptClass = { copago: Set<"con" | "sin"> | null; dental: boolean | null; reembolso: boolean | null };
+
+function classifyText(text: string): OptClass {
+  const t = (text || "").toLowerCase();
+  const copago = new Set<"con" | "sin">();
+  if (t.includes("sin copago") || t.includes("reembolso") || t.includes("reintegro")) copago.add("sin");
+  if (t.includes("copago") && !t.includes("sin copago")) copago.add("con");
+  return {
+    copago: copago.size ? copago : null,
+    dental: t.includes("dental") ? true : null,
+    reembolso: t.includes("reembolso") || t.includes("reintegro") ? true : null,
+  };
+}
+
+// Producto manual del catálogo: datos explícitos (precios con/sin copago +
+// servicios), así que su clasificación es fiable.
+function classifyProduct(p: Product): OptClass {
+  // Copago según la modalidad configurada (no según qué campo de precio tenga
+  // valor), coherente con lo que muestra la tarjeta.
+  const modo = copagoModoDe(p);
+  const copago = new Set<"con" | "sin">();
+  if (modo === "con" || modo === "ambas") copago.add("con");
+  if (modo === "sin" || modo === "ambas") copago.add("sin");
+  const servicios = (p.servicios ?? []).join(" ").toLowerCase();
+  // Dental: campo explícito si está definido; si no, se infiere de servicios.
+  const dental = typeof p.dental === "boolean" ? p.dental : servicios.includes("dental");
+  return {
+    copago: copago.size ? copago : null,
+    dental,
+    reembolso: servicios.includes("reembolso") || servicios.includes("reintegro"),
+  };
+}
+
+function matchesSaludFilters(cls: OptClass, active: SaludFilter[]): boolean {
+  if (!active.length) return true;
+  const wantCon = active.includes("copago");
+  const wantSin = active.includes("sinCopago");
+  if ((wantCon || wantSin) && cls.copago) {
+    const ok = (wantCon && cls.copago.has("con")) || (wantSin && cls.copago.has("sin"));
+    if (!ok) return false;
+  }
+  if (active.includes("dental") && cls.dental === false) return false;
+  if (active.includes("sinDental") && cls.dental === true) return false;
+  if (active.includes("reembolso") && cls.reembolso === false) return false;
+  if (active.includes("sinReembolso") && cls.reembolso === true) return false;
+  return true;
+}
+
 export function Comparativa() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const productoParam = searchParams.get("producto");
   const producto = productoParam === "vida" ? "vida" : productoParam === "auto" ? "auto" : productoParam === "decesos" ? "decesos" : "salud";
+  // leadId es el ancla de la tarificación real de Codeoscopic (que cuelga del
+  // lead, no de un presupuesto). Viene del URL (?lead=, o ?pid= heredado) si
+  // el lead ya existe, o se rellena al desbloquear el gate (que es cuando se
+  // crea el lead REAL en el backend).
+  const initialLead = searchParams.get("lead") ?? searchParams.get("pid") ?? "";
+  const [leadId, setLeadId] = useState(initialLead);
 
   const [quote, setQuote] = useState<QuoteProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -46,6 +156,87 @@ export function Comparativa() {
   const [dental, setDental] = useState(false);
   const [fumador, setFumador] = useState(false);
   const [coberturaDeseada, setCoberturaDeseada] = useState("");
+  // Precios reales de Codeoscopic. Se pueblan al montar si producto=salud y
+  // hay ?pid=... en la URL. Fallback silencioso al catálogo mock si falta
+  // cualquier pieza (Codeoscopic no configurado, lead sin datos suficientes,
+  // etc.). Ver app/api/quote/create y app/api/quote/[insuranceId].
+  const [realQuotes, setRealQuotes] = useState<RealQuote[]>([]);
+  const [realStatus, setRealStatus] = useState<RealStatus>("idle");
+  // Se incrementa al pulsar "Recalcular precios": vuelve a lanzar el efecto de
+  // Codeoscopic con recalcular=true para refrescar también las opciones reales.
+  const [recalcNonce, setRecalcNonce] = useState(0);
+  // Orden elegido por el usuario para los precios reales.
+  const [sortBy, setSortBy] = useState<"default" | "precio" | "valoracion">("default");
+  // Filtros multi-selección (salud): con/sin copago, dental, con/sin reembolso.
+  const [filters, setFilters] = useState<SaludFilter[]>([]);
+  function toggleFilter(k: SaludFilter) {
+    setFilters((prev) => prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]);
+  }
+  const sortedRealQuotes = useMemo(() => {
+    const list = realQuotes.filter((q) => matchesSaludFilters(classifyText(`${q.producto} ${q.modalidad} ${q.categoria ?? ""}`), filters));
+    if (sortBy === "precio") {
+      // Precio menor primero; los que aún no tienen premium van al final.
+      list.sort((a, b) => (a.premium ?? Infinity) - (b.premium ?? Infinity));
+    } else if (sortBy === "valoracion") {
+      // Mayor valoración primero; sin valoración al final.
+      list.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    }
+    return list; // "default": orden tal cual llega de Codeoscopic
+  }, [realQuotes, sortBy, filters]);
+  // Opciones NEGOCIADAS por Asegurados Ventajón = catálogo manual de salud
+  // (todas las activas visibles, ordenadas destacado→orden por listProducts).
+  // Se muestran SIEMPRE arriba del todo, como recomendadas con badge, por
+  // encima de los precios reales de Codeoscopic. Se les aplican los filtros.
+  const negociadas = useMemo(
+    () => products.filter((p) => matchesSaludFilters(classifyProduct(p), filters)),
+    [products, filters],
+  );
+  // insuranceId real de Codeoscopic — se muestra al pie de la sección de
+  // precios reales como "Cotización Codeoscopic Nº XYZ" para que el asesor
+  // lo pueda referenciar en la llamada. Se rellena al primer POST /create.
+  const [insuranceId, setInsuranceId] = useState("");
+  // Modal de coberturas de una cotización concreta (Ver coberturas → detalle).
+  const [coveragesFor, setCoveragesFor] = useState<RealQuote | null>(null);
+  // Modal de rescate "igualación de precio" — se ofrece al usuario que ya
+  // vio las cotizaciones (reales o mock) por si tiene un precio más bajo de
+  // otra fuente y quiere que se lo estudiemos.
+  const [priceMatchOpen, setPriceMatchOpen] = useState(false);
+  const pollingRef = useRef<{ stop: boolean }>({ stop: false });
+
+  // Comparativa bloqueada tras un blur pesado + modal fullscreen hasta que
+  // el usuario confirma contacto y consentimientos. Dos modos:
+  //  · "gate-obligatorio" (nuevo flujo salud/vida): no hay pid, hay un
+  //    draft de tarificación en sessionStorage. Al enviar el modal, se
+  //    crea el lead REAL en backend con todos los datos combinados.
+  //  · "gate-legacy" (auto/decesos, o link antiguo con pid): el lead ya
+  //    existe; el modal solo pide los datos que puedan faltar y refresca
+  //    el contacto vía /api/client/update-contact.
+  const [unlocked, setUnlocked] = useState(false);
+  const [gateNombre, setGateNombre] = useState("");
+  const [gateApellido1, setGateApellido1] = useState("");
+  // Segundo apellido: Codeoscopic exige nombre + DOS apellidos para el titular
+  // con DNI ("The name and surnames of the holder are not valid." si falta).
+  const [gateApellido2, setGateApellido2] = useState("");
+  // DNI/NIE del titular: obligatorio en salud para que Codeoscopic tarifique
+  // con precios reales (no de catálogo).
+  const [gateDocumentoTipo, setGateDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
+  const [gateDocumento, setGateDocumento] = useState("");
+  const [gateTelefono, setGateTelefono] = useState("");
+  const [gateEmail, setGateEmail] = useState("");
+  // Un único check cubre privacidad + autorización de contacto + (si aplica)
+  // datos de salud — ver components/EssentialConsent.tsx.
+  const [gateAceptaEsencial, setGateAceptaEsencial] = useState(false);
+  const [gateAceptaComercial, setGateAceptaComercial] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+  // Producto es salud/vida: el consentimiento art. 9 RGPD es obligatorio.
+  const isHealthLike = producto === "salud" || producto === "vida";
+  // Modal obligatorio (no cerrable) cuando estamos creando el lead ahora
+  // desde el modal — es decir, cuando hay draft pendiente. Cuando el lead
+  // ya existe (pid en URL), el modal actúa como refresco opcional pero se
+  // puede cerrar con "Ver sin completar" como antes.
+  const mustGate = hasDraft;
 
   useEffect(() => {
     const q = loadQuote();
@@ -57,8 +248,152 @@ export function Comparativa() {
       setDental(!!q.coberturaDental);
       setFumador(!!q.fumador);
       setCoberturaDeseada(q.coberturaDeseada ?? "");
+      setGateNombre(q.nombre ?? "");
+      setGateTelefono(q.telefono ?? "");
+      setGateEmail(q.email ?? "");
     }
+    // Detectar draft pendiente — significa que venimos del tarificador y
+    // aún no se ha creado el lead (flujo salud/vida unificado 2026-08).
+    const draft = loadLeadDraft();
+    if (draft) {
+      setHasDraft(true);
+    } else {
+      // El lead ya existe (volvemos de "Más información" o de una opción, o
+      // recargamos con ?pid=...). No hay que volver a bloquear ni re-pedir los
+      // datos: restauramos el pid y desbloqueamos si ya se pasó el gate antes
+      // (tenemos pid en la URL, o un presupuesto/contacto guardado).
+      const restoredLead = initialLead || q?.leadId || "";
+      if (restoredLead && !leadId) setLeadId(restoredLead);
+      const yaPasoGate = !!(restoredLead || (q?.nombre && q?.telefono && q?.email));
+      if (yaPasoGate) setUnlocked(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function unlockComparativa(e: React.FormEvent) {
+    e.preventDefault();
+    setGateError(null);
+    if (!gateNombre.trim() || gateNombre.trim().length < 2) { setGateError("Dinos tu nombre."); return; }
+    if (producto === "salud" && (!gateApellido1.trim() || gateApellido1.trim().length < 2)) {
+      setGateError("Dinos tu primer apellido."); return;
+    }
+    if (producto === "salud" && (!gateApellido2.trim() || gateApellido2.trim().length < 2)) {
+      setGateError("Dinos tu segundo apellido."); return;
+    }
+    if (producto === "salud") {
+      const doc = gateDocumento.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
+      if (!/^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(doc)) {
+        setGateError("Revisa tu DNI o NIE (p. ej. 12345678Z)."); return;
+      }
+    }
+    if (!/^[6-9]\d{8}$/.test(normalizePhone(gateTelefono))) { setGateError("Introduce un móvil español válido (9 dígitos)."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim())) { setGateError("Revisa tu correo electrónico."); return; }
+    if (!gateAceptaEsencial) {
+      setGateError(isHealthLike
+        ? "Necesitamos tu consentimiento para tratar tus datos de salud (art. 9 RGPD)."
+        : "Necesitamos que aceptes la política de privacidad."
+      );
+      return;
+    }
+
+    setGateSubmitting(true);
+    const nowIso = new Date().toISOString();
+    try {
+      const draft = loadLeadDraft();
+      if (draft) {
+        // Nuevo flujo: creamos el lead REAL con datos combinados. El
+        // backend ya valida strict con los schemas Zod correspondientes.
+        const consent = {
+          privacidadAt: nowIso,
+          contactoAt: nowIso,
+          ...(isHealthLike ? { datosSaludAt: nowIso } : {}),
+          ...(gateAceptaComercial ? { comercialAt: nowIso } : {}),
+        };
+        const payload = {
+          ...draft.data,
+          nombre: gateNombre,
+          ...(producto === "salud"
+            ? { apellido1: gateApellido1, apellido2: gateApellido2, documentoTipo: gateDocumentoTipo, documento: gateDocumento.trim().toUpperCase() }
+            : {}),
+          telefono: gateTelefono,
+          email: gateEmail,
+          aceptaPrivacidad: true,
+          autorizaContacto: true,
+          ...(isHealthLike ? { aceptaDatosSalud: true } : {}),
+          aceptaComercial: gateAceptaComercial,
+          consent,
+        };
+        const res = await fetch(draft.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; error?: string; errors?: Record<string, string[]> } | null;
+        if (!res.ok || !body?.ok) {
+          const first = body?.errors ? Object.values(body.errors).find((v) => v && v[0])?.[0] : undefined;
+          setGateError(first ?? body?.error ?? "No hemos podido enviar tus datos. Inténtalo de nuevo.");
+          setGateSubmitting(false);
+          return;
+        }
+        // /api/lead ya no crea presupuesto: devuelve el leadId, que es el
+        // ancla de la tarificación real de Codeoscopic.
+        const newLead = body.id ?? "";
+        const updated = updateQuote({
+          nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
+          leadId: newLead, consentAt: consent,
+        }) ?? {
+          id: newLead, leadId: newLead, producto: draft.producto, createdAt: nowIso,
+          nombre: gateNombre, telefono: gateTelefono, email: gateEmail,
+          consentAt: consent,
+        };
+        if (updated) {
+          setQuote(updated);
+          addClientQuote(updated);
+        }
+        saveClientProfile({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
+        clearLeadDraft();
+        setHasDraft(false);
+        pushDataLayerEvent("generate_lead", { producto: draft.producto, form: "comparativa-gate" });
+        // Reflejamos el leadId en la URL para que /comparativa recargable
+        // siga funcionando (compartir enlace, back/forward) sin re-bloquear.
+        if (newLead) {
+          const nextUrl = `/comparativa?producto=${producto}&lead=${encodeURIComponent(newLead)}`;
+          router.replace(nextUrl);
+          // También seteamos el estado local para disparar el useEffect
+          // de Codeoscopic sin esperar a re-lectura de searchParams.
+          setLeadId(newLead);
+        }
+      } else {
+        // Flujo legacy: el lead ya existe; solo refrescamos contacto.
+        await fetch("/api/client/update-contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lookupPhone: quote?.telefono,
+            lookupEmail: quote?.email,
+            patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: gateAceptaComercial },
+          }),
+        });
+        const next = updateQuote({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
+        if (next) setQuote(next);
+      }
+    } catch {
+      setGateError("Parece que hay un problema de conexión. Inténtalo de nuevo.");
+      setGateSubmitting(false);
+      return;
+    } finally {
+      setGateSubmitting(false);
+    }
+    setUnlocked(true);
+  }
+
+  // Salir sin dejar más datos: SOLO permitido en modo legacy (lead ya
+  // existe). En modo obligatorio (draft pendiente) no hay salida — sin
+  // datos de contacto no podemos crear el lead ni mostrar precios.
+  function skipGate() {
+    if (mustGate) return;
+    setUnlocked(true);
+  }
 
   useEffect(() => {
     fetch(`/api/products?producto=${producto}`)
@@ -66,6 +401,144 @@ export function Comparativa() {
       .then((body) => { if (body.ok) setProducts(body.products); })
       .catch(() => {});
   }, [producto]);
+
+  // Solicita cotizaciones reales a Codeoscopic + polling hasta que dejen de
+  // estar en estimate=true (o hasta un timeout de 90s: pasado ese tiempo,
+  // dejamos de martillear y mostramos lo que haya). Sólo salud por ahora.
+  useEffect(() => {
+    if (producto !== "salud" || !leadId) return;
+    const local: { stop: boolean } = { stop: false };
+    pollingRef.current = local;
+    setRealStatus("loading");
+
+    function parseSnapshot(snapshot: unknown): RealQuote[] {
+      if (!snapshot || typeof snapshot !== "object") return [];
+      const s = snapshot as { mainQuotes?: unknown[]; addonQuotes?: unknown[] };
+      const all = [...(s.mainQuotes ?? []), ...(s.addonQuotes ?? [])];
+      return all
+        .map((raw): RealQuote | null => {
+          if (!raw || typeof raw !== "object") return null;
+          const q = raw as {
+            id?: string;
+            product?: {
+              name?: string; vendor?: { name?: string };
+              modality?: { name?: string; category?: { name?: string }; rating?: number };
+              imageUrl?: string;
+            };
+            premium?: number;
+            downPayment?: number;
+            deductible?: number;
+            paymentFrequency?: { id?: string };
+            estimate?: boolean;
+            links?: { name?: string; url?: string }[];
+          };
+          if (!q.id) return null;
+          const compania = q.product?.vendor?.name?.trim() || "";
+          const modalidad = q.product?.modality?.name?.trim() || "";
+          return {
+            id: q.id,
+            compania: compania || (q.product?.name ?? "Compañía"),
+            producto: q.product?.name?.trim() || "",
+            modalidad,
+            premium: typeof q.premium === "number" ? q.premium : null,
+            downPayment: typeof q.downPayment === "number" ? q.downPayment : null,
+            frequency: q.paymentFrequency?.id ?? "",
+            estimate: !!q.estimate,
+            imageUrl: q.product?.imageUrl?.trim() || undefined,
+            categoria: q.product?.modality?.category?.name?.trim() || undefined,
+            rating: typeof q.product?.modality?.rating === "number" ? q.product.modality.rating : null,
+            deductible: typeof q.deductible === "number" ? q.deductible : null,
+            docUrl: q.links?.find((l) => l?.url)?.url?.trim() || undefined,
+          };
+        })
+        .filter((q): q is RealQuote => q !== null);
+    }
+
+    (async () => {
+      try {
+        // En un recálculo (recalcNonce > 0) mandamos los datos de salud
+        // editados y pedimos una cotización nueva; en el primer montaje no.
+        const recalcular = recalcNonce > 0;
+        const createRes = await fetch("/api/quote/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            recalcular
+              ? { leadId, recalcular: true, numAsegurados: quote?.numAsegurados ?? undefined, coberturaDental: quote?.coberturaDental ?? undefined }
+              : { leadId }
+          ),
+        });
+        const createBody = (await createRes.json().catch(() => null)) as
+          | { ok: true; insuranceId: string; snapshot: unknown }
+          | { ok: false; reason: string }
+          | null;
+        if (local.stop) return;
+        if (!createBody?.ok) {
+          setRealStatus(createBody?.reason === "not_configured" ? "unavailable" : "error");
+          return;
+        }
+        const initial = parseSnapshot(createBody.snapshot);
+        if (initial.length) setRealQuotes(initial);
+        setInsuranceId(createBody.insuranceId);
+        // Si ya vinieron cerradas todas de golpe, no polleamos.
+        const alreadyDone = initial.length > 0 && initial.every((q) => !q.estimate && q.premium != null);
+        if (alreadyDone) { setRealStatus("done"); return; }
+
+        const insuranceId = createBody.insuranceId;
+        const started = Date.now();
+        const TIMEOUT_MS = 90_000;
+        const INTERVAL_MS = 4_000;
+        while (!local.stop && Date.now() - started < TIMEOUT_MS) {
+          await new Promise((r) => setTimeout(r, INTERVAL_MS));
+          if (local.stop) return;
+          // El polling se autoriza por la cookie de sesión de cliente (el lead
+          // dueño de este insurance). No hace falta pasar ids en la URL.
+          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}`);
+          const pollBody = (await pollRes.json().catch(() => null)) as
+            | { ok: true; done: boolean; snapshot: unknown }
+            | { ok: false }
+            | null;
+          if (local.stop) return;
+          if (!pollBody?.ok) continue;
+          const parsed = parseSnapshot(pollBody.snapshot);
+          if (parsed.length) setRealQuotes(parsed);
+          if (pollBody.done) { setRealStatus("done"); return; }
+        }
+        setRealStatus("done"); // timeout: mostramos lo que haya llegado
+      } catch (err) {
+        console.error("[comparativa] Codeoscopic falló:", err);
+        if (!local.stop) setRealStatus("error");
+      }
+    })();
+
+    return () => { local.stop = true; };
+    // quote solo se lee al recalcular (valores editados); no queremos re-lanzar
+    // el sondeo en cada cambio de quote, solo cuando cambia recalcNonce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [producto, leadId, recalcNonce]);
+
+  // "Que te llamen gratis" en salud = mostrar interés en una opción concreta.
+  // ESTE es el momento en el que se crea el presupuesto (antes solo hay un
+  // lead que ha tarificado). Después llevamos al flujo de solicitud de llamada.
+  async function solicitarSalud(opts: { compania: string; precio?: number | null; quoteId?: string; modalidad?: string; insuranceId?: string }) {
+    const destino = `/quiero-que-me-llamen?producto=salud&compania=${encodeURIComponent(opts.compania)}${opts.precio != null ? `&precio=${opts.precio}` : ""}`;
+    try {
+      if (leadId) {
+        await fetch("/api/quote/interes", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId,
+            insuranceId: opts.insuranceId || undefined,
+            quoteId: opts.quoteId,
+            compania: opts.compania,
+            precio: opts.precio ?? undefined,
+            modalidad: opts.modalidad,
+          }),
+        });
+      }
+    } catch { /* best-effort: aunque falle el registro, llevamos al usuario al flujo de llamada */ }
+    router.push(destino);
+  }
 
   function saveEdits() {
     const next = updateQuote({
@@ -77,9 +550,18 @@ export function Comparativa() {
     });
     if (next) setQuote(next);
     setEditing(false);
+    // Salud: además de recalcular los precios negociados (que se derivan del
+    // quote y se refrescan solos al re-renderizar), relanzamos el sondeo de
+    // Codeoscopic con los datos nuevos. Limpiamos las opciones reales para que
+    // se muestre el esqueleto de carga mientras llegan las nuevas.
+    if (producto === "salud" && leadId) {
+      setRealQuotes([]);
+      setRealStatus("loading");
+      setRecalcNonce((k) => k + 1);
+    }
   }
 
-  if (loaded && !quote) {
+  if (loaded && !quote && !hasDraft) {
     return (
       <>
         <main id="contenido" className="mx-auto max-w-app px-5 py-14 text-center md:max-w-xl md:py-20">
@@ -103,21 +585,38 @@ export function Comparativa() {
   const widgetWaText = buildWhatsAppText({ producto, quote, origen: "comparativa" });
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
 
+  // Blur pesado + no scroll + inerte cuando el gate está activo. El modal
+  // se renderiza APARTE (fuera del blur) para que sea nítido y usable.
+  const gateBlocking = !unlocked;
+  const mainBlurred = gateBlocking ? "pointer-events-none select-none blur-md" : "";
+  // Bloquea el scroll del body mientras el gate esté visible — evita
+  // desplazamientos por debajo del modal (que además está en blur y
+  // aria-hidden). Al desbloquear, se restaura.
+  useEffect(() => {
+    if (!loaded || !gateBlocking) return;
+    const body = document.body;
+    const prev = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => { body.style.overflow = prev; };
+  }, [gateBlocking, loaded]);
+
   return (
     <>
-      <main id="contenido" className="mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20">
+      <main id="contenido" aria-hidden={gateBlocking} className={`mx-auto max-w-app px-5 py-14 md:max-w-2xl md:py-20 ${producto === "salud" ? "lg:max-w-6xl" : ""} ${mainBlurred}`}>
         <MinimalTopBar />
         <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-white">
           <Check width={30} height={30} />
         </div>
         <h1 className="mt-6 text-[28px] font-extrabold leading-tight text-navy">
-          {firstName ? `${firstName}, ya tenemos tu comparativa` : "Ya tenemos tu comparativa"}
+          {firstName ? `${firstName}, esto es lo que puedes pagar` : "Esto es lo que puedes pagar"}
         </h1>
         {quote && (
-          <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>
+          // Es una COTIZACIÓN mientras el usuario no elige una opción. Solo pasa
+          // a "presupuesto" cuando pulsa "Que te llamen" (ver /api/quote/interes).
+          <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Cotización nº {quoteNumber(quote.leadId || quote.id)}</p>
         )}
-        <p className="mt-3 text-[16px] leading-relaxed text-slate2">
-          Así de orientativo se mueve el precio entre las compañías con las que trabajamos.
+        <p className="mt-3 text-[16px] leading-relaxed text-slate2 lg:max-w-3xl">
+          Hemos comparado tu perfil entre {PARTNERS_LIST} para darte el precio más ajustado.
           {" "}Un asesor de {BRAND_NAME} te llama para confirmar tu propuesta final, sin compromiso.
         </p>
 
@@ -244,22 +743,264 @@ export function Comparativa() {
           </div>
         )}
 
-        <div className="mt-5 rounded-card border border-hair bg-mist p-4">
-          <p className="text-[13px] font-bold text-navy">Precios orientativos</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Son precios de ejemplo, no una cotización en firme: el precio final depende de tu perfil
-            y te lo confirma tu asesor sin compromiso.
-          </p>
-        </div>
+        {producto === "salud" ? (
+          /* Salud en desktop: dos columnas — filtros (20%) + opciones (80%).
+             En móvil/tablet se apila (filtros arriba, opciones debajo). */
+          <div className="mt-6 lg:grid lg:grid-cols-[1fr_4fr] lg:items-start lg:gap-8">
+            {/* Columna izquierda: Ordenar + Filtrar. Sticky en desktop para que
+                siga visible al hacer scroll por la lista de opciones. */}
+            {(negociadas.length > 0 || realQuotes.length > 0 || realStatus === "loading") && (
+              <aside className="mb-5 lg:mb-0 lg:sticky lg:top-6 lg:self-start">
+                <div className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                  {realQuotes.length > 1 && (
+                    <>
+                      <p className="text-[13px] font-bold text-navy">Ordenar</p>
+                      <div className="mt-2 flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
+                        {([["default", "Recomendado"], ["precio", "Precio más bajo"], ["valoracion", "Mejor valoración"]] as const).map(([val, label]) => (
+                          <button
+                            key={val} type="button" aria-pressed={sortBy === val}
+                            onClick={() => setSortBy(val as typeof sortBy)} tabIndex={unlocked ? 0 : -1}
+                            className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors lg:text-left ${
+                              sortBy === val ? "border-navy bg-navy text-white" : "border-hair bg-white text-navy hover:bg-mist"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* Filtrar (multi-selección): afecta a negociadas y a reales. */}
+                  <p className={`text-[13px] font-bold text-navy ${realQuotes.length > 1 ? "mt-4" : ""}`}>Filtrar</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {SALUD_FILTERS.map((f) => {
+                      const active = filters.includes(f.key);
+                      return (
+                        <button
+                          key={f.key} type="button" aria-pressed={active}
+                          onClick={() => toggleFilter(f.key)} tabIndex={unlocked ? 0 : -1}
+                          className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                            active ? "border-brand-red bg-brand-red text-white" : "border-hair bg-white text-navy hover:border-navy/40 hover:bg-mist"
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {filters.length > 0 && (
+                    <button
+                      type="button" onClick={() => setFilters([])} tabIndex={unlocked ? 0 : -1}
+                      className="mt-2 block text-[12px] font-semibold text-slate2 underline underline-offset-2 hover:text-brand-red"
+                    >
+                      Quitar filtros
+                    </button>
+                  )}
+                </div>
+              </aside>
+            )}
 
-        <ul className="mt-5 flex flex-col gap-3">
-          {producto !== "salud"
-            ? products.map((c) => {
-                const price = producto === "auto"
-                  ? autoPrice({ precio: c.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
+            {/* Columna derecha: opciones (negociadas + esqueleto + reales). */}
+            <div className="min-w-0">
+              {/* Opciones NEGOCIADAS por Asegurados Ventajón (catálogo manual del
+                  admin): SIEMPRE arriba, como recomendadas con badge y borde
+                  reforzado, por encima de los precios reales de Codeoscopic. */}
+              {negociadas.length > 0 && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="rounded-pill bg-brand-red px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Recomendado</span>
+                    <h3 className="text-[14px] font-bold text-navy">Opciones negociadas por Asegurados Ventajon</h3>
+                  </div>
+                  <ul className="flex flex-col gap-3">
+                    {negociadas.map((c) => {
+                      // Precio con tramos de edad + zona + descuento por nº de
+                      // asegurados si están configurados en /admin/productos;
+                      // si no, cae al precio plano de siempre.
+                      const price = saludPriceAdvanced(c, {
+                        numAsegurados: quote?.numAsegurados,
+                        coberturaDental: quote?.coberturaDental,
+                        codigoPostal: quote?.codigoPostal,
+                        edad: age,
+                      });
+                      const modo = copagoModoDe(c);
+                      // Precio que viaja al "interés": el de la modalidad mostrada
+                      // (sin copago por defecto en las negociadas).
+                      const precioInteres = modo === "con" ? price.conCopago : price.sinCopago;
+                      return (
+                        <li key={c.id} className="rounded-card border-2 border-brand-red bg-white p-4 shadow-card">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {c.logoUrl
+                                ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
+                                : <span className="truncate text-[16px] font-bold text-ink">{c.compania}</span>}
+                              <span className="shrink-0 rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>
+                            </div>
+                            {/* Modalidad reforzada (sin copagos por defecto). */}
+                            <span className="shrink-0 rounded-pill bg-emerald-600/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{copagoChip(modo)}</span>
+                          </div>
+                          {/* Título/modalidad del producto (como "Adeslas GO 2026"). */}
+                          {c.titulo && <p className="mt-1 text-[13px] font-semibold text-ink">{c.titulo}</p>}
+                          {modo === "ambas" ? (
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Con copago</span>
+                                <span className="text-[20px] font-extrabold tnums text-navy">{euros(price.conCopago)} €<span className="text-[13px] font-semibold text-slate2">/mes</span></span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-[13px] text-slate2">
+                                <span>Sin copago</span>
+                                <span className="text-[20px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €<span className="text-[13px] font-semibold text-slate2">/mes</span></span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Modalidad única: la etiqueta ya la da el badge verde,
+                               así que aquí solo va el precio, más grande. */
+                            <p className="mt-2 text-right">
+                              <span className="text-[28px] font-extrabold tnums text-navy">{euros(modo === "con" ? price.conCopago : price.sinCopago)} €</span>
+                              <span className="text-[15px] font-semibold text-slate2">/mes</span>
+                            </p>
+                          )}
+                          {/* Texto dinámico según la modalidad elegida. */}
+                          <p className="mt-1.5 text-[12px] leading-relaxed text-slate2">{copagoTexto(modo)}</p>
+                          {c.servicios?.[0] && <p className="mt-1 text-[12px] font-medium text-ink">{c.servicios[0]}</p>}
+                          <CompanyActions producto={producto} compania={c.compania} precio={precioInteres} locked={!unlocked} recommended masInfoHref={`/comparativa/${slugify(c.compania)}?producto=${producto}&pid=${encodeURIComponent(c.id)}`} onSolicitar={() => solicitarSalud({ compania: c.compania, precio: precioInteres, modalidad: `Opción negociada (${copagoChip(modo)})` })} />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+              {negociadas.length === 0 && filters.length > 0 && (
+                <p className="rounded-card border border-hair bg-mist/40 px-4 py-3 text-[13px] text-slate2">
+                  Ninguna opción negociada coincide con los filtros seleccionados.
+                </p>
+              )}
+
+              {/* Esqueleto de carga de las opciones reales (Codeoscopic). */}
+              {realStatus === "loading" && realQuotes.length === 0 && (
+                <RealQuotesSkeleton count={4} withHeading />
+              )}
+
+              {realQuotes.length > 0 && (
+                <p className="mt-6 mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>
+              )}
+              {realQuotes.length > 0 && sortedRealQuotes.length === 0 && (
+                <p className="mt-3 rounded-card border border-hair bg-mist/40 px-4 py-3 text-[13px] text-slate2">
+                  Ninguna cotización de las aseguradoras coincide con los filtros seleccionados.
+                </p>
+              )}
+              {realQuotes.length > 0 && (
+                <ul className="mt-3 flex flex-col gap-3">
+                  {sortedRealQuotes.map((q, i) => (
+                    <Fragment key={q.id}>
+                    <li className="rounded-card border border-hair bg-white p-4 shadow-soft">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          {q.imageUrl
+                            ? <CompanyLogo logoUrl={q.imageUrl} compania={q.compania} size="h-8 max-w-[96px]" />
+                            : null}
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-[16px] font-bold text-ink">{q.compania}</span>
+                            {(q.producto || q.modalidad || q.categoria) && (
+                              <span className="truncate text-[12px] text-slate2">
+                                {[q.modalidad || q.producto, q.categoria].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
+                            {typeof q.rating === "number" && q.rating > 0 && (
+                              <span aria-label={`Valoración ${q.rating} de 5`} className="text-[12px] leading-none text-amber-500">
+                                {"★".repeat(Math.round(q.rating))}<span className="text-slate2/40">{"★".repeat(Math.max(0, 5 - Math.round(q.rating)))}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="shrink-0 text-right text-[14px] text-slate2">
+                          {(q.downPayment != null && q.downPayment > 0) || q.premium != null
+                            ? <><span className="text-[17px] font-extrabold tnums text-navy">{euros((q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0))} €</span>/mes</>
+                            : <span className="text-[13px] italic text-slate2">Calculando…</span>}
+                        </p>
+                      </div>
+                      {/* La primera prima (downPayment) es el precio mensual; la
+                          prima total pasa a mostrarse como referencia anual. */}
+                      {q.premium != null && q.downPayment != null && q.downPayment > 0 && q.premium !== q.downPayment && (
+                        <p className="mt-1 text-[12px] text-slate2">
+                          Prima anual: <span className="font-semibold tnums text-ink">{euros(q.premium)} €</span>
+                        </p>
+                      )}
+                      {q.estimate && <p className="mt-1 text-[11px] italic text-slate2">Precio orientativo — puede afinarse con más datos.</p>}
+                      <div className="mt-3 flex flex-col gap-2.5">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <button
+                            type="button"
+                            onClick={() => setCoveragesFor(q)}
+                            tabIndex={unlocked ? 0 : -1}
+                            className="inline-flex items-center gap-1 text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red"
+                          >
+                            Ver coberturas
+                          </button>
+                          {q.docUrl && (
+                            <a
+                              href={q.docUrl} target="_blank" rel="noopener noreferrer"
+                              tabIndex={unlocked ? 0 : -1}
+                              className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate2 underline underline-offset-2 hover:text-navy"
+                            >
+                              Condiciones (PDF)
+                            </a>
+                          )}
+                        </div>
+                        {((q.downPayment != null && q.downPayment > 0) || q.premium != null) && (() => {
+                          const precioMes = (q.downPayment != null && q.downPayment > 0) ? q.downPayment : (q.premium ?? 0);
+                          return <CompanyActions producto={producto} compania={q.compania} precio={precioMes} locked={!unlocked} onMasInfo={() => setCoveragesFor(q)} onSolicitar={() => solicitarSalud({ compania: q.compania, precio: precioMes, quoteId: q.id, modalidad: q.modalidad, insuranceId: insuranceId || undefined })} />;
+                        })()}
+                      </div>
+                    </li>
+                    {/* Bloque de llamada cada 3 opciones (no tras la última). */}
+                    {(i + 1) % 3 === 0 && i !== sortedRealQuotes.length - 1 && (
+                      <InlineCallBanner locked={!unlocked} />
+                    )}
+                    </Fragment>
+                  ))}
+                </ul>
+              )}
+              {/* Resultados parciales: ya hay compañías, esperando al resto. */}
+              {realStatus === "loading" && realQuotes.length > 0 && (
+                <RealQuotesSkeleton count={2} withHeading={false} />
+              )}
+
+              {realQuotes.length > 0 && insuranceId && (
+                <p className="mt-3 text-[11px] leading-relaxed text-slate2">
+                  Cotización Codeoscopic Nº <span className="tnums font-semibold text-ink">{insuranceId}</span>
+                  <span className="text-slate2/80"> · Guárdalo por si tu asesor te lo pide para localizarlo al instante.</span>
+                </p>
+              )}
+            </div>
+
+            {coveragesFor && insuranceId && unlocked && (
+              <CoveragesModal
+                insuranceId={insuranceId}
+                quote={coveragesFor}
+                onClose={() => setCoveragesFor(null)}
+                onSolicitar={() => solicitarSalud({ compania: coveragesFor.compania, precio: (coveragesFor.downPayment != null && coveragesFor.downPayment > 0) ? coveragesFor.downPayment : coveragesFor.premium, quoteId: coveragesFor.id, modalidad: coveragesFor.modalidad, insuranceId: insuranceId || undefined })}
+              />
+            )}
+          </div>
+        ) : (
+          /* Resto de ramos (auto/vida/decesos): una sola columna con el
+             catálogo orientativo. */
+          <div className="mt-5">
+            <p className="rounded-card border border-hair bg-mist px-4 py-3 text-[13px] leading-relaxed text-slate2">
+              El precio final depende de tu perfil; tu asesor te lo confirma sin compromiso.
+            </p>
+            <ul className="mt-5 flex flex-col gap-3">
+              {products.map((c) => {
+                // Base por zona/edad si hay pricing avanzado configurado; si no,
+                // el precio plano. Luego el multiplicador propio del ramo y el
+                // descuento por nº de asegurados.
+                const base = resolveBasePrecio(c, { codigoPostal: quote?.codigoPostal, edad: age });
+                const raw = producto === "auto"
+                  ? autoPrice({ precio: base }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada })
                   : producto === "decesos"
-                  ? decesosPrice({ precio: c.precio ?? 0 }, { numAsegurados: quote?.numAsegurados })
-                  : vidaPrice({ precio: c.precio ?? 0 }, { fumador: quote?.fumador });
+                  ? decesosPrice({ precio: base }, { numAsegurados: quote?.numAsegurados })
+                  : vidaPrice({ precio: base }, { fumador: quote?.fumador });
+                const price = { precio: applyNumInsuredDiscount(raw.precio, Math.max(1, quote?.numAsegurados ?? 1), c.pricing?.descuentos) };
                 return (
                   <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
                     <div className="flex items-center justify-between gap-3">
@@ -273,38 +1014,174 @@ export function Comparativa() {
                         Desde <span className="text-[17px] font-extrabold tnums text-navy">{euros(price.precio)} €</span>/mes
                       </p>
                     </div>
-                    <CompanyActions producto={producto} compania={c.compania} precio={price.precio} />
-                  </li>
-                );
-              })
-            : products.map((c) => {
-                const price = saludPrice({ conCopago: c.precioConCopago ?? 0, sinCopago: c.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
-                return (
-                  <li key={c.id} className={`rounded-card border bg-white p-4 shadow-soft ${c.destacado ? "border-brand-red" : "border-hair"}`}>
-                    <div className="flex items-center gap-2">
-                      {c.logoUrl
-                        ? <CompanyLogo logoUrl={c.logoUrl} compania={c.compania} size="h-8 max-w-[110px]" />
-                        : <span className="text-[16px] font-bold text-ink">{c.compania}</span>}
-                      {c.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-red">Recomendado</span>}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                      <span>Con copago</span>
-                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.conCopago)} €/mes</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-slate2">
-                      <span>Sin copago</span>
-                      <span className="text-[15px] font-extrabold tnums text-navy">{euros(price.sinCopago)} €/mes</span>
-                    </div>
-                    <CompanyActions producto={producto} compania={c.compania} precio={price.conCopago} />
+                    <CompanyActions producto={producto} compania={c.compania} precio={price.precio} locked={!unlocked} recommended={!!c.destacado} />
                   </li>
                 );
               })}
-        </ul>
+            </ul>
+          </div>
+        )}
+
+        {/* Rescate "igualación de precio": bloque discreto pero visible
+            debajo de las cotizaciones. Objetivo — recuperar al usuario que
+            no se convence por precio y tiene otra oferta que quiere
+            estudiar. Genera un lead con source="price-match-comparativa"
+            para poder medir por separado la efectividad de este canal. */}
+        <div className="mt-6 rounded-[20px] border border-hair bg-mist/50 p-5">
+          <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold text-navy">¿Ya tienes un precio más bajo?</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-slate2">
+                Envíanoslo y estudiamos la mejor alternativa del mercado en menos de 24 h. Gratis y sin compromiso.
+              </p>
+            </div>
+            <button
+              type="button" onClick={() => setPriceMatchOpen(true)}
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-card border-2 border-navy bg-white px-5 text-[14px] font-semibold text-navy transition-colors hover:bg-mist"
+            >
+              Envíanos tu presupuesto →
+            </button>
+          </div>
+        </div>
+
+        {priceMatchOpen && (
+          <div
+            role="dialog" aria-modal="true" aria-label="Envíanos tu presupuesto"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
+            onClick={(e) => { if (e.currentTarget === e.target) setPriceMatchOpen(false); }}
+          >
+            <div className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+              <header className="sticky top-0 flex items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-brand-red">Igualación de precio</p>
+                  <h3 className="text-[16px] font-extrabold text-navy">Envíanos tu presupuesto</h3>
+                </div>
+                <button type="button" onClick={() => setPriceMatchOpen(false)} aria-label="Cerrar"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 hover:bg-mist">
+                  ✕
+                </button>
+              </header>
+              <div className="max-h-[calc(90vh-72px)] overflow-y-auto p-5">
+                <p className="mb-3 text-[13px] leading-relaxed text-slate2">
+                  Un asesor humano estudia tu caso entre las principales aseguradoras del mercado y te responde en menos de 24 h.
+                </p>
+                <PriceMatchForm
+                  origen="comparativa"
+                  defaultProducto={producto as "salud" | "vida" | "auto" | "decesos"}
+                  onSuccess={() => setPriceMatchOpen(false)}
+                  redirectOnSuccess={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <NextSteps whatsappHref={whatsAppUrl(waText)} showCaller={false} />
       </main>
-      <WhatsAppHelpWidget message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />
+      {gateBlocking && (
+        <ComparativaGate
+          producto={producto}
+          isHealthLike={isHealthLike}
+          mustGate={mustGate}
+          nombre={gateNombre} onNombre={setGateNombre}
+          apellido1={gateApellido1} onApellido1={setGateApellido1}
+          apellido2={gateApellido2} onApellido2={setGateApellido2}
+          documentoTipo={gateDocumentoTipo} onDocumentoTipo={setGateDocumentoTipo}
+          documento={gateDocumento} onDocumento={setGateDocumento}
+          telefono={gateTelefono} onTelefono={setGateTelefono}
+          email={gateEmail} onEmail={setGateEmail}
+          aceptaEsencial={gateAceptaEsencial} onAceptaEsencial={setGateAceptaEsencial}
+          aceptaComercial={gateAceptaComercial} onAceptaComercial={setGateAceptaComercial}
+          error={gateError}
+          submitting={gateSubmitting}
+          onSubmit={unlockComparativa}
+          onSkip={skipGate}
+        />
+      )}
+      {!gateBlocking && <WhatsAppHelpWidget raised message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
+      {!gateBlocking && <ComparativaHelpBar quote={quote} producto={producto} />}
     </>
+  );
+}
+
+// Mensajes rotatorios del esqueleto de carga (fuera del componente para que la
+// dependencia del intervalo sea estable).
+const SKELETON_MESSAGES = [
+  "Consultando en tiempo real con las aseguradoras…",
+  "Comparando coberturas y condiciones…",
+  "Afinando tu mejor precio…",
+  "Ordenando las mejores opciones para ti…",
+];
+
+// Esqueleto de carga de las cotizaciones reales: un mensaje que va cambiando
+// (para que la espera no parezca congelada) y tarjetas "shimmer" con la misma
+// silueta que las opciones reales, de modo que la lista no dé un salto brusco
+// cuando llegan los precios.
+function RealQuotesSkeleton({ count = 3, withHeading = true }: { count?: number; withHeading?: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % SKELETON_MESSAGES.length), 2200);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className={withHeading ? "mt-6" : "mt-3"}>
+      {withHeading && <p className="mb-1 text-[13px] font-bold text-navy">Precios reales de las aseguradoras</p>}
+      <p aria-live="polite" className="mb-3 flex items-center gap-2 text-[13px] text-slate2">
+        <span aria-hidden className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate2/25 border-t-brand-red" />
+        {SKELETON_MESSAGES[i]}
+      </p>
+      <ul className="flex flex-col gap-3">
+        {Array.from({ length: count }).map((_, k) => (
+          <li key={k} className="rounded-card border border-hair bg-white p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="h-8 w-20 animate-pulse rounded bg-mist" />
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-3 w-28 animate-pulse rounded bg-mist" />
+                  <div className="h-2.5 w-20 animate-pulse rounded bg-mist" />
+                </div>
+              </div>
+              <div className="h-5 w-24 shrink-0 animate-pulse rounded bg-mist" />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <div className="h-9 flex-1 animate-pulse rounded-card bg-mist" />
+              <div className="h-9 flex-1 animate-pulse rounded-card bg-mist" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Bloque de llamada intercalado cada 3 opciones reales (patrón de los
+// comparadores tipo Rastreator): un recordatorio de que un asesor llama gratis
+// para ayudar a elegir. Los agentes atienden L–V de 9:00 a 19:00 (hora
+// canaria). Lleva al funnel genérico de "que me llamen" (no crea presupuesto
+// de una opción concreta, es ayuda general).
+function InlineCallBanner({ locked = false }: { locked?: boolean }) {
+  return (
+    <li className="list-none">
+      <div className="flex flex-col items-start gap-3 rounded-card bg-navy p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-white">
+            <Phone width={20} height={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold leading-snug">¿Necesitas ayuda para encontrar el mejor seguro de salud?</p>
+            <p className="mt-0.5 text-[12px] text-white/75">Te llamamos gratis · L–V de 9:00 a 19:00 h (hora canaria)</p>
+          </div>
+        </div>
+        <a
+          href="/quiero-que-me-llamen?producto=salud"
+          tabIndex={locked ? -1 : 0}
+          className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-1.5 rounded-pill bg-white px-5 text-[14px] font-bold text-navy transition-colors hover:bg-white/90 sm:w-auto"
+        >
+          <Phone width={16} height={16} aria-hidden />
+          Te llamamos gratis
+        </a>
+      </div>
+    </li>
   );
 }
 
@@ -316,21 +1193,366 @@ export function CompanyLogo({
   return <img src={logoUrl} alt={compania} className={`w-auto shrink-0 object-contain ${size}`} />;
 }
 
-function CompanyActions({ producto, compania, precio }: { producto: string; compania: string; precio: number }) {
+// El botón primario se muestra en verde mientras la comparativa está
+// bloqueada tras el velo (empuja a completar el gate para "desbloquear" el
+// color normal, un empujón visual más hacia dejar el dato) y también, ya
+// desbloqueada, en la opción recomendada — esa se queda en verde a
+// propósito para que siga destacando, en vez de volver a rojo como el resto.
+function CompanyActions({
+  producto, compania, precio, locked = false, recommended = false, onMasInfo, onSolicitar, masInfoHref,
+}: {
+  producto: string; compania: string; precio: number; locked?: boolean; recommended?: boolean;
+  // Si se pasa, "Más información" abre el detalle en la propia página (modal)
+  // en vez de navegar a /comparativa/[compania] — necesario para las opciones
+  // reales de Codeoscopic, que no existen como página de catálogo y además
+  // evita salir de la comparativa y volver a pasar por el gate.
+  onMasInfo?: () => void;
+  // Destino del enlace "Más información" (si no se usa onMasInfo). Permite
+  // apuntar a un producto concreto por su id (?pid=) cuando hay varios de la
+  // misma compañía; si no se pasa, se usa el slug de la compañía.
+  masInfoHref?: string;
+  // Si se pasa, "Que te llamen gratis" ejecuta este handler (crear presupuesto
+  // por interés + navegar) en vez de ser un simple enlace. Se usa en salud.
+  onSolicitar?: () => void;
+}) {
+  const green = locked || recommended;
+  // En móvil los botones se apilan a ancho completo (evita que "Que te llamen
+  // gratis" desborde la tarjeta); en ≥sm van en fila repartiendo el ancho.
   return (
-    <div className="mt-3 flex gap-2">
-      <a
-        href={`/comparativa/${slugify(compania)}?producto=${producto}`}
-        className="flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold text-navy transition-colors hover:border-navy/40 hover:bg-mist"
-      >
-        Más información
-      </a>
-      <a
-        href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
-        className="flex-1 rounded-card bg-brand-red px-3 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
-      >
-        Que me llamen
-      </a>
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+      {onMasInfo ? (
+        <button
+          type="button" onClick={onMasInfo}
+          tabIndex={locked ? -1 : 0}
+          className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+        >
+          Más información
+        </button>
+      ) : (
+        <a
+          href={masInfoHref ?? `/comparativa/${slugify(compania)}?producto=${producto}`}
+          tabIndex={locked ? -1 : 0}
+          className="min-w-0 flex-1 rounded-card border border-hair px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-navy transition-colors hover:border-navy/40 hover:bg-mist"
+        >
+          Más información
+        </a>
+      )}
+      {onSolicitar ? (
+        <button
+          type="button" onClick={onSolicitar}
+          tabIndex={locked ? -1 : 0}
+          className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
+        >
+          Que te llamen gratis
+        </button>
+      ) : (
+        <a
+          href={`/quiero-que-me-llamen?producto=${producto}&compania=${encodeURIComponent(compania)}&precio=${precio}`}
+          tabIndex={locked ? -1 : 0}
+          className={`min-w-0 flex-1 rounded-card px-3 py-2.5 text-center text-[13px] font-semibold leading-tight text-white transition-colors ${green ? "bg-emerald-600 hover:bg-emerald-700" : "bg-brand-red hover:bg-brand-red-deep"}`}
+        >
+          Que te llamen gratis
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------ Gate de contacto --------------------------- */
+// Modal fullscreen con backdrop opaco. En modo mustGate (draft pendiente
+// = salud/vida) NO permite cerrar: sin datos no podemos crear el lead ni
+// mostrar precios. En modo legacy (lead ya existe) sí se puede "Ver sin
+// completar" para no romper el flujo antiguo.
+function ComparativaGate({
+  producto, isHealthLike, mustGate,
+  nombre, onNombre, apellido1, onApellido1, apellido2, onApellido2,
+  documentoTipo, onDocumentoTipo, documento, onDocumento,
+  telefono, onTelefono, email, onEmail,
+  aceptaEsencial, onAceptaEsencial,
+  aceptaComercial, onAceptaComercial,
+  error, submitting, onSubmit, onSkip,
+}: {
+  producto: string;
+  isHealthLike: boolean;
+  mustGate: boolean;
+  nombre: string; onNombre: (v: string) => void;
+  apellido1: string; onApellido1: (v: string) => void;
+  apellido2: string; onApellido2: (v: string) => void;
+  documentoTipo: "Dni" | "Nie"; onDocumentoTipo: (v: "Dni" | "Nie") => void;
+  documento: string; onDocumento: (v: string) => void;
+  telefono: string; onTelefono: (v: string) => void;
+  email: string; onEmail: (v: string) => void;
+  aceptaEsencial: boolean; onAceptaEsencial: (v: boolean) => void;
+  aceptaComercial: boolean; onAceptaComercial: (v: boolean) => void;
+  error: string | null;
+  submitting: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div
+      role="dialog" aria-modal="true" aria-labelledby="gate-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-navy/80 p-0 md:p-6"
+    >
+      <div className="flex h-full w-full flex-col overflow-y-auto bg-white shadow-card md:h-auto md:max-h-[92vh] md:max-w-lg md:rounded-[24px]">
+        <div className="flex items-start justify-between gap-3 border-b border-hair px-6 pb-4 pt-6 md:pt-8">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-brand-red">Casi hemos terminado</p>
+            <h2 id="gate-title" className="mt-1 text-[20px] font-extrabold leading-snug text-navy md:text-[22px]">
+              Confirma tus datos para ver tu comparativa
+            </h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-slate2">
+              Con esto podemos {isHealthLike ? "tarificar con las aseguradoras y mostrarte" : "mostrarte"} tus precios personalizados.
+            </p>
+          </div>
+          {!mustGate && (
+            <button
+              type="button" onClick={onSkip}
+              aria-label="Ver la comparativa sin completar el formulario"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3 px-6 py-5">
+          <input
+            type="text" value={nombre} onChange={(e) => onNombre(e.target.value)}
+            placeholder="Nombre" autoComplete="given-name" autoFocus
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+          {producto === "salud" && (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text" value={apellido1} onChange={(e) => onApellido1(e.target.value)}
+                placeholder="Primer apellido" autoComplete="family-name"
+                className="w-full min-w-0 flex-1 rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+              <input
+                type="text" value={apellido2} onChange={(e) => onApellido2(e.target.value)}
+                placeholder="Segundo apellido" autoComplete="additional-name"
+                className="w-full min-w-0 flex-1 rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+            </div>
+          )}
+          {producto === "salud" && (
+            <div className="flex gap-2">
+              <select
+                value={documentoTipo} onChange={(e) => onDocumentoTipo(e.target.value as "Dni" | "Nie")}
+                aria-label="Tipo de documento"
+                className="shrink-0 rounded-[12px] border border-hair bg-white px-3 py-3 text-[15px] text-ink focus:border-navy focus:outline-none"
+              >
+                <option value="Dni">DNI</option>
+                <option value="Nie">NIE</option>
+              </select>
+              <input
+                type="text" value={documento}
+                onChange={(e) => onDocumento(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 9))}
+                placeholder={documentoTipo === "Nie" ? "X1234567L" : "12345678Z"}
+                inputMode="text" autoComplete="off" maxLength={9}
+                className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] uppercase tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+              />
+            </div>
+          )}
+          <input
+            type="tel" inputMode="tel" value={telefono} onChange={(e) => onTelefono(e.target.value)}
+            placeholder="Teléfono móvil" autoComplete="tel"
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] tnums text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+          <input
+            type="email" inputMode="email" value={email} onChange={(e) => onEmail(e.target.value)}
+            placeholder="Correo electrónico" autoComplete="email"
+            className="w-full rounded-[12px] border border-hair bg-white px-4 py-3 text-[15px] text-ink placeholder:text-slate2/60 focus:border-navy focus:outline-none"
+          />
+
+          <p className="mt-1 text-[12px] leading-relaxed text-slate2">
+            {BRAND_NAME}, como responsable del tratamiento, usará tus datos para tarificar tu seguro y que un asesor te confirme el precio final.{" "}
+            <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
+          </p>
+          <EssentialConsentCheckbox
+            idPrefix="comparativa-gate" datosSalud={isHealthLike}
+            checked={aceptaEsencial} onChange={onAceptaEsencial}
+          />
+          <ComercialConsentCheckbox
+            idPrefix="comparativa-gate" checked={aceptaComercial} onChange={onAceptaComercial}
+          />
+
+          {error && <p role="alert" className="mt-1 rounded-[10px] bg-brand-red/10 px-4 py-2.5 text-[13px] font-medium text-brand-red-deep">{error}</p>}
+
+          <button
+            type="submit" disabled={submitting} aria-busy={submitting || undefined}
+            className="mt-3 inline-flex min-h-[52px] w-full items-center justify-center rounded-[12px] bg-emerald-600 px-5 text-[16px] font-bold text-white transition-colors hover:bg-emerald-700 disabled:bg-slate2/40"
+          >
+            {submitting ? "Preparando tu comparativa…" : "Ver mi comparativa"}
+          </button>
+          {!mustGate && (
+            <button type="button" onClick={onSkip} className="text-center text-[12px] font-medium text-slate2 underline">
+              Ver sin completar
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- Modal de coberturas -------------------------- */
+// Detalle de coberturas real de la cotización, tal cual lo devuelve
+// Codeoscopic. Se agrupan por categoría (Coberturas médicas, Dental,
+// Extras…) — el shape lo normaliza el propio endpoint server-side
+// (/api/quote/{id}/coverages), aquí solo pintamos.
+type CoverageItem = { concepto: string; descripcion: string; cubierto: boolean; limite: string; copago: string };
+type CoverageGroup = { categoria: string; items: CoverageItem[] };
+type CoveragesState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; grupos: CoverageGroup[] };
+
+function CoveragesModal({ insuranceId, quote, onClose, onSolicitar }: { insuranceId: string; quote: RealQuote; onClose: () => void; onSolicitar?: () => void }) {
+  const [state, setState] = useState<CoveragesState>({ kind: "loading" });
+
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}/coverages?quoteId=${encodeURIComponent(quote.id)}`);
+        const body = (await res.json().catch(() => null)) as { ok: true; grupos: CoverageGroup[] } | { ok: false; reason: string } | null;
+        if (stop) return;
+        if (!body?.ok) {
+          const reasonLabel =
+            body?.reason === "not_configured" ? "El motor de coberturas no está activo en este momento."
+            : body?.reason === "offer_not_found" ? "No pudimos localizar el detalle de coberturas para esta cotización."
+            : "No pudimos cargar las coberturas. Inténtalo de nuevo en un momento.";
+          setState({ kind: "error", message: reasonLabel });
+          return;
+        }
+        setState({ kind: "ok", grupos: body.grupos });
+      } catch {
+        if (!stop) setState({ kind: "error", message: "Fallo de red. Inténtalo de nuevo." });
+      }
+    })();
+    return () => { stop = true; };
+  }, [insuranceId, quote.id]);
+
+  // Bloquear scroll de fondo mientras el modal está abierto.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div
+      role="dialog" aria-modal="true" aria-label={`Detalle de ${quote.compania}`}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-4"
+      onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
+    >
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[24px] bg-white shadow-card md:rounded-[24px]">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-hair bg-white px-5 py-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {quote.imageUrl ? <CompanyLogo logoUrl={quote.imageUrl} compania={quote.compania} size="h-9 max-w-[110px]" /> : null}
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate2">Detalle de la opción</p>
+              <h3 className="truncate text-[17px] font-extrabold text-navy">{quote.compania}</h3>
+              {(quote.modalidad || quote.producto || quote.categoria) && (
+                <p className="truncate text-[12px] text-slate2">
+                  {[quote.modalidad || quote.producto, quote.categoria].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button" onClick={onClose} aria-label="Cerrar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hair text-slate2 transition-colors hover:bg-mist"
+          >
+            ✕
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
+          {/* Resumen de la opción: precio, valoración y condiciones. */}
+          <div className="rounded-card border border-hair bg-mist/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {typeof quote.rating === "number" && quote.rating > 0 && (
+                  <span aria-label={`Valoración ${quote.rating} de 5`} className="text-[13px] leading-none text-amber-500">
+                    {"★".repeat(Math.round(quote.rating))}<span className="text-slate2/40">{"★".repeat(Math.max(0, 5 - Math.round(quote.rating)))}</span>
+                  </span>
+                )}
+                {quote.docUrl && (
+                  <a href={quote.docUrl} target="_blank" rel="noopener noreferrer"
+                    className="mt-1 block text-[12px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red">
+                    Condiciones del producto (PDF)
+                  </a>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                {(quote.downPayment != null && quote.downPayment > 0) || quote.premium != null
+                  ? <p className="text-[14px] text-slate2"><span className="text-[19px] font-extrabold tnums text-navy">{euros((quote.downPayment != null && quote.downPayment > 0) ? quote.downPayment : (quote.premium ?? 0))} €</span>/mes</p>
+                  : <p className="text-[13px] italic text-slate2">Precio en cálculo…</p>}
+                {quote.premium != null && quote.downPayment != null && quote.downPayment > 0 && quote.premium !== quote.downPayment && (
+                  <p className="mt-0.5 text-[12px] text-slate2">Prima anual: <span className="font-semibold tnums text-ink">{euros(quote.premium)} €</span></p>
+                )}
+                {quote.estimate && <p className="mt-0.5 text-[11px] italic text-slate2">Precio orientativo</p>}
+              </div>
+            </div>
+          </div>
+          <h4 className="mt-5 mb-1 text-[13px] font-bold uppercase tracking-wide text-slate2">Coberturas</h4>
+          {state.kind === "loading" && (
+            <p className="py-8 text-center text-[13px] text-slate2">Cargando coberturas…</p>
+          )}
+          {state.kind === "error" && (
+            <p role="alert" className="py-8 text-center text-[13px] font-medium text-brand-red">{state.message}</p>
+          )}
+          {state.kind === "ok" && state.grupos.length === 0 && (
+            <p className="py-8 text-center text-[13px] text-slate2">La aseguradora no ha proporcionado detalle de coberturas para este producto.</p>
+          )}
+          {state.kind === "ok" && state.grupos.map((g) => (
+            <section key={g.categoria} className="mt-4 first:mt-0">
+              <h4 className="text-[13px] font-bold uppercase tracking-wide text-brand-red">{g.categoria}</h4>
+              <ul className="mt-2 divide-y divide-hair rounded-card border border-hair bg-white">
+                {g.items.map((it, i) => (
+                  <li key={i} className="flex items-start gap-3 p-3">
+                    <span
+                      className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                        it.cubierto ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {it.cubierto ? <Check width={14} height={14} /> : "—"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold text-ink">{it.concepto}</p>
+                      {it.descripcion && <p className="mt-0.5 text-[12px] leading-relaxed text-slate2">{it.descripcion}</p>}
+                      {(it.limite || it.copago) && (
+                        <p className="mt-1 text-[12px] tnums text-slate2">
+                          {it.limite && <>Límite: <span className="font-semibold text-ink">{it.limite}</span></>}
+                          {it.limite && it.copago && <span className="px-1.5 text-slate2/50">·</span>}
+                          {it.copago && <>Copago: <span className="font-semibold text-ink">{it.copago}</span></>}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+        {/* CTA de conversión: registra la solicitud de llamada Y crea el
+            presupuesto de ESTA opción concreta (vía solicitarSalud → interés). */}
+        {onSolicitar && (
+          <footer className="shrink-0 border-t border-hair bg-white px-5 py-4">
+            <button
+              type="button"
+              onClick={onSolicitar}
+              className="flex w-full items-center justify-center rounded-card bg-brand-red px-5 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
+            >
+              Que me llamen gratis
+            </button>
+            <p className="mt-1.5 text-center text-[11px] text-slate2">Sin compromiso · Te llamamos cuando mejor te venga</p>
+          </footer>
+        )}
+      </div>
     </div>
   );
 }

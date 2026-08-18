@@ -4,6 +4,7 @@ import { upsertLead, updateLead } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { rateLimitFail } from "@/lib/rateLimit";
 import { sendMetaLeadEvent, capiContextFromRequest } from "@/lib/metaCapi";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
   if (d.aceptaComercial) {
     await sendMetaLeadEvent({ email: d.email, ...capiContextFromRequest(request) });
   }
+
+  await notifyTeamNewLead({
+    leadId: id, source: guia.source,
+    aceptaComercial: d.aceptaComercial,
+    extraNote: `Descargó "${guia.label}"`,
+  }).catch((err) => console.error("[lead-magnet] notifyTeam error", err));
 
   return NextResponse.json({ ok: true, downloadUrl: guia.downloadUrl });
 }

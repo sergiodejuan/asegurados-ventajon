@@ -1,9 +1,14 @@
+import crypto from "node:crypto";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import QRCode from "qrcode";
 import { BRAND_NAME } from "@/lib/brand";
 import { buildWhatsAppText, whatsAppUrl, quoteNumber, ageFromDob, type QuoteProfile } from "@/lib/quote";
-import { rateLimitFail } from "@/lib/rateLimit";
+import { rateLimitFail, checkRateLimit } from "@/lib/rateLimit";
+import { CLIENT_SESSION_COOKIE, verifySessionToken } from "@/lib/clientSession";
+import { resolveIdentity } from "@/lib/agentAuth";
+import { getPresupuesto } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +20,10 @@ type PdfRequest = {
   precio: { conCopago?: number; sinCopago?: number; precio?: number };
   servicios: string[];
   condiciones: string;
+  // presupuestoId real (id del presupuesto en KV). Requerido para clientes
+  // públicos: se valida que la sesión del cliente sea la dueña. Los admin
+  // pueden omitirlo (autenticación por token/agente da acceso a cualquiera).
+  presupuestoId?: string;
 };
 
 const NAVY = rgb(0x1b / 255, 0x2b / 255, 0x6b / 255);
@@ -57,6 +66,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Datos incompletos." }, { status: 400 });
   }
 
+  // Autenticación: 1) admin (token o sesión de agente) tiene acceso libre
+  // para generar PDFs de cualquier presupuesto; 2) cliente público debe
+  // tener sesión válida (cookie httpOnly firmada tras completar el
+  // tarificador) Y su leadId debe ser el dueño del presupuestoId que
+  // solicita. Sin sesión, no se genera PDF (auditoría, X-04) — antes
+  // era abierto y permitía a cualquiera generar PDFs con la marca
+  // Ventajon para datos arbitrarios (vector de fraude/phishing).
+  const identity = await resolveIdentity(request).catch(() => null);
+  const isAdmin = !!identity; // ADMIN_TOKEN o sesión de agente
+  if (!isAdmin) {
+    // Cliente público: exigir sesión + presupuestoId real + propiedad.
+    const clientLeadId = verifySessionToken(cookies().get(CLIENT_SESSION_COOKIE)?.value);
+    if (!clientLeadId) {
+      return NextResponse.json({ ok: false, error: "No autorizado. Completa primero un presupuesto para poder descargarlo." }, { status: 401 });
+    }
+    const presupuestoId = body.presupuestoId || (body.quote?.id ?? "");
+    if (!presupuestoId) {
+      return NextResponse.json({ ok: false, error: "Falta el identificador del presupuesto." }, { status: 400 });
+    }
+    // Rate limit por leadId (defensa de coste: 20 PDFs por lead/día).
+    const perLead = await checkRateLimit(`presupuesto-pdf:lead:${clientLeadId}`, 20, 24 * 3600);
+    if (!perLead.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Has generado muchos PDFs. Prueba de nuevo mañana." },
+        { status: 429, headers: { "Retry-After": String(perLead.retryAfterSeconds) } }
+      );
+    }
+    const presupuesto = await getPresupuesto(presupuestoId).catch(() => null);
+    if (!presupuesto || presupuesto.leadId !== clientLeadId) {
+      return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 403 });
+    }
+  }
+
   // pdf-lib con la fuente estándar Helvetica solo soporta WinAnsi: un texto
   // con emoji u otros caracteres fuera de ese rango lanza una excepción al
   // dibujarlo. Se captura aquí para devolver un 400 controlado en vez de un
@@ -67,6 +109,22 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "No se pudo generar el PDF con esos datos." }, { status: 400 });
   }
+}
+
+// Watermark de verificación: hash HMAC-SHA256 truncado del contenido clave
+// del PDF + timestamp, calculado con un secreto propio (o ADMIN_TOKEN como
+// fallback). Se estampa como pie discreto — cualquier PDF falsificado
+// mostrará un hash que no valida contra el endpoint /api/presupuesto/verify
+// (a futuro), permitiendo desmentir documentos que suplanten la marca.
+function pdfWatermark(body: PdfRequest, at: string): string {
+  // Estricto: solo PDF_WATERMARK_SECRET. Nunca ADMIN_TOKEN — si algún día
+  // rotamos el master, no queremos invalidar la trazabilidad de PDFs pasados
+  // ni tampoco compartir superficie de compromiso (auditoría consultora Meta-A).
+  const secret = process.env.PDF_WATERMARK_SECRET || "";
+  if (!secret) return "";
+  const payload = `${body.producto}|${body.compania}|${body.quote?.id ?? ""}|${JSON.stringify(body.precio)}|${at}`;
+  const h = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  return h.slice(0, 12).toUpperCase();
 }
 
 async function buildPresupuestoPdf(body: PdfRequest): Promise<NextResponse> {
@@ -194,6 +252,16 @@ async function buildPresupuestoPdf(body: PdfRequest): Promise<NextResponse> {
   disclaimer.forEach((line, i) => {
     page.drawText(line, { x: marginX, y: qrY + qrSize - 14 - i * 11, size: 8, font, color: SLATE });
   });
+
+  // Watermark de verificación (auditoría X-04). Cadena corta al pie que
+  // permite desmentir PDFs falsificados: solo Ventajon puede regenerar
+  // exactamente ese hash con el secreto de firma y el mismo contenido.
+  const at = new Date().toISOString();
+  const wm = pdfWatermark(body, at);
+  if (wm) {
+    const wmText = `Ref. ${wm} · Emitido ${at.slice(0, 10)}`;
+    page.drawText(wmText, { x: marginX, y: 32, size: 7, font, color: SLATE });
+  }
 
   const bytes = await doc.save();
   return new NextResponse(Buffer.from(bytes), {

@@ -26,6 +26,9 @@ const utmField = z
     campaign: z.string().optional(),
     content: z.string().optional(),
     term: z.string().optional(),
+    // Programa referidos — código único del cliente que refirió.
+    // Formato tipo "MARIA-P-3X" (máx. 40 chars por si el nombre es largo).
+    ref: z.string().max(40).optional(),
     referrer: z.string().optional(),
     landingPage: z.string().optional(),
   })
@@ -38,6 +41,7 @@ const consentClient = z
     privacidadAt: z.string().optional(),
     contactoAt: z.string().optional(),
     comercialAt: z.string().optional(),
+    datosSaludAt: z.string().optional(),
   })
   .partial()
   .optional();
@@ -48,14 +52,33 @@ const consentPrivacidad = z.literal(true, {
 const consentContacto = z.literal(true, {
   errorMap: () => ({ message: "Necesitamos tu autorización para poder llamarte." }),
 });
+// Plus5 · Art. 9 RGPD (categorías especiales — datos de salud). Se pide
+// como consentimiento explícito, separado del consentimiento genérico de
+// privacidad, en TODO formulario que trate datos de salud (salud, vida —
+// tabaquismo/motivo son datos de salud a efectos legales). AEPD exige
+// consentimiento inequívoco y separado para estas categorías.
+const consentDatosSalud = z.literal(true, {
+  errorMap: () => ({ message: "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD)." }),
+});
 
 const honeypot = z.string().max(0).optional().default("");
 
 // De dónde viene el envío dentro de la propia web: formulario normal de la
-// página, el widget asistente flotante, o el tarificador embebido en una
-// landing de captación SEO — para poder distinguirlo en el origen del lead
-// sin tocar la atribución de marketing real (utm).
-const origenField = z.enum(["web", "asistente", "seo-landing"]).optional().default("web");
+// página, el widget asistente flotante, el tarificador embebido en una
+// landing de captación SEO, o una landing paid de /lp/[slug] — para poder
+// distinguirlo en el origen del lead sin tocar la atribución de marketing
+// real (utm). "lp-salud" se mantiene por compatibilidad con clientes ya
+// cacheados en el momento del despliegue de /lp/[slug]; "lp" es el valor
+// genérico nuevo, válido para cualquier landing (el slug concreto viaja
+// aparte en landingSlug).
+const origenField = z.enum(["web", "asistente", "seo-landing", "lp-salud", "lp"]).optional().default("web");
+
+// Slug de la landing paid (/lp/[slug]) de la que vino el envío, si aplica.
+// Texto libre, sin validar contra la colección real de landings: una
+// landing borrada o renombrada después de que alguien cargó la página no
+// debe tumbar el envío de un lead ya en curso — el peor caso es un slug
+// huérfano en analítica, inofensivo.
+const landingSlugField = z.string().trim().toLowerCase().max(80).optional().default("");
 
 const dobField = z
   .string()
@@ -66,6 +89,41 @@ const dobField = z
     const year = new Date().getFullYear();
     return y >= 1920 && y <= year - 17;
   }, "Revisa la fecha de nacimiento.");
+
+// Igual que dobField pero sin exigir mayoría de edad — para asegurados
+// adicionales (hijos, etc.), no solo el titular/contratante.
+const dobAnyAgeField = z
+  .string()
+  .regex(/^\d{2}\/\d{2}\/\d{4}$/, "Usa el formato dd/mm/aaaa.")
+  .refine((v) => {
+    const [d, m, y] = v.split("/").map(Number);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+    const year = new Date().getFullYear();
+    return y >= 1920 && y <= year;
+  }, "Revisa la fecha de nacimiento.");
+
+// Campos de identificación pensados para la futura integración con
+// Codescopic (ver payload de referencia): tipo + número de documento,
+// apellidos separados y código postal real. Sin validación de letra de
+// control (DNI/NIE): solo formato, la validación fuerte la hará Codescopic.
+const documentoTipoField = z.enum(["Dni", "Nie"], { errorMap: () => ({ message: "Selecciona el tipo de documento." }) });
+function normalizeDocumento(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
+}
+const documentoField = z
+  .string()
+  .transform(normalizeDocumento)
+  .refine((v) => /^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(v), { message: "Revisa el DNI o NIE (formato no válido)." });
+const codigoPostalRealField = z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos.");
+
+// Asegurados adicionales (más allá del titular): solo género y fecha de
+// nacimiento, recogidos de forma ligera dentro del propio tarificador — el
+// resto de datos de cada uno (documento, dirección…) se completan más
+// adelante, no en este primer contacto.
+const aseguradoAdicionalSchema = z.object({
+  fechaNacimiento: dobAnyAgeField,
+  sexo: z.enum(["hombre", "mujer"]),
+});
 
 // Seguro actual (opcional) para comparar / presupuestar.
 const importeField = z.preprocess(
@@ -87,19 +145,35 @@ export const leadSchema = z.object({
   numAsegurados: z.number().int().min(1).max(9),
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
+  // Documento de identidad (DNI/NIE) del titular: OBLIGATORIO. La API de
+  // Codeoscopic lo exige para tarificar (no solo para contratar), así que se
+  // recoge en el gate de /comparativa antes de crear el lead. Sin él, la
+  // comparativa solo podría mostrar precios de catálogo, no reales.
+  documentoTipo: documentoTipoField,
+  documento: documentoField,
+  codigoPostalReal: codigoPostalRealField,
+  fumador: z.boolean(),
+  aseguradosAdicionales: z.array(aseguradoAdicionalSchema).max(8).optional().default([]),
   coberturaDental: z.boolean(),
   yaTieneSeguro: z.boolean(),
   ...seguroActual,
   nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  apellido1: z.string().trim().min(2, "Dinos tu primer apellido.").max(60),
+  // Codeoscopic exige nombre + DOS apellidos para el titular con DNI, así que
+  // en salud el segundo apellido es obligatorio (se recoge en el gate).
+  apellido2: z.string().trim().min(2, "Dinos tu segundo apellido.").max(60),
   telefono: phoneField,
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
+  aceptaDatosSalud: consentDatosSalud, // Art. 9 RGPD — obligatorio en salud
   aceptaComercial: z.boolean().default(false),
   consent: consentClient,
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type LeadInput = z.input<typeof leadSchema>;
 
@@ -118,11 +192,14 @@ export const vidaSchema = z.object({
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   aceptaPrivacidad: consentPrivacidad,
   autorizaContacto: consentContacto,
+  aceptaDatosSalud: consentDatosSalud, // Art. 9 RGPD — obligatorio en vida (fumador/motivo son datos de salud)
   aceptaComercial: z.boolean().default(false),
   consent: consentClient,
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type VidaInput = z.input<typeof vidaSchema>;
 
@@ -151,6 +228,8 @@ export const decesosSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type DecesosInput = z.input<typeof decesosSchema>;
 
@@ -180,6 +259,8 @@ export const autoSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
+  turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type AutoInput = z.input<typeof autoSchema>;
 
@@ -188,7 +269,7 @@ export type AutoInput = z.input<typeof autoSchema>;
 export const callRequestSchema = z.object({
   nombre: z.string().trim().max(120).optional().default(""),
   telefono: phoneField,
-  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."),
+  codigoPostal: z.union([z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."), z.literal("")]).optional().default(""),
   producto: z.string().max(40).optional().default("salud"),
   compania: z.string().max(60).optional(),
   precioElegido: z.preprocess(
@@ -212,6 +293,7 @@ export const callRequestSchema = z.object({
   company: honeypot,
   utm: utmField,
   origen: origenField,
+  landingSlug: landingSlugField,
   turnstileToken: z.string().max(2000).optional().default(""),
 });
 export type CallRequestInput = z.input<typeof callRequestSchema>;
@@ -278,3 +360,73 @@ export const leadMagnetSchema = z.object({
   utm: utmField,
 });
 export type LeadMagnetInput = z.input<typeof leadMagnetSchema>;
+
+/* --------------------- Igualación de precio (price-match) ------------------ */
+// Formulario del flujo "¿ya tienes un precio? Te lo estudiamos". El usuario
+// llega con presupuesto de otra compañía (habitualmente su renovación) y
+// pide que le busquemos una alternativa igual o mejor. Se convierte en un
+// lead con source="price-match" y un bloque `priceMatch` con los datos
+// aportados — el equipo comercial trabaja el caso desde /admin.
+//
+// La captura (foto/PDF del presupuesto) es opcional pero muy útil para el
+// asesor: viene comprimida desde el cliente como data URI hasta 900KB
+// (mismo tope que resto del panel: ver components/admin/ImageField.tsx).
+const capturaPresupuestoField = z
+  .string()
+  .max(900_000, "El archivo es demasiado grande.")
+  .optional()
+  .default("");
+
+export const priceMatchSchema = z.object({
+  producto: z.enum(["salud", "vida", "auto", "decesos", "hogar"]),
+  companiaActual: z.string().trim().min(2, "Dinos qué compañía te lo ofrece.").max(120),
+  precioActual: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number().positive("Debe ser un importe positivo.").max(100000, "El importe parece demasiado alto.")
+  ),
+  periodicidad: z.enum(["mes", "año"]),
+  capturaUrl: capturaPresupuestoField,
+  nombre: z.string().trim().min(2, "Dinos tu nombre.").max(120),
+  telefono: phoneField,
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
+  codigoPostal: zonaField,
+  // Contexto opcional: le sirve al asesor para dimensionar el caso (renovar
+  // caro, un asegurado con enfermedad preexistente...). Máx. 500 caracteres
+  // para que no se convierta en un chat.
+  comentario: z.string().trim().max(500).optional().default(""),
+  aceptaPrivacidad: consentPrivacidad,
+  autorizaContacto: consentContacto,
+  aceptaComercial: z.boolean().default(false),
+  consent: consentClient,
+  company: honeypot,
+  utm: utmField,
+  turnstileToken: z.string().max(2000).optional().default(""),
+});
+export type PriceMatchInput = z.input<typeof priceMatchSchema>;
+
+/* --------------------- Programa referidos (Amigos Ventajon) ------------------ */
+// Formulario del referidor generando su enlace/código personal desde la
+// landing /referidos o desde su área de cliente. NO recoge ningún dato del
+// amigo — el referido llega por el link ?ref=CODE, no lo introduce el
+// referidor (art. 21 LSSI: no se puede enviar publicidad a terceros sin su
+// consentimiento). El schema es minimalista: solo identifica al referidor
+// para asociar el código a su lead existente.
+export const referralGenerateSchema = z.object({
+  // El referidor DEBE tener un lead + presupuesto contratado; el endpoint
+  // valida elegibilidad server-side. Aquí solo pedimos su email/tel para
+  // el lookup (la sesión cliente ya lo cubre en el flujo autenticado; este
+  // schema es para el fallback anónimo desde /referidos).
+  email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico.").optional(),
+  telefono: phoneField.optional(),
+  company: honeypot,
+  turnstileToken: z.string().max(2000).optional().default(""),
+});
+export type ReferralGenerateInput = z.input<typeof referralGenerateSchema>;
+
+// Opt-in del referido tras completar comparativa. El backend genera un
+// token firmado (HMAC) y lo envía por email; el usuario hace clic y este
+// endpoint lo valida antes de disparar el envío del vale Amazon.
+export const referralOptInSchema = z.object({
+  token: z.string().min(20).max(300),
+});
+export type ReferralOptInInput = z.input<typeof referralOptInSchema>;

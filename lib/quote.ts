@@ -1,10 +1,14 @@
 import { WHATSAPP_URL } from "./brand";
+import type { PricingZona, ProductPricing, TramoEdad, DescuentoAsegurados } from "./catalog";
 
 // Perfil resumido que viaja del tarificador a la página de comparativa (y de
 // ahí a la página de cada compañía). Se guarda en sessionStorage: vive solo
 // mientras dura la sesión del navegador, no es información persistida en servidor.
 export type QuoteProfile = {
   id: string;
+  // leadId del lead creado en el gate (salud). Ancla la tarificación real de
+  // Codeoscopic, que ahora cuelga del lead y no de un presupuesto.
+  leadId?: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   createdAt: string;
   codigoPostal?: string;
@@ -38,6 +42,12 @@ export type QuoteProfile = {
 };
 
 const STORAGE_KEY = "ventajon:quote";
+// Draft de payload de tarificación pendiente de completar con datos de
+// contacto + consentimientos. Se guarda en sessionStorage cuando el
+// tarificador termina los pasos técnicos, y la comparativa lo consume al
+// completar el gate de contacto — en ese momento se crea el lead REAL en
+// el backend. Antes esta captura estaba duplicada (tarificador + comparativa).
+const DRAFT_KEY = "ventajon:leadDraft";
 
 export function saveQuote(q: QuoteProfile) {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(q)); } catch { /* sessionStorage no disponible */ }
@@ -58,6 +68,29 @@ export function updateQuote(patch: Partial<QuoteProfile>): QuoteProfile | null {
   const next = { ...current, ...patch };
   saveQuote(next);
   return next;
+}
+
+export type LeadDraftPayload = {
+  producto: "salud" | "vida" | "auto" | "decesos";
+  endpoint: string; // p. ej. "/api/lead" o "/api/vida"
+  data: Record<string, unknown>; // payload SIN nombre/telefono/email/consents
+};
+
+export function saveLeadDraft(draft: LeadDraftPayload) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
+}
+
+export function loadLeadDraft(): LeadDraftPayload | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as LeadDraftPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLeadDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
 export function quoteNumber(id: string) {
@@ -82,6 +115,66 @@ export function saludPrice(base: { conCopago: number; sinCopago: number }, profi
     conCopago: (base.conCopago + dentalExtra) * n,
     sinCopago: (base.sinCopago + dentalExtra) * n,
   };
+}
+
+/* --------------------- Precios avanzados (tramos/zona/descuento) ---------- */
+// La zona viaja en el perfil como etiqueta del tarificador ("Islas Canarias"…);
+// la traducimos a la clave estable con la que se guardan los precios.
+export function pricingZonaFromLabel(codigoPostal?: string): PricingZona {
+  const s = (codigoPostal || "").toLowerCase();
+  if (s.includes("canaria")) return "canarias";
+  if (s.includes("balear")) return "baleares";
+  return "peninsula";
+}
+
+// Tramo de edad que cubre la edad dada (o null si no hay configuración/edad).
+export function resolveTramo(pricing: ProductPricing | undefined, edad: number | null): TramoEdad | null {
+  if (!pricing?.tramos?.length || edad == null) return null;
+  return pricing.tramos.find((t) => edad >= t.min && edad <= t.max) ?? null;
+}
+
+// Aplica el descuento por nº de asegurados a una prima total: se coge el de
+// mayor `desde` que no supere el nº de asegurados. En € resta de la prima
+// mensual total; en % la reduce.
+export function applyNumInsuredDiscount(total: number, numAsegurados: number, descuentos?: DescuentoAsegurados[]): number {
+  if (!descuentos?.length) return total;
+  const aplicable = descuentos
+    .filter((d) => numAsegurados >= d.desde)
+    .sort((a, b) => b.desde - a.desde)[0];
+  if (!aplicable) return total;
+  const out = aplicable.tipo === "pct" ? total * (1 - aplicable.valor / 100) : total - aplicable.valor;
+  return Math.max(0, Math.round(out * 100) / 100);
+}
+
+// Precio de salud de una opción NEGOCIADA teniendo en cuenta, si están
+// configurados, los tramos de edad + zona y el descuento por nº de asegurados.
+// Si no hay pricing avanzado, se comporta como saludPrice (precio plano).
+export function saludPriceAdvanced(
+  product: { precioConCopago?: number; precioSinCopago?: number; pricing?: ProductPricing },
+  profile: Pick<QuoteProfile, "numAsegurados" | "coberturaDental" | "codigoPostal"> & { edad?: number | null },
+): { conCopago: number; sinCopago: number } {
+  const zona = pricingZonaFromLabel(profile.codigoPostal);
+  const tramo = resolveTramo(product.pricing, profile.edad ?? null);
+  const zonaPrecio = tramo?.porZona?.[zona];
+  const baseCon = zonaPrecio?.conCopago ?? product.precioConCopago ?? 0;
+  const baseSin = zonaPrecio?.sinCopago ?? product.precioSinCopago ?? 0;
+  const n = Math.max(1, Math.min(9, profile.numAsegurados ?? 1));
+  const dentalExtra = profile.coberturaDental ? 4 : 0;
+  return {
+    conCopago: applyNumInsuredDiscount((baseCon + dentalExtra) * n, n, product.pricing?.descuentos),
+    sinCopago: applyNumInsuredDiscount((baseSin + dentalExtra) * n, n, product.pricing?.descuentos),
+  };
+}
+
+// Precio base por zona/edad para ramos de precio único (vida/auto/decesos).
+// Devuelve el precio del tramo+zona si existe, o el precio plano del producto.
+export function resolveBasePrecio(
+  product: { precio?: number; pricing?: ProductPricing },
+  profile: { codigoPostal?: string; edad?: number | null },
+): number {
+  const zona = pricingZonaFromLabel(profile.codigoPostal);
+  const tramo = resolveTramo(product.pricing, profile.edad ?? null);
+  return tramo?.porZona?.[zona]?.precio ?? product.precio ?? 0;
 }
 
 export function vidaPrice(base: { precio: number }, profile: Pick<QuoteProfile, "fumador">) {
@@ -133,8 +226,10 @@ export function whatsAppUrl(text: string) {
 }
 
 // Resultado de una solicitud de llamada, para personalizar la página de
-// agradecimiento (nombre + preferencia horaria) sin tener que volver a pedirlo.
-export type CallResult = { nombre?: string; diaLlamada?: string; turnoLlamada?: string };
+// agradecimiento (nombre + preferencia horaria + producto solicitado, este
+// último para poder sugerir un segundo producto sin volver a preguntarlo)
+// sin tener que volver a pedirlo.
+export type CallResult = { nombre?: string; diaLlamada?: string; turnoLlamada?: string; producto?: string };
 const CALL_RESULT_KEY = "ventajon:callResult";
 
 export function saveCallResult(v: CallResult) {

@@ -227,14 +227,14 @@ export type HomeHeroConfig = {
 };
 
 export const DEFAULT_HOME_HERO: HomeHeroConfig = {
-  eyebrow: "Correduría de seguros",
-  headline: "Asegurarte bien\nes de listos",
+  eyebrow: "Correduría de seguros online",
+  headline: "Compara tu seguro entre las mejores aseguradoras\ny paga solo lo justo",
   subheadline:
-    "Comparamos tu seguro de salud, vida, decesos, hogar y auto entre las mejores compañías " +
-    "para que pagues lo justo. Sin trucos, sin letra pequeña.",
+    "En menos de 2 minutos calculamos tu precio real de seguro de salud, vida, decesos, hogar o auto. " +
+    "Comparamos por ti, no vendemos por una compañía. Sin trucos, sin letra pequeña.",
   ctaPrimaryLabel: "Calcula tu precio",
   ctaPrimaryHref: "",
-  ctaSecondaryLabel: "Te llamamos gratis",
+  ctaSecondaryLabel: "Que te llamen gratis",
   ctaSecondaryHref: "/quiero-que-me-llamen",
 };
 

@@ -30,6 +30,9 @@ export function Menu(p: SVGProps<SVGSVGElement>) {
 export function CalendarIcon(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><rect x={3} y={4} width={18} height={18} rx={2} /><path d="M16 2v4M8 2v4M3 10h18" /></svg>);
 }
+export function Clock(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3 3" /></svg>);
+}
 export function Star(p: SVGProps<SVGSVGElement>) {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
@@ -64,6 +67,15 @@ export function Minus(p: SVGProps<SVGSVGElement>) {
 export function Plus(p: SVGProps<SVGSVGElement>) {
   return (<svg {...base} {...p}><path d="M12 5v14M5 12h14" /></svg>);
 }
+export function Sun(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>);
+}
+export function Moon(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>);
+}
+export function Sidebar(p: SVGProps<SVGSVGElement>) {
+  return (<svg {...base} {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /></svg>);
+}
 export function WhatsApp(p: SVGProps<SVGSVGElement>) {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
@@ -83,6 +95,15 @@ export function IconByName({ name, ...p }: { name: string } & SVGProps<SVGSVGEle
     case "flower": return (<svg {...base} {...p}><circle cx="12" cy="12" r="3" /><path d="M12 9V2M12 22v-7M9 12H2M22 12h-7" /></svg>);
     case "home": return (<svg {...base} {...p}><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 21v-6h6v6" /></svg>);
     case "car": return (<svg {...base} {...p}><path d="M5 13 6.5 7.5A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.5L19 13" /><path d="M3 13h18v5H3z" /><circle cx="7.5" cy="18.5" r="1.5" /><circle cx="16.5" cy="18.5" r="1.5" /></svg>);
+    case "gift": return (<svg {...base} {...p}><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>);
+    case "chat": return (<svg {...base} {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
+    // Iconos de secciones del menú de admin
+    case "inbox": return (<svg {...base} {...p}><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.4 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.8 1.5z" /></svg>);
+    case "megaphone": return (<svg {...base} {...p}><path d="m3 11 15-5v12L3 13z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /><path d="M18 8a3 3 0 0 1 0 6" /></svg>);
+    case "layers": return (<svg {...base} {...p}><path d="m12 2 9 5-9 5-9-5 9-5z" /><path d="m3 12 9 5 9-5" /><path d="m3 17 9 5 9-5" /></svg>);
+    case "box": return (<svg {...base} {...p}><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>);
+    case "bars": return (<svg {...base} {...p}><path d="M3 3v18h18" /><path d="M8 17v-5M13 17V8M18 17v-3" /></svg>);
+    case "settings": return (<svg {...base} {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>);
     default: return (<svg {...base} {...p}><circle cx="12" cy="12" r="9" /></svg>);
   }
 }

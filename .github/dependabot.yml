@@ -1,0 +1,35 @@
+version: 2
+
+# Actualizaciones automáticas de dependencias:
+#   - npm: semanal, agrupando actualizaciones de patch/minor en un único PR
+#     por semana para no saturar la revisión; las major van en PRs propios.
+#   - github-actions: mensual, ya que cambian menos y son de bajo riesgo.
+# Los PRs se abren contra main con la etiqueta "dependencies" y son
+# revisados por el equipo antes de mergear (no auto-merge).
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - ci

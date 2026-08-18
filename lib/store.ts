@@ -12,11 +12,17 @@ import {
 import { hashPassword } from "./password";
 import { nextBusinessDays } from "./schedule";
 import { DEFAULT_PRODUCTS, sortProducts, type Product, type ProductDraft } from "./catalog";
+import { normalizeBrand, type Ramo } from "./brands";
 import { DEFAULT_POSTS, type Post, type PostDraft } from "./posts";
 import { DEFAULT_PROMOTIONS, isPromotionActive, type Promotion, type PromotionDraft } from "./promotions";
 import { DEFAULT_TESTIMONIOS, type Testimonio, type TestimonioDraft } from "./testimonios";
+import { SEED_EMAIL_TEMPLATES, type EmailTemplate, type EmailTemplateDraft } from "./leadEmailTemplates";
 import { DEFAULT_CAMPAIGN_CONFIG, type CampaignConfig } from "./campaign";
 import { DEFAULT_EXIT_INTENT_CONFIG, type ExitIntentConfig } from "./exitIntentCampaign";
+import { DEFAULT_INACTIVITY_MODAL, type InactivityModalConfig } from "./inactivityModal";
+import { DEFAULT_LANDING_SALUD, type Landing, type LandingDraft, type LandingProducto, type LandingDevice, type LandingDaypart } from "./landings";
+import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./priceMatchLanding";
+import { DEFAULT_REFERRAL_LANDING, type ReferralLandingConfig } from "./referralLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
 
@@ -72,6 +78,15 @@ async function jset(key: string, val: unknown): Promise<void> {
   }
   mem.data.set(key, val);
 }
+async function jsetTtl(key: string, val: unknown, ttlSec: number): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    await r.set(key, val as string, { ex: ttlSec });
+    return;
+  }
+  mem.data.set(key, val);
+  setTimeout(() => { mem.data.delete(key); }, ttlSec * 1000).unref?.();
+}
 async function jdel(key: string): Promise<void> {
   if (hasKV) {
     const r = await redisClient();
@@ -100,6 +115,84 @@ async function zrangeRev(key: string): Promise<string[]> {
   return (mem.z.get(key) ?? []).slice().sort((a, b) => b.s - a.s).map((e) => e.m);
 }
 
+// Lock distribuido básico (SET NX PX ...). Se usa para evitar que dos envíos
+// concurrentes del MISMO teléfono/email creen dos leads huérfanos o dejen
+// los índices idx:phone/idx:email en estado inconsistente (auditoría
+// consultora, race en upsertLead). Retorna un token que hay que pasar a
+// releaseLock para no soltar el lock de otro proceso.
+async function acquireLock(key: string, ttlMs = 5000): Promise<string | null> {
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  if (hasKV) {
+    const r = await redisClient();
+    const res = await r.set(key, token, { nx: true, px: ttlMs });
+    return res === "OK" ? token : null;
+  }
+  const existing = mem.data.get(key) as { token: string; expiresAt: number } | undefined;
+  if (existing && existing.expiresAt > Date.now()) return null;
+  mem.data.set(key, { token, expiresAt: Date.now() + ttlMs });
+  return token;
+}
+async function releaseLock(key: string, token: string): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    // Solo borra si el token coincide (evita soltar el lock de otro proceso
+    // si el nuestro caducó). Upstash Redis soporta eval con Lua.
+    const script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+    try { await r.eval(script, [key], [token]); } catch { await r.del(key).catch(() => {}); }
+    return;
+  }
+  const existing = mem.data.get(key) as { token: string; expiresAt: number } | undefined;
+  if (existing?.token === token) mem.data.delete(key);
+}
+// Idempotency claim: SET NX PX. Retorna true si esta llamada fue la primera
+// en registrar la clave (procesamos), false si otra ya la tenía (rechazamos
+// como duplicado). No hay que liberar — la clave caduca sola con el TTL.
+// Se usa para deduplicar webhooks Retell/Bland/Manychat en la ventana de
+// firma (~5 min); una réplica accidental o intencional del mismo payload
+// no doblará el efecto lateral (auditoría consultora, P0.9).
+export async function claimOnce(key: string, ttlMs = 15 * 60 * 1000): Promise<boolean> {
+  if (hasKV) {
+    const r = await redisClient();
+    const res = await r.set(key, "1", { nx: true, px: ttlMs });
+    return res === "OK";
+  }
+  const existing = mem.data.get(key) as { expiresAt: number } | undefined;
+  if (existing && existing.expiresAt > Date.now()) return false;
+  mem.data.set(key, { expiresAt: Date.now() + ttlMs });
+  return true;
+}
+
+async function withLock<T>(key: string, fn: () => Promise<T>, ttlMs = 5000, retries = 5): Promise<T> {
+  let token: string | null = null;
+  for (let i = 0; i < retries; i++) {
+    token = await acquireLock(key, ttlMs);
+    if (token) break;
+    // Espera exponencial ligera con jitter (50-150ms base).
+    await new Promise((r) => setTimeout(r, 50 + Math.random() * 100 + i * 100));
+  }
+  if (!token) throw new Error(`[lock] no se pudo adquirir ${key} tras ${retries} intentos`);
+  try { return await fn(); }
+  finally { await releaseLock(key, token).catch(() => {}); }
+}
+
+// Prueba de conexión real para el panel /admin/integraciones (API propia de
+// la web): un round-trip de escritura+lectura sobre el almacén que usan de
+// verdad todos los endpoints públicos, no solo comprobar que las variables
+// de entorno existen — así detecta también un Redis mal configurado o caído.
+export async function pingStore(): Promise<{ ok: boolean; backend: "kv" | "memory"; latencyMs: number; error?: string }> {
+  const start = Date.now();
+  try {
+    const key = "integraciones:ping";
+    const value = Date.now();
+    await jset(key, value);
+    const read = await jget<number>(key);
+    if (read !== value) throw new Error("La lectura no coincide con lo escrito.");
+    return { ok: true, backend: hasKV ? "kv" : "memory", latencyMs: Date.now() - start };
+  } catch (err) {
+    return { ok: false, backend: hasKV ? "kv" : "memory", latencyMs: Date.now() - start, error: err instanceof Error ? err.message : "Error de conexión con el almacén." };
+  }
+}
+
 /* -------------------------------- Upsert ---------------------------------- */
 
 function fillEmpty(lead: Lead, draft: LeadDraft) {
@@ -109,6 +202,7 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
     "tipoVehiculo", "matricula", "marcaVehiculo", "modeloVehiculo", "anioVehiculo",
     "usoVehiculo", "antiguedadCarnet", "coberturaDeseada",
     "seguroActualImporte", "seguroActualPeriodo", "diaLlamada", "turnoLlamada",
+    "documentoTipo", "documento", "apellido1", "apellido2", "codigoPostalReal",
   ];
   for (const k of keys) {
     const dv = draft[k];
@@ -122,9 +216,15 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   // al último presupuesto referenciado (p.ej. una reprogramación de llamada),
   // no solo si la ficha estaba vacía.
   if (draft.presupuestoId) lead.presupuestoId = draft.presupuestoId;
+  // priceMatch: si el lead vuelve con nueva solicitud de igualación, guardamos
+  // la última (la más reciente es la que interesa al asesor).
+  if (draft.priceMatch) lead.priceMatch = draft.priceMatch;
   // Servicios (array): si el nuevo trae datos y la ficha estaba vacía, se completa.
   if (draft.seguroActualServicios?.length && !lead.seguroActualServicios?.length) {
     lead.seguroActualServicios = draft.seguroActualServicios;
+  }
+  if (draft.aseguradosAdicionales?.length && !lead.aseguradosAdicionales?.length) {
+    lead.aseguradosAdicionales = draft.aseguradosAdicionales;
   }
   if (draft.aceptaPrivacidad) lead.aceptaPrivacidad = true;
   if (draft.autorizaContacto) lead.autorizaContacto = true;
@@ -132,6 +232,9 @@ function fillEmpty(lead: Lead, draft: LeadDraft) {
   if (draft.utm && Object.keys(draft.utm).length && !Object.keys(lead.utm).length) {
     lead.utm = draft.utm as Record<string, string | undefined>;
   }
+  // Atribución de landing: igual que utm, gana el primer valor no vacío —
+  // no se sobrescribe en envíos posteriores del mismo lead.
+  if (draft.landingSlug && !lead.landingSlug) lead.landingSlug = draft.landingSlug;
 }
 
 export async function upsertLead(
@@ -141,6 +244,21 @@ export async function upsertLead(
 ): Promise<{ id: string; deduped: boolean; submissionId: string }> {
   const phone = draft.telefono ? normalizePhone(draft.telefono) : "";
   const email = draft.email ? draft.email.trim().toLowerCase() : "";
+  // Lock por identidad (teléfono como primary, email como secundario): impide
+  // race condition entre envíos concurrentes del mismo usuario que crearía
+  // dos leads huérfanos y dejaría los índices phone/email inconsistentes
+  // (auditoría consultora, API6:2023 Unrestricted business logic).
+  const lockKey = `lock:upsertLead:${phone || email || "anon"}`;
+  return withLock(lockKey, () => upsertLeadCritical(draft, source, phone, email, consent));
+}
+
+async function upsertLeadCritical(
+  draft: LeadDraft,
+  source: string,
+  phone: string,
+  email: string,
+  consent?: ConsentRecord
+): Promise<{ id: string; deduped: boolean; submissionId: string }> {
   const now = new Date().toISOString();
   const score = Date.parse(now);
   const srcLabel = SOURCE_LABELS[source] ?? source;
@@ -186,6 +304,9 @@ export async function upsertLead(
     status: "nuevo", nextStep: "",
     agenteAsignadoId: "", agenteAsignadoNombre: "",
     nombre: draft.nombre ?? "", telefono: phone, email, codigoPostal: draft.codigoPostal ?? "",
+    documentoTipo: draft.documentoTipo ?? "", documento: draft.documento ?? "",
+    apellido1: draft.apellido1 ?? "", apellido2: draft.apellido2 ?? "",
+    codigoPostalReal: draft.codigoPostalReal ?? "", aseguradosAdicionales: draft.aseguradosAdicionales ?? [],
     inicio: draft.inicio ?? "", numAsegurados: draft.numAsegurados ?? null, coberturaDental: draft.coberturaDental ?? null,
     motivo: draft.motivo ?? "", fumador: draft.fumador ?? null,
     paraQuien: draft.paraQuien ?? "",
@@ -200,9 +321,11 @@ export async function upsertLead(
     diaLlamada: draft.diaLlamada ?? "",
     turnoLlamada: draft.turnoLlamada ?? "",
     presupuestoId: draft.presupuestoId ?? "",
+    priceMatch: draft.priceMatch ?? null,
     aceptaPrivacidad: !!draft.aceptaPrivacidad, autorizaContacto: !!draft.autorizaContacto, aceptaComercial: !!draft.aceptaComercial,
     consents: consent ? [consent] : [],
     utm: (draft.utm as Record<string, string | undefined>) ?? {},
+    landingSlug: draft.landingSlug ?? "",
     activity: [{ at: now, type: "alta", note: `Alta desde ${srcLabel}${draft.producto ? ` · ${draft.producto}` : ""}`, meta: { source } }],
     submissions: [],
     emails: [],
@@ -227,7 +350,7 @@ export async function upsertLead(
 
 export async function updateLeadContactByLookup(
   lookup: { leadId?: string; telefono?: string; email?: string },
-  patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string }
+  patch: { nombre?: string; telefono?: string; email?: string; diaLlamada?: string; turnoLlamada?: string; aceptaComercial?: boolean }
 ): Promise<Lead | null> {
   const lookupPhone = lookup.telefono ? normalizePhone(lookup.telefono) : "";
   const lookupEmail = lookup.email ? lookup.email.trim().toLowerCase() : "";
@@ -250,6 +373,11 @@ export async function updateLeadContactByLookup(
   if (patch.telefono !== undefined) {
     const newPhone = normalizePhone(patch.telefono);
     if (newPhone && newPhone !== lead.telefono) {
+      // IMPORTANTE: borrar el índice del teléfono viejo antes de escribir el
+      // nuevo, si no un futuro usuario que se registre con el teléfono viejo
+      // recibiría la ficha del anterior (colisión de identidad — ver
+      // auditoría, hallazgo P-01).
+      if (lead.telefono) await jdel(`idx:phone:${lead.telefono}`).catch(() => {});
       await jset(`idx:phone:${newPhone}`, id);
       lead.telefono = newPhone;
       changes.push("teléfono");
@@ -258,6 +386,9 @@ export async function updateLeadContactByLookup(
   if (patch.email !== undefined) {
     const newEmail = patch.email.trim().toLowerCase();
     if (newEmail && newEmail !== lead.email) {
+      // Igual que con el teléfono: liberar el índice del email viejo antes
+      // de escribir el nuevo (auditoría P-01).
+      if (lead.email) await jdel(`idx:email:${lead.email}`).catch(() => {});
       await jset(`idx:email:${newEmail}`, id);
       lead.email = newEmail;
       changes.push("email");
@@ -270,6 +401,13 @@ export async function updateLeadContactByLookup(
   if (patch.turnoLlamada !== undefined && patch.turnoLlamada !== lead.turnoLlamada) {
     lead.turnoLlamada = patch.turnoLlamada;
     changes.push("turno preferido");
+  }
+  // Consentimiento comercial: solo se registra al concederlo (nunca se
+  // retira por esta vía) — pensado para el "desbloqueo" de la comparativa,
+  // donde el cliente puede marcar la casilla opcional sin haberlo hecho antes.
+  if (patch.aceptaComercial === true && !lead.aceptaComercial) {
+    lead.aceptaComercial = true;
+    changes.push("comunicaciones comerciales");
   }
 
   if (changes.length) {
@@ -293,6 +431,44 @@ export async function listLeads(source?: string): Promise<Lead[]> {
     if (l) out.push(l);
   }
   return out;
+}
+
+// Ancla la cotización de Codeoscopic al lead (ver Lead.codeoscopicInsuranceId).
+// Se usa en el flujo público de la comparativa: el lead tarifica sin crear
+// presupuesto; el insuranceId vive aquí hasta que el usuario elige una opción.
+export async function setLeadCodeoscopicInsuranceId(leadId: string, insuranceId: string): Promise<void> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return;
+  if (lead.codeoscopicInsuranceId === insuranceId) return;
+  lead.codeoscopicInsuranceId = insuranceId;
+  await jset(`lead:${leadId}`, lead);
+}
+
+// Actualiza los datos de tarificación de salud editables desde la comparativa
+// ("Editar y recalcular": nº de asegurados y cobertura dental). Se persisten
+// en el lead para que la ficha del back office refleje lo que el usuario pidió
+// y para que el siguiente POST /insurances de Codeoscopic tarifique con la
+// cifra actualizada. Devuelve true si algún valor cambió realmente.
+export async function setLeadSaludTarificacion(
+  leadId: string,
+  patch: { numAsegurados?: number | null; coberturaDental?: boolean | null }
+): Promise<boolean> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return false;
+  let changed = false;
+  if (typeof patch.numAsegurados === "number" && patch.numAsegurados !== lead.numAsegurados) {
+    lead.numAsegurados = Math.max(1, Math.min(9, patch.numAsegurados));
+    changed = true;
+  }
+  if (typeof patch.coberturaDental === "boolean" && patch.coberturaDental !== lead.coberturaDental) {
+    lead.coberturaDental = patch.coberturaDental;
+    changed = true;
+  }
+  if (changed) {
+    lead.updatedAt = new Date().toISOString();
+    await jset(`lead:${leadId}`, lead);
+  }
+  return changed;
 }
 
 export async function getLead(id: string): Promise<Lead | null> {
@@ -345,7 +521,7 @@ export async function updateLead(
 
 export async function addEmailLog(
   leadId: string,
-  entry: { id: string; to: string; subject: string; tipo: string }
+  entry: { id: string; to: string; subject: string; tipo: string; agente?: string }
 ): Promise<void> {
   const lead = await jget<Lead>(`lead:${leadId}`);
   if (!lead) return;
@@ -355,6 +531,7 @@ export async function addEmailLog(
     status: "enviado", openedAt: "", openCount: 0, clickedAt: "", clickCount: 0,
   };
   lead.emails = [log, ...(lead.emails ?? [])];
+  lead.activity.unshift({ at: now, type: "email", note: `Email enviado: ${entry.subject}`, meta: entry.agente ? { agente: entry.agente } : undefined });
   lead.updatedAt = now;
   await jset(`lead:${leadId}`, lead);
   await zadd("leads:index", Date.parse(now), leadId);
@@ -468,6 +645,41 @@ export async function purgeStaleLeads(olderThanDays: number): Promise<{ purged: 
   return { purged: candidatos.length, total: all.length };
 }
 
+// Auto-caducidad de presupuestos fríos: los que siguen en "nuevo" (nadie los
+// ha trabajado nunca) y llevan más de `olderThanDays` sin actividad se pasan
+// a estado "caducado". NO se borra nada —se conserva todo el histórico y la
+// analítica—: es solo higiene de pipeline, y es reversible (un agente puede
+// devolverlos a "nuevo"). A propósito NO toca los estados en progreso
+// (en_seguimiento/enviado/negociando) ni los cerrados (ganado/perdido/ya
+// caducado): "en progreso se conserva". Se mide por `updatedAt` (última
+// actividad), igual que purgeStaleLeads, así un "nuevo" reabierto/reguardado
+// hace poco no caduca. Pensada para ejecutarse desde /api/cron/retention.
+export async function expireStalePresupuestos(olderThanDays: number): Promise<{ expired: number; total: number }> {
+  const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+  const all = await listPresupuestos();
+  const candidatos = all.filter((p) => p.status === "nuevo" && Date.parse(p.updatedAt) < cutoff);
+
+  const now = new Date().toISOString();
+  for (const p of candidatos) {
+    const fresh = await jget<Presupuesto>(`presupuesto:${p.id}`);
+    if (!fresh || fresh.status !== "nuevo") continue; // pudo cambiar entre la lista y aquí
+    const nota: PresupuestoNote = {
+      id: makeSubmissionId(), at: now,
+      texto: `Caducado automáticamente: sin actividad en más de ${olderThanDays} días desde su creación.`,
+      agente: "Sistema (retención)",
+    };
+    const next: Presupuesto = {
+      ...fresh, status: "caducado", closedAt: now, closedBy: "sistema",
+      notas: [nota, ...fresh.notas], updatedAt: now,
+    };
+    await jset(`presupuesto:${p.id}`, next);
+    // No se re-puntúan los índices: el presupuesto sigue existiendo y
+    // listándose, solo cambia de estado.
+  }
+
+  return { expired: candidatos.length, total: all.length };
+}
+
 /* ---------------------------- Catálogo (productos) ------------------------- */
 // Ofertas por compañía × producto que alimentan la página de comparativa.
 // Se guardan como un único documento JSON (catálogo pequeño, no necesita índice).
@@ -546,6 +758,41 @@ export async function deleteProduct(id: string): Promise<boolean> {
   if (next.length === all.length) return false;
   await jset(PRODUCTS_KEY, next);
   return true;
+}
+
+/* --------------------- Catálogo de aseguradoras por ramo -------------------- */
+// Control unificado de qué marcas se muestran en la comparativa (precios
+// reales de Codeoscopic + catálogo manual). Lista negra por ramo, keyeada por
+// nombre normalizado — ver lib/brands.ts. Por defecto no hay nada oculto.
+
+function hiddenBrandsKey(ramo: Ramo): string { return `brand_hidden:${ramo}`; }
+
+export async function getHiddenBrands(ramo: Ramo): Promise<string[]> {
+  return (await jget<string[]>(hiddenBrandsKey(ramo))) ?? [];
+}
+
+// Oculta/muestra una marca. Devuelve la lista de claves ocultas resultante.
+export async function setBrandHidden(ramo: Ramo, brandName: string, hidden: boolean): Promise<string[]> {
+  const key = normalizeBrand(brandName);
+  if (!key) return getHiddenBrands(ramo);
+  const current = new Set(await getHiddenBrands(ramo));
+  if (hidden) current.add(key); else current.delete(key);
+  const next = Array.from(current);
+  await jset(hiddenBrandsKey(ramo), next);
+  return next;
+}
+
+// Nombres de compañía distintos que hay hoy en el catálogo manual de un ramo,
+// para sembrar la UI de admin con las marcas ya conocidas.
+export async function listCatalogCompanies(ramo: Ramo): Promise<string[]> {
+  const all = await readProducts();
+  const names = new Map<string, string>(); // clave normalizada → primer nombre visto
+  for (const p of all) {
+    if (p.producto !== ramo) continue;
+    const key = normalizeBrand(p.compania);
+    if (key && !names.has(key)) names.set(key, p.compania.trim());
+  }
+  return Array.from(names.values()).sort((a, b) => a.localeCompare(b, "es"));
 }
 
 /* -------------------------- Blog ("Actualidad") ----------------------------- */
@@ -753,6 +1000,74 @@ export async function deletePromotion(id: string): Promise<boolean> {
   return true;
 }
 
+/* ------------------------- Plantillas de email (leads) ------------------ */
+// Editables desde /admin/configuracion/plantillas-email, usadas al enviar un
+// correo manual desde la ficha de un lead — ver
+// app/api/admin/leads/[id]/enviar-email y lib/leadEmailTemplates.ts. Mismo
+// patrón de colección con semilla aditiva que promociones/testimonios.
+
+const EMAIL_TEMPLATES_KEY = "email_templates:all";
+
+async function readEmailTemplates(): Promise<EmailTemplate[]> {
+  const stored = await jget<EmailTemplate[]>(EMAIL_TEMPLATES_KEY);
+  if (!stored || !stored.length) {
+    const seeded = [...SEED_EMAIL_TEMPLATES];
+    await jset(EMAIL_TEMPLATES_KEY, seeded);
+    return seeded;
+  }
+  const knownIds = new Set(stored.map((t) => t.id));
+  const missing = SEED_EMAIL_TEMPLATES.filter((t) => !knownIds.has(t.id));
+  if (missing.length) {
+    const next = [...stored, ...missing];
+    await jset(EMAIL_TEMPLATES_KEY, next);
+    return next;
+  }
+  return stored;
+}
+
+export async function listEmailTemplates(): Promise<EmailTemplate[]> {
+  const all = await readEmailTemplates();
+  return [...all].sort((a, b) => (a.nombre < b.nombre ? -1 : 1));
+}
+
+export async function getEmailTemplate(id: string): Promise<EmailTemplate | null> {
+  const all = await readEmailTemplates();
+  return all.find((t) => t.id === id) ?? null;
+}
+
+export async function createEmailTemplate(draft: EmailTemplateDraft): Promise<EmailTemplate> {
+  const all = await readEmailTemplates();
+  const now = new Date().toISOString();
+  const template: EmailTemplate = {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    nombre: draft.nombre ?? "",
+    asunto: draft.asunto ?? "",
+    cuerpoHtml: draft.cuerpoHtml ?? "",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(template);
+  await jset(EMAIL_TEMPLATES_KEY, all);
+  return template;
+}
+
+export async function updateEmailTemplate(id: string, patch: EmailTemplateDraft): Promise<EmailTemplate | null> {
+  const all = await readEmailTemplates();
+  const idx = all.findIndex((t) => t.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(EMAIL_TEMPLATES_KEY, all);
+  return all[idx];
+}
+
+export async function deleteEmailTemplate(id: string): Promise<boolean> {
+  const all = await readEmailTemplates();
+  const next = all.filter((t) => t.id !== id);
+  if (next.length === all.length) return false;
+  await jset(EMAIL_TEMPLATES_KEY, next);
+  return true;
+}
+
 /* ----------------------------- Testimonios ------------------------------ */
 // "/testimonios" y "/testimonios/[slug]", editables desde /admin/testimonios.
 // Mismo patrón que promociones (semilla aditiva), salvo que las semillas de
@@ -872,6 +1187,659 @@ export async function saveCampaignConfig(patch: Partial<CampaignConfig>): Promis
   return next;
 }
 
+/* ------------------------- Landings PAID (/lp/[slug]) ----------------------- */
+// Editable desde /admin/campanas/landings. Sustituye a la antigua landing
+// única de /lp/salud (documento singleton en "landing:lp-salud") por una
+// colección — mismo patrón que promociones/testimonios: un array JSON
+// completo bajo una única clave, leído/escrito entero en cada operación.
+
+const LANDINGS_KEY = "landings:all";
+// Clave legacy de la landing única anterior a esta colección — se lee solo
+// una vez, para migrar su contenido si la colección nueva está vacía. No se
+// borra: queda como copia de seguridad recuperable en Redis sin más coste.
+const LEGACY_LP_SALUD_KEY = "landing:lp-salud";
+
+async function readLandings(): Promise<Landing[]> {
+  const stored = await jget<Landing[]>(LANDINGS_KEY);
+  if (stored && stored.length) return stored;
+
+  // Primer arranque tras el despliegue de la colección: si había una config
+  // guardada bajo el documento singleton antiguo, se adapta a un Landing con
+  // slug "salud" para no perder la copia ya editada por el equipo de paid;
+  // si no había nada, se siembra con la copia por defecto de siempre.
+  const legacy = await jget<Omit<Landing, "id" | "slug" | "status" | "producto" | "createdAt">>(LEGACY_LP_SALUD_KEY);
+  const seeded: Landing[] = [
+    legacy
+      ? {
+          ...DEFAULT_LANDING_SALUD,
+          ...legacy,
+          id: "seed-salud", slug: "salud", status: "publicado", producto: "salud",
+          createdAt: legacy.updatedAt || DEFAULT_LANDING_SALUD.createdAt,
+        }
+      : DEFAULT_LANDING_SALUD,
+  ];
+  await jset(LANDINGS_KEY, seeded);
+  return seeded;
+}
+
+export async function listLandings(opts?: { onlyPublished?: boolean; producto?: LandingProducto }): Promise<Landing[]> {
+  let all = await readLandings();
+  if (opts?.onlyPublished) all = all.filter((l) => l.status === "publicado");
+  if (opts?.producto) all = all.filter((l) => l.producto === opts.producto);
+  return [...all].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+export async function getLanding(id: string): Promise<Landing | null> {
+  const all = await readLandings();
+  return all.find((l) => l.id === id) ?? null;
+}
+
+export async function getLandingBySlug(slug: string, opts?: { onlyPublished?: boolean }): Promise<Landing | null> {
+  const all = await readLandings();
+  const landing = all.find((l) => l.slug === slug) ?? null;
+  if (landing && opts?.onlyPublished && landing.status !== "publicado") return null;
+  return landing;
+}
+
+// true si el slug ya está en uso por OTRA landing (excludeId = la que se está editando).
+export async function landingSlugTaken(slug: string, excludeId?: string): Promise<boolean> {
+  const all = await readLandings();
+  return all.some((l) => l.slug === slug && l.id !== excludeId);
+}
+
+export async function createLanding(draft: LandingDraft): Promise<Landing> {
+  const all = await readLandings();
+  const now = new Date().toISOString();
+  const landing: Landing = {
+    ...DEFAULT_LANDING_SALUD,
+    ...draft,
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: draft.slug ?? "",
+    status: draft.status ?? "borrador",
+    producto: draft.producto ?? "salud",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(landing);
+  await jset(LANDINGS_KEY, all);
+  return landing;
+}
+
+export async function updateLanding(id: string, patch: LandingDraft): Promise<Landing | null> {
+  const all = await readLandings();
+  const idx = all.findIndex((l) => l.id === id);
+  if (idx === -1) return null;
+  all[idx] = { ...all[idx], ...patch, id, updatedAt: new Date().toISOString() };
+  await jset(LANDINGS_KEY, all);
+  return all[idx];
+}
+
+export async function deleteLanding(id: string): Promise<boolean> {
+  const all = await readLandings();
+  const next = all.filter((l) => l.id !== id);
+  if (next.length === all.length) return false;
+  await jset(LANDINGS_KEY, next);
+  return true;
+}
+
+// Copia una landing existente bajo un slug nuevo, como borrador — el punto
+// de partida para "por ramo o público objetivo" sin reescribir todo a mano.
+export async function duplicateLanding(id: string, newSlug: string): Promise<Landing | null> {
+  const source = await getLanding(id);
+  if (!source) return null;
+  const all = await readLandings();
+  const now = new Date().toISOString();
+  const copy: Landing = {
+    ...source,
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    slug: newSlug,
+    status: "borrador",
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(copy);
+  await jset(LANDINGS_KEY, all);
+  return copy;
+}
+
+/* ------------------- Contadores del dashboard de landings ------------------ */
+// Vistas y clics de CTA por landing y día, para el mini-dashboard de
+// comparación (/admin/campanas/landings/comparar). Bucket diario, no log por
+// evento — suficiente para tendencia histórica sin crecer sin límite.
+// A diferencia del resto del store (documentos JSON completos vía jget/jset),
+// aquí usamos comandos atómicos nativos de Redis (HINCRBY/HGETALL): es un
+// contador puro, no hace falta el lock de más arriba.
+
+async function hincrby(key: string, field: string, by = 1): Promise<void> {
+  if (hasKV) {
+    const r = await redisClient();
+    await r.hincrby(key, field, by);
+    return;
+  }
+  const rec = (mem.data.get(key) as Record<string, number> | undefined) ?? {};
+  rec[field] = (rec[field] ?? 0) + by;
+  mem.data.set(key, rec);
+}
+async function hgetall(key: string): Promise<Record<string, number>> {
+  if (hasKV) {
+    const r = await redisClient();
+    return ((await r.hgetall(key)) as Record<string, number> | null) ?? {};
+  }
+  return (mem.data.get(key) as Record<string, number> | undefined) ?? {};
+}
+
+function beaconKey(slug: string, day: string): string {
+  return `beacon:${slug}:${day}`;
+}
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+// Rango de días yyyy-mm-dd inclusive, en orden — usado para leer el
+// desglose de un periodo día a día sin necesitar un índice aparte.
+function dayRange(fromDay: string, toDay: string): string[] {
+  const days: string[] = [];
+  let d = new Date(`${fromDay}T00:00:00Z`);
+  const end = new Date(`${toDay}T00:00:00Z`);
+  while (d <= end && days.length < 366) {
+    days.push(d.toISOString().slice(0, 10));
+    d = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return days;
+}
+
+export type LandingEventKind = "view" | "cta_calcular" | "cta_llamar";
+
+// Cada campo del hash combina las 3 dimensiones ("kind:device:daypart") en
+// vez de abrir una clave de Redis por combinación — sigue siendo un único
+// HINCRBY/HGETALL por landing y día, solo que con más campos dentro. El
+// desglose por dispositivo/franja horaria se reconstruye sumando los campos
+// que correspondan (ver parseCounterField / aggregateLandingCounters).
+function counterField(kind: LandingEventKind, device: LandingDevice, daypart: LandingDaypart): string {
+  return `${kind}:${device}:${daypart}`;
+}
+function parseCounterField(field: string): { kind: LandingEventKind; device: LandingDevice; daypart: LandingDaypart } | null {
+  const [kind, device, daypart] = field.split(":");
+  if (!kind || !device || !daypart) return null;
+  return { kind: kind as LandingEventKind, device: device as LandingDevice, daypart: daypart as LandingDaypart };
+}
+
+export async function trackLandingEvent(
+  slug: string, kind: LandingEventKind, device: LandingDevice, daypart: LandingDaypart, day = todayStr()
+): Promise<void> {
+  await hincrby(beaconKey(slug, day), counterField(kind, device, daypart), 1);
+}
+
+// { [yyyy-mm-dd]: { "view:mobile:tarde": N, ... } } para el rango pedido —
+// forma cruda, pensada para agregar con aggregateLandingCounters.
+export async function getLandingCounters(slug: string, fromDay: string, toDay: string): Promise<Record<string, Record<string, number>>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const day of dayRange(fromDay, toDay)) {
+    out[day] = await hgetall(beaconKey(slug, day));
+  }
+  return out;
+}
+
+export type LandingCounterTotals = { views: number; ctaCalcular: number; ctaLlamar: number };
+
+// Reduce la forma cruda de getLandingCounters a: el total (todas las
+// dimensiones sumadas) + el desglose por dispositivo y por franja horaria —
+// consumido por app/api/admin/landings/stats.
+export function aggregateLandingCounters(counters: Record<string, Record<string, number>>): {
+  total: LandingCounterTotals;
+  byDevice: Record<LandingDevice, LandingCounterTotals>;
+  byDaypart: Record<LandingDaypart, LandingCounterTotals>;
+} {
+  const empty = (): LandingCounterTotals => ({ views: 0, ctaCalcular: 0, ctaLlamar: 0 });
+  const total = empty();
+  const byDevice: Record<LandingDevice, LandingCounterTotals> = { mobile: empty(), tablet: empty(), desktop: empty() };
+  const byDaypart: Record<LandingDaypart, LandingCounterTotals> = { madrugada: empty(), manana: empty(), tarde: empty(), noche: empty() };
+
+  function add(bucket: LandingCounterTotals, kind: LandingEventKind, n: number) {
+    if (kind === "view") bucket.views += n;
+    else if (kind === "cta_calcular") bucket.ctaCalcular += n;
+    else if (kind === "cta_llamar") bucket.ctaLlamar += n;
+  }
+
+  for (const dayFields of Object.values(counters)) {
+    for (const [field, n] of Object.entries(dayFields)) {
+      const parsed = parseCounterField(field);
+      if (!parsed) continue; // campo de un formato antiguo/desconocido — se ignora, no rompe el resto
+      add(total, parsed.kind, n);
+      if (byDevice[parsed.device]) add(byDevice[parsed.device], parsed.kind, n);
+      if (byDaypart[parsed.daypart]) add(byDaypart[parsed.daypart], parsed.kind, n);
+    }
+  }
+  return { total, byDevice, byDaypart };
+}
+
+/* ---------------- Landing "igualación de precio" ---------------- */
+// Editable desde /admin/campanas/precio-mejor. Singleton (a diferencia de
+// las landings de /lp/[slug], que son una colección — ver más abajo):
+// mantiene defaults por sub-sección para no romper la landing si se guarda
+// una config parcial.
+
+const PRICE_MATCH_KEY = "landing:price-match";
+
+export async function getPriceMatchLandingConfig(): Promise<PriceMatchLandingConfig> {
+  const stored = await jget<PriceMatchLandingConfig>(PRICE_MATCH_KEY);
+  if (!stored) return DEFAULT_PRICE_MATCH_LANDING;
+  return {
+    ...DEFAULT_PRICE_MATCH_LANDING,
+    ...stored,
+    hideAssistant: typeof stored.hideAssistant === "boolean" ? stored.hideAssistant : DEFAULT_PRICE_MATCH_LANDING.hideAssistant,
+    hero: { ...DEFAULT_PRICE_MATCH_LANDING.hero, ...(stored.hero ?? {}) },
+    compromisoBadges: Array.isArray(stored.compromisoBadges) ? stored.compromisoBadges : DEFAULT_PRICE_MATCH_LANDING.compromisoBadges,
+    comoFunciona: {
+      ...DEFAULT_PRICE_MATCH_LANDING.comoFunciona,
+      ...(stored.comoFunciona ?? {}),
+      steps: Array.isArray(stored.comoFunciona?.steps) ? stored.comoFunciona!.steps : DEFAULT_PRICE_MATCH_LANDING.comoFunciona.steps,
+    },
+    socialProof: {
+      ...DEFAULT_PRICE_MATCH_LANDING.socialProof,
+      ...(stored.socialProof ?? {}),
+      testimonios: Array.isArray(stored.socialProof?.testimonios) ? stored.socialProof!.testimonios : DEFAULT_PRICE_MATCH_LANDING.socialProof.testimonios,
+    },
+    faq: {
+      ...DEFAULT_PRICE_MATCH_LANDING.faq,
+      ...(stored.faq ?? {}),
+      items: Array.isArray(stored.faq?.items) ? stored.faq!.items : DEFAULT_PRICE_MATCH_LANDING.faq.items,
+    },
+    footer: {
+      ...DEFAULT_PRICE_MATCH_LANDING.footer,
+      ...(stored.footer ?? {}),
+      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_PRICE_MATCH_LANDING.footer.enlaces,
+    },
+    utm: { ...DEFAULT_PRICE_MATCH_LANDING.utm, ...(stored.utm ?? {}) },
+  };
+}
+
+export async function savePriceMatchLandingConfig(next: PriceMatchLandingConfig): Promise<PriceMatchLandingConfig> {
+  const stamped: PriceMatchLandingConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(PRICE_MATCH_KEY, stamped);
+  return stamped;
+}
+
+/* ------------------ Landing programa referidos + doc referral ---------------- */
+// Editable desde /admin/campanas/referidos. Mismo criterio de merge que las
+// demás landings: mantiene defaults por sub-sección para no romper si se
+// guarda una config parcial.
+//
+// Además de la config, aquí viven los documentos de referral en sí:
+//   · referral:code:{CODE} — { referidorLeadId, creadoAt, convertidos: [], bloqueado }
+//   · idx:refcode:{CODE} → leadId del referidor (búsqueda rápida por código)
+//   · referral:byLead:{leadId} → CODE (para no re-generar código si ya tiene)
+//
+// Un lead que llega con ?ref=CODE guarda el código en utm; al contratar,
+// disparamos appendReferralConvertido y — si supera 30 días de vigencia —
+// se paga el bono al referidor. El bono al referido se paga tras opt-in.
+
+const REFERRAL_LANDING_KEY = "landing:referral";
+
+export async function getReferralLandingConfig(): Promise<ReferralLandingConfig> {
+  const stored = await jget<ReferralLandingConfig>(REFERRAL_LANDING_KEY);
+  if (!stored) return DEFAULT_REFERRAL_LANDING;
+  return {
+    ...DEFAULT_REFERRAL_LANDING,
+    ...stored,
+    programaActivo: typeof stored.programaActivo === "boolean" ? stored.programaActivo : DEFAULT_REFERRAL_LANDING.programaActivo,
+    incentivo: { ...DEFAULT_REFERRAL_LANDING.incentivo, ...(stored.incentivo ?? {}) },
+    hero: { ...DEFAULT_REFERRAL_LANDING.hero, ...(stored.hero ?? {}) },
+    compromisoBadges: Array.isArray(stored.compromisoBadges) ? stored.compromisoBadges : DEFAULT_REFERRAL_LANDING.compromisoBadges,
+    comoFunciona: {
+      ...DEFAULT_REFERRAL_LANDING.comoFunciona,
+      ...(stored.comoFunciona ?? {}),
+      steps: Array.isArray(stored.comoFunciona?.steps) ? stored.comoFunciona!.steps : DEFAULT_REFERRAL_LANDING.comoFunciona.steps,
+    },
+    socialProof: {
+      ...DEFAULT_REFERRAL_LANDING.socialProof,
+      ...(stored.socialProof ?? {}),
+      testimonios: Array.isArray(stored.socialProof?.testimonios) ? stored.socialProof!.testimonios : DEFAULT_REFERRAL_LANDING.socialProof.testimonios,
+    },
+    cta: { ...DEFAULT_REFERRAL_LANDING.cta, ...(stored.cta ?? {}) },
+    mensajeCompartir: {
+      ...DEFAULT_REFERRAL_LANDING.mensajeCompartir,
+      ...(stored.mensajeCompartir ?? {}),
+      email: { ...DEFAULT_REFERRAL_LANDING.mensajeCompartir.email, ...(stored.mensajeCompartir?.email ?? {}) },
+    },
+    faq: {
+      ...DEFAULT_REFERRAL_LANDING.faq,
+      ...(stored.faq ?? {}),
+      items: Array.isArray(stored.faq?.items) ? stored.faq!.items : DEFAULT_REFERRAL_LANDING.faq.items,
+    },
+    footer: {
+      ...DEFAULT_REFERRAL_LANDING.footer,
+      ...(stored.footer ?? {}),
+      enlaces: Array.isArray(stored.footer?.enlaces) ? stored.footer!.enlaces : DEFAULT_REFERRAL_LANDING.footer.enlaces,
+    },
+    utm: { ...DEFAULT_REFERRAL_LANDING.utm, ...(stored.utm ?? {}) },
+  };
+}
+
+export async function saveReferralLandingConfig(next: ReferralLandingConfig): Promise<ReferralLandingConfig> {
+  const stamped: ReferralLandingConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(REFERRAL_LANDING_KEY, stamped);
+  return stamped;
+}
+
+/* --------- Documentos de referral (código único por cliente) ------- */
+
+export type ReferralConvertido = {
+  leadId: string; // el amigo
+  nombre: string; // solo para mostrar al referidor en su dashboard
+  producto: string;
+  presupuestoId: string;
+  // Máquina de estados del convertido:
+  //   cotizado   → llegó y completó comparativa (bono referido pendiente)
+  //   opt-in     → confirmó email (bono referido pagable/pagado)
+  //   contratado → el asesor cerró póliza (arranca el reloj T+30d)
+  //   pagado     → referidor cobró su bono
+  //   cancelado  → póliza cancelada en periodo de gracia; no se paga a nadie
+  status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
+  cotizadoAt: string;
+  optInAt?: string;
+  contratadoAt?: string;
+  pagadoReferidorAt?: string;
+  pagadoReferidoAt?: string;
+  // Tracking de los envíos vía Tremendous — permite auditar en el panel
+  // sin volver a llamar a la API, y sirve de idempotencia por si algún
+  // reintento accidental crea otra order con el mismo external_id.
+  tremendousOrderIdReferido?: string;
+  tremendousOrderIdReferidor?: string;
+  // Reintentos de pago tras fallo transitorio (red/429/5xx). El cron
+  // desiste tras N intentos y deja el bono para revisión manual.
+  retryCountReferido?: number;
+  retryCountReferidor?: number;
+  ultimoErrorPago?: string;
+};
+
+export type ReferralDoc = {
+  code: string; // MARIA-LP, JUANP-3X, etc.
+  referidorLeadId: string;
+  referidorNombre: string;
+  referidorEmail: string;
+  creadoAt: string;
+  bloqueado: boolean; // fraude detectado / manual desde admin
+  convertidos: ReferralConvertido[];
+};
+
+// Slug legible desde nombre + 2 chars random. Determinista para el mismo
+// nombre + intento — evita colisiones probando sufijo aleatorio. Solo
+// letras/dígitos, mayúsculas. Ej. "María Pérez" → "MARIA-P-3X".
+function slugifyReferralName(nombre: string): string {
+  const norm = nombre
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase().replace(/[^A-Z]/g, " ").trim();
+  const parts = norm.split(/\s+/).filter(Boolean);
+  if (!parts.length) return "AMIGO";
+  const first = parts[0].slice(0, 6);
+  const initial = parts.length > 1 ? parts[1][0] : "";
+  return initial ? `${first}-${initial}` : first;
+}
+function randomSuffix(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin I,O,1,0 (confundibles)
+  let out = "";
+  for (let i = 0; i < 2; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+// Reutiliza el código si el lead ya tenía uno (idempotente por leadId).
+// Si no, genera uno único evitando colisiones con reintento.
+export async function getOrCreateReferralCode(
+  referidorLeadId: string,
+  referidorNombre: string,
+  referidorEmail: string,
+): Promise<ReferralDoc> {
+  const existingCode = await jget<string>(`referral:byLead:${referidorLeadId}`);
+  if (existingCode) {
+    const doc = await jget<ReferralDoc>(`referral:code:${existingCode}`);
+    if (doc) return doc;
+  }
+  const base = slugifyReferralName(referidorNombre);
+  for (let i = 0; i < 8; i++) {
+    const candidate = `${base}-${randomSuffix()}`;
+    const clash = await jget<string>(`idx:refcode:${candidate}`);
+    if (clash) continue;
+    const doc: ReferralDoc = {
+      code: candidate,
+      referidorLeadId,
+      referidorNombre,
+      referidorEmail,
+      creadoAt: new Date().toISOString(),
+      bloqueado: false,
+      convertidos: [],
+    };
+    await jset(`referral:code:${candidate}`, doc);
+    await jset(`idx:refcode:${candidate}`, referidorLeadId);
+    await jset(`referral:byLead:${referidorLeadId}`, candidate);
+    // Índice global — permite al cron iterar todos los códigos sin SCAN
+    // (Upstash no lo expone directamente). Score = timestamp de creación
+    // para orden estable.
+    await zadd("referral:codes:index", Date.now(), candidate);
+    return doc;
+  }
+  throw new Error("[referral] no se pudo generar código único tras 8 intentos");
+}
+
+// Lista todos los códigos existentes (más recientes primero). Sin
+// paginación de momento — a los volúmenes esperados (unos cientos/mes)
+// vale con un único fetch. Si se dispara, migrar a paginación cursor.
+export async function listAllReferralCodes(): Promise<string[]> {
+  return zrangeRev("referral:codes:index");
+}
+
+// Bloquea/desbloquea un código desde admin — bloqueado corta el pago
+// de bonos futuros y hace que /r/[code] redirija a /referidos. Los
+// bonos ya devengados NO se revierten.
+export async function setReferralBlocked(code: string, bloqueado: boolean): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    doc.bloqueado = bloqueado;
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
+}
+
+export async function getReferralByCode(code: string): Promise<ReferralDoc | null> {
+  return jget<ReferralDoc>(`referral:code:${code}`);
+}
+
+export async function getReferralByLeadId(leadId: string): Promise<ReferralDoc | null> {
+  const code = await jget<string>(`referral:byLead:${leadId}`);
+  return code ? getReferralByCode(code) : null;
+}
+
+// Lado contrario a getReferralByLeadId: dado un lead que pudo haber
+// entrado como AMIGO (referido) desde /r/{code} — el código viaja en
+// lead.utm.ref (ver lib/store.ts updatePresupuesto y app/api/lead/route.ts)
+// —, resuelve el ReferralDoc de quien lo trajo y su propia entrada de
+// convertido (estado, fechas, bonos). null si el lead no vino por
+// referido o el código ya no existe. Usado en la ficha de /admin para
+// mostrar "Referido por…" — ver app/api/admin/leads/[id]/route.ts.
+export async function getReferralAsReferido(
+  leadId: string
+): Promise<{ doc: ReferralDoc; convertido: ReferralConvertido } | null> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  const code = lead?.utm?.ref;
+  if (!code) return null;
+  const doc = await getReferralByCode(code);
+  if (!doc) return null;
+  const convertido = doc.convertidos.find((c) => c.leadId === leadId);
+  return convertido ? { doc, convertido } : null;
+}
+
+// Agregado para el dashboard de /admin/informes/referidos: recorre todos
+// los códigos existentes (volumen esperado en cientos, no miles — barato
+// de traer entero) y resume el embudo + importes estimados. Los importes
+// son una ESTIMACIÓN local (nº de bonos pagados × el importe vigente hoy en
+// la config del programa) — no sustituyen la contabilidad real de
+// Tremendous, que puede llevar importes distintos si el incentivo cambió
+// entre medias; para el estado exacto de una order concreta hay que mirar
+// su tremendousOrderId (ver GET /api/admin/referral/[code]).
+export type ReferralSummary = {
+  totalReferidores: number;
+  totalConvertidos: number;
+  porEstado: Record<ReferralConvertido["status"], number>;
+  bonosReferidoPagados: number;
+  bonosReferidorPagados: number;
+  montoPagadoEstimado: number;
+  montoPendienteReferidorEstimado: number;
+  conErrorPago: number;
+  topReferidores: {
+    code: string; referidorLeadId: string; referidorNombre: string;
+    totalConvertidos: number; contratados: number; pagados: number;
+  }[];
+  atencion: {
+    code: string; leadId: string; nombre: string; status: ReferralConvertido["status"];
+    ultimoErrorPago: string; lado: "referido" | "referidor";
+  }[];
+  // Un registro por amigo referido (sin agregar), para la tabla de detalle
+  // del dashboard — con acceso directo a la ficha del amigo Y a la del
+  // referidor. Puede crecer con cientos de filas; el propio dashboard pagina
+  // en cliente, aquí se devuelve completo (ver nota de coste en la firma de
+  // getReferralSummary).
+  detalle: {
+    code: string; leadId: string; nombre: string; producto: string; status: ReferralConvertido["status"];
+    referidorLeadId: string; referidorNombre: string;
+    cotizadoAt: string; contratadoAt: string; pagadoReferidoAt: string; pagadoReferidorAt: string;
+  }[];
+};
+
+export async function getReferralSummary(): Promise<ReferralSummary> {
+  const cfg = await getReferralLandingConfig();
+  const codes = await listAllReferralCodes();
+  const docs = (await Promise.all(codes.map((c) => getReferralByCode(c)))).filter((d): d is ReferralDoc => !!d);
+
+  const porEstado: ReferralSummary["porEstado"] = { cotizado: 0, "opt-in": 0, contratado: 0, pagado: 0, cancelado: 0 };
+  let totalConvertidos = 0, bonosReferidoPagados = 0, bonosReferidorPagados = 0, conErrorPago = 0;
+  const atencion: ReferralSummary["atencion"] = [];
+  const topReferidores: ReferralSummary["topReferidores"] = [];
+  const detalle: ReferralSummary["detalle"] = [];
+
+  for (const doc of docs) {
+    let contratados = 0, pagados = 0;
+    for (const c of doc.convertidos) {
+      totalConvertidos++;
+      porEstado[c.status] = (porEstado[c.status] ?? 0) + 1;
+      if (c.pagadoReferidoAt) bonosReferidoPagados++;
+      if (c.pagadoReferidorAt) bonosReferidorPagados++;
+      if (c.status === "contratado" || c.status === "pagado") contratados++;
+      if (c.status === "pagado") pagados++;
+      if (c.ultimoErrorPago && !c.pagadoReferidoAt && !c.pagadoReferidorAt) {
+        conErrorPago++;
+        // El mensaje siempre empieza por "referido: " o "referidor: " (ver
+        // lib/referralPayouts.ts) — de ahí se deduce qué lado reintentar sin
+        // tener que adivinarlo en el cliente.
+        const lado: "referido" | "referidor" = c.ultimoErrorPago.startsWith("referidor:") ? "referidor" : "referido";
+        atencion.push({ code: doc.code, leadId: c.leadId, nombre: c.nombre, status: c.status, ultimoErrorPago: c.ultimoErrorPago, lado });
+      }
+      detalle.push({
+        code: doc.code, leadId: c.leadId, nombre: c.nombre, producto: c.producto, status: c.status,
+        referidorLeadId: doc.referidorLeadId, referidorNombre: doc.referidorNombre,
+        cotizadoAt: c.cotizadoAt, contratadoAt: c.contratadoAt ?? "",
+        pagadoReferidoAt: c.pagadoReferidoAt ?? "", pagadoReferidorAt: c.pagadoReferidorAt ?? "",
+      });
+    }
+    topReferidores.push({
+      code: doc.code, referidorLeadId: doc.referidorLeadId, referidorNombre: doc.referidorNombre,
+      totalConvertidos: doc.convertidos.length, contratados, pagados,
+    });
+  }
+  topReferidores.sort((a, b) => b.totalConvertidos - a.totalConvertidos);
+  detalle.sort((a, b) => (a.cotizadoAt < b.cotizadoAt ? 1 : -1));
+
+  // Pendiente de pago al referidor: ya contratado pero aún sin abonar (ni en
+  // periodo de gracia ni ya procesable) — dinero comprometido a futuro.
+  const pendientesReferidor = docs.reduce(
+    (acc, doc) => acc + doc.convertidos.filter((c) => c.status === "contratado" && !c.pagadoReferidorAt).length,
+    0
+  );
+
+  return {
+    totalReferidores: docs.length,
+    totalConvertidos,
+    porEstado,
+    bonosReferidoPagados,
+    bonosReferidorPagados,
+    montoPagadoEstimado: bonosReferidoPagados * cfg.incentivo.montoReferido + bonosReferidorPagados * cfg.incentivo.montoReferidor,
+    montoPendienteReferidorEstimado: pendientesReferidor * cfg.incentivo.montoReferidor,
+    conErrorPago,
+    topReferidores: topReferidores.slice(0, 10),
+    atencion: atencion.slice(0, 20),
+    detalle,
+  };
+}
+
+// Añade un nuevo convertido al documento del código, con lock para evitar
+// pérdida de escrituras concurrentes cuando dos amigos entran a la vez con
+// el mismo código y ambos cotizan casi simultáneamente.
+export async function appendReferralConvertido(
+  code: string,
+  entry: ReferralConvertido,
+): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    // Deduplica por leadId — un mismo amigo no puede contar dos veces
+    // aunque rellene el tarificador varias veces.
+    if (doc.convertidos.some((c) => c.leadId === entry.leadId)) return doc;
+    doc.convertidos.push(entry);
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
+}
+
+// Actualiza el status de un convertido concreto (opt-in, contratado, pagado).
+// Usa el mismo lock para no pisar escrituras si llegan dos updates casi
+// simultáneos del mismo lead.
+export async function updateReferralConvertidoStatus(
+  code: string,
+  leadId: string,
+  patch: Partial<ReferralConvertido>,
+): Promise<ReferralDoc | null> {
+  return withLock(`lock:referral:${code}`, async () => {
+    const doc = await getReferralByCode(code);
+    if (!doc) return null;
+    const idx = doc.convertidos.findIndex((c) => c.leadId === leadId);
+    if (idx < 0) return doc;
+    doc.convertidos[idx] = { ...doc.convertidos[idx], ...patch };
+    await jset(`referral:code:${code}`, doc);
+    return doc;
+  });
+}
+
+// Lookup rápido de leadId por teléfono o email — sin cargar el Lead
+// completo. Devuelve null si no hay match. Se usa desde /api/referral/generate
+// para encontrar al cliente que quiere generar su código sin sesión.
+export async function findLeadIdByPhoneOrEmail(
+  phone?: string,
+  email?: string,
+): Promise<string | null> {
+  if (phone) {
+    const id = await jget<string>(`idx:phone:${phone}`);
+    if (id) return id;
+  }
+  if (email) {
+    const id = await jget<string>(`idx:email:${email}`);
+    if (id) return id;
+  }
+  return null;
+}
+
+// Elegibilidad del referidor: solo clientes con AL MENOS un presupuesto
+// en status "ganado" (equivalente CRM a póliza contratada). Se usa antes
+// de generar el código y también antes de pagar el bono al referidor.
+export async function isEligibleReferrer(leadId: string): Promise<boolean> {
+  const lead = await jget<Lead>(`lead:${leadId}`);
+  if (!lead) return false;
+  const submissions = lead.submissions ?? [];
+  for (const sub of submissions) {
+    const p = await jget<Presupuesto>(`presupuesto:${sub.id}`);
+    if (p && p.status === "ganado") return true;
+  }
+  return false;
+}
+
 /* ------------------------ Exit-intent de la web general --------------------- */
 
 const EXIT_INTENT_KEY = "exitintent:general";
@@ -886,6 +1854,23 @@ export async function saveExitIntentConfig(patch: Partial<ExitIntentConfig>): Pr
   const current = await getExitIntentConfig();
   const next: ExitIntentConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
   await jset(EXIT_INTENT_KEY, next);
+  return next;
+}
+
+/* -------------------- Modal de inactividad de la comparativa ---------------- */
+
+const INACTIVITY_MODAL_KEY = "inactivity_modal:comparativa";
+
+export async function getInactivityModalConfig(): Promise<InactivityModalConfig> {
+  const stored = await jget<InactivityModalConfig>(INACTIVITY_MODAL_KEY);
+  if (!stored) return DEFAULT_INACTIVITY_MODAL;
+  return { ...DEFAULT_INACTIVITY_MODAL, ...stored };
+}
+
+export async function saveInactivityModalConfig(patch: Partial<InactivityModalConfig>): Promise<InactivityModalConfig> {
+  const current = await getInactivityModalConfig();
+  const next: InactivityModalConfig = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  await jset(INACTIVITY_MODAL_KEY, next);
   return next;
 }
 
@@ -1003,6 +1988,12 @@ export async function createManualPresupuesto(input: {
   precio: number | null;
   condiciones?: string;
   servicios?: string[];
+  // Presente cuando el agente consultó un precio real vía Codeoscopic antes
+  // de crear el presupuesto (ver app/api/admin/leads/[id]/codeoscopic-quote
+  // y components/admin/CreatePresupuestoModal.tsx) — se guarda igual que
+  // setPresupuestoCodeoscopicInsurance, para que el badge "Codeoscopic ✓"
+  // (app/admin/page.tsx PresupuestosPanel) se muestre también aquí.
+  codeoscopicInsuranceId?: string;
 }): Promise<Presupuesto | null> {
   const lead = await getLead(input.leadId);
   if (!lead) return null;
@@ -1015,10 +2006,12 @@ export async function createManualPresupuesto(input: {
     compania: input.compania, precio: input.precio,
     condiciones: input.condiciones, servicios: input.servicios, at: now,
   };
+  const data: Record<string, unknown> = { codigoPostal: lead.codigoPostal };
+  if (input.codeoscopicInsuranceId) data.codeoscopicInsuranceId = input.codeoscopicInsuranceId;
   const presupuesto: Presupuesto = {
     id, leadId: input.leadId, createdAt: now, updatedAt: now, closedAt: "",
     source: "admin-manual", producto: input.producto, status: "enviado",
-    data: { codigoPostal: lead.codigoPostal }, precioAprox: input.precio, notas: [], eleccion, closedBy: "",
+    data, precioAprox: input.precio, notas: [], eleccion, closedBy: "",
     nombre: lead.nombre, telefono: lead.telefono, email: lead.email,
   };
   await jset(`presupuesto:${id}`, presupuesto);
@@ -1031,6 +2024,210 @@ export async function createManualPresupuesto(input: {
 // Registra qué compañía y precio eligió realmente el cliente (al pedir que
 // le llamen sobre una compañía concreta desde la comparativa): se aplica al
 // presupuesto más reciente de ese lead para el mismo producto.
+// Guarda el id devuelto por Codeoscopic al crear el proyecto de seguros
+// (POST /insurances) en el propio presupuesto, para que el polling posterior
+// desde el frontend sepa a qué insurance mirar. Se guarda dentro de `data`
+// para no ampliar el tipo Presupuesto — es un dato específico de una
+// integración externa, no un campo estable del pipeline comercial.
+export async function setPresupuestoCodeoscopicInsurance(
+  presupuestoId: string,
+  insuranceId: string
+): Promise<void> {
+  const p = await jget<Presupuesto>(`presupuesto:${presupuestoId}`);
+  if (!p) return;
+  const data = { ...(p.data ?? {}), codeoscopicInsuranceId: insuranceId };
+  const now = new Date().toISOString();
+  await jset(`presupuesto:${presupuestoId}`, { ...p, data, updatedAt: now });
+}
+
+// Snapshot resumido de las cotizaciones que devuelve Codeoscopic — lo que
+// se muestra en el bloque "Codeoscopic" de /admin/presupuestos/[id] para
+// que el equipo comercial vea el detalle real sin depender de que la API
+// de Codeoscopic responda en ese momento. Se refresca en cada
+// POST /api/quote/create y cada GET /api/quote/[insuranceId].
+export type CodeoscopicQuoteSummary = {
+  id: string;
+  compania: string;
+  producto: string;
+  modalidad: string;
+  premium: number | null;
+  downPayment: number | null;
+  frequency: string;
+  estimate: boolean;
+  // Enriquecido desde la cotización cruda: logo de la aseguradora, categoría
+  // (Terceros, Todo Riesgo…), valoración 1-5 del producto, franquicia y el
+  // enlace al condicionado/IPID en PDF. La UI los usa para pintar logos,
+  // estrellas y el botón "Ver condiciones"; todos son opcionales.
+  imageUrl?: string;
+  categoria?: string;
+  rating?: number | null;
+  deductible?: number | null;
+  docUrl?: string;
+};
+
+/* ------------------------- Métricas Codeoscopic --------------------------- */
+// Escanea todos los presupuestos y agrega KPIs de la integración Codeoscopic
+// para /admin/informes. Es O(N) sobre el listado — bien mientras no sean
+// decenas de miles; en ese caso movemos esto a un cron con precómputo.
+
+export type CodeoscopicMetrics = {
+  totalPresupuestos: number;
+  soloSalud: number;
+  conInsuranceId: number;
+  conSnapshot: number;
+  snapshotCompleto: number;
+  cotizacionesTotales: number;
+  precioMedioMensual: number | null;
+  topCompanias: { compania: string; cotizaciones: number; precioMedio: number | null }[];
+  topElecciones: { compania: string; elecciones: number; precioMedio: number | null }[];
+  ultimoSnapshotAt: string;
+};
+
+export async function computeCodeoscopicMetrics(): Promise<CodeoscopicMetrics> {
+  const all = await listPresupuestos();
+  const salud = all.filter((p) => p.producto === "salud");
+  let conInsuranceId = 0;
+  let conSnapshot = 0;
+  let snapshotCompleto = 0;
+  let cotizacionesTotales = 0;
+  let ultimoSnapshotAt = "";
+  const preciosMensuales: number[] = [];
+  const cotXCompania = new Map<string, number[]>();
+  const eleccionesXCompania = new Map<string, number[]>();
+
+  for (const p of salud) {
+    const data = (p.data ?? {}) as Record<string, unknown>;
+    const insuranceId = typeof data.codeoscopicInsuranceId === "string" ? data.codeoscopicInsuranceId : "";
+    if (insuranceId) conInsuranceId += 1;
+    const snap = data.codeoscopicSnapshot as { updatedAt?: string; done?: boolean; quotes?: unknown[] } | undefined;
+    if (snap && Array.isArray(snap.quotes)) {
+      conSnapshot += 1;
+      if (snap.done) snapshotCompleto += 1;
+      if (snap.updatedAt && (!ultimoSnapshotAt || snap.updatedAt > ultimoSnapshotAt)) ultimoSnapshotAt = snap.updatedAt;
+      for (const q of snap.quotes) {
+        const quote = q as { compania?: string; premium?: number | null; frequency?: string };
+        cotizacionesTotales += 1;
+        if (typeof quote.premium === "number") {
+          const mensual = quote.frequency === "Annually" ? quote.premium / 12 : quote.premium;
+          preciosMensuales.push(mensual);
+          const bucket = cotXCompania.get(quote.compania ?? "—") ?? [];
+          bucket.push(mensual);
+          cotXCompania.set(quote.compania ?? "—", bucket);
+        }
+      }
+    }
+    if (p.eleccion?.compania) {
+      const bucket = eleccionesXCompania.get(p.eleccion.compania) ?? [];
+      if (typeof p.eleccion.precio === "number") bucket.push(p.eleccion.precio);
+      eleccionesXCompania.set(p.eleccion.compania, bucket);
+    }
+  }
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  const topCompanias = Array.from(cotXCompania.entries())
+    .map(([compania, arr]) => ({ compania, cotizaciones: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.cotizaciones - a.cotizaciones)
+    .slice(0, 10);
+
+  const topElecciones = Array.from(eleccionesXCompania.entries())
+    .map(([compania, arr]) => ({ compania, elecciones: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.elecciones - a.elecciones)
+    .slice(0, 10);
+
+  return {
+    totalPresupuestos: all.length,
+    soloSalud: salud.length,
+    conInsuranceId,
+    conSnapshot,
+    snapshotCompleto,
+    cotizacionesTotales,
+    precioMedioMensual: avg(preciosMensuales),
+    topCompanias,
+    topElecciones,
+    ultimoSnapshotAt,
+  };
+}
+
+/* ------------------- Métricas "igualación de precio" ---------------------- */
+// Escanea leads con priceMatch para /admin/informes. Devuelve total,
+// distribución por compañía competidora, precio medio ofrecido, ratio de
+// cierre (leads price-match con eleccion registrada).
+
+export type PriceMatchMetrics = {
+  totalSolicitudes: number;
+  precioMedioOfrecido: number | null;
+  topCompeticion: { compania: string; solicitudes: number; precioMedio: number | null }[];
+  cerrados: number; // leads price-match que acabaron con presupuesto.eleccion
+  ratioCierre: number; // 0-1
+  ultimoSolicitadoAt: string;
+};
+
+export async function computePriceMatchMetrics(): Promise<PriceMatchMetrics> {
+  const all = await listLeads();
+  const pmLeads = all.filter((l) => l.priceMatch);
+  const precios: number[] = [];
+  const byCompania = new Map<string, number[]>();
+  let ultimo = "";
+
+  for (const l of pmLeads) {
+    const pm = l.priceMatch!;
+    if (typeof pm.precioActual === "number") {
+      // Mensualizamos si viene anual para comparar en la misma escala.
+      const mensual = pm.periodicidad === "año" ? pm.precioActual / 12 : pm.precioActual;
+      precios.push(mensual);
+      const bucket = byCompania.get(pm.companiaActual || "—") ?? [];
+      bucket.push(mensual);
+      byCompania.set(pm.companiaActual || "—", bucket);
+    }
+    if (pm.solicitadoAt && pm.solicitadoAt > ultimo) ultimo = pm.solicitadoAt;
+  }
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  // Cierre: leads price-match cuyo presupuesto asociado tiene eleccion.
+  // Escaneamos presupuestos y cruzamos por leadId.
+  const allPresupuestos = await listPresupuestos();
+  const cerradosSet = new Set<string>();
+  const pmLeadIds = new Set(pmLeads.map((l) => l.id));
+  for (const p of allPresupuestos) {
+    if (pmLeadIds.has(p.leadId) && p.eleccion?.compania) cerradosSet.add(p.leadId);
+  }
+
+  const topCompeticion = Array.from(byCompania.entries())
+    .map(([compania, arr]) => ({ compania, solicitudes: arr.length, precioMedio: avg(arr) }))
+    .sort((a, b) => b.solicitudes - a.solicitudes)
+    .slice(0, 10);
+
+  return {
+    totalSolicitudes: pmLeads.length,
+    precioMedioOfrecido: avg(precios),
+    topCompeticion,
+    cerrados: cerradosSet.size,
+    ratioCierre: pmLeads.length > 0 ? cerradosSet.size / pmLeads.length : 0,
+    ultimoSolicitadoAt: ultimo,
+  };
+}
+
+export async function setPresupuestoCodeoscopicSnapshot(
+  presupuestoId: string,
+  snapshot: { insuranceId: string; quotes: CodeoscopicQuoteSummary[]; done: boolean }
+): Promise<void> {
+  const p = await jget<Presupuesto>(`presupuesto:${presupuestoId}`);
+  if (!p) return;
+  const now = new Date().toISOString();
+  const data = {
+    ...(p.data ?? {}),
+    codeoscopicInsuranceId: snapshot.insuranceId,
+    codeoscopicSnapshot: {
+      updatedAt: now,
+      done: snapshot.done,
+      quotes: snapshot.quotes,
+    },
+  };
+  await jset(`presupuesto:${presupuestoId}`, { ...p, data, updatedAt: now });
+}
+
 export async function setPresupuestoEleccion(
   leadId: string,
   producto: string,
@@ -1150,6 +2347,25 @@ export async function updatePresupuesto(
     notifyText = "¡Enhorabuena por tu nuevo seguro! ¿Nos cuentas qué tal la experiencia?";
     notifyUrl = `/valoracion/${p.id}`;
     await createClientNotification({ leadId: p.leadId, llamadaId: "", texto: notifyText, url: notifyUrl });
+
+    // Programa referidos: si este lead entró por un código de referido,
+    // marcamos el convertido como "contratado" en el ReferralDoc — arranca
+    // el reloj T+N días que dispara el pago al referidor por el cron. El
+    // código vive en lead.utm.ref (primer toque, se conserva 30d). No
+    // fallamos si algo no cuadra: es un hook best-effort.
+    try {
+      const lead = await jget<Lead>(`lead:${p.leadId}`);
+      const rawUtm = (lead?.utm ?? {}) as Record<string, unknown>;
+      const code = typeof rawUtm.ref === "string" ? rawUtm.ref : "";
+      if (code) {
+        await updateReferralConvertidoStatus(code, p.leadId, {
+          status: "contratado",
+          contratadoAt: now,
+        });
+      }
+    } catch (err) {
+      console.error("[updatePresupuesto] referral hook error", err);
+    }
   }
 
   return { presupuesto: p, notifyText, notifyUrl };
@@ -1343,6 +2559,83 @@ export async function removePushSubscription(leadId: string, endpoint: string): 
   await jset(key, existing.filter((s) => s.endpoint !== endpoint));
 }
 
+/* -------------------- Suscripciones push del equipo (admin) -------------------- */
+// Además del canal cliente (por lead), cada agente del equipo puede activar
+// avisos push en su navegador para enterarse en tiempo real de un lead nuevo.
+// Los avisos son distintos: aquí siempre "algo entra al pipeline", allí
+// "hay novedad en tu ficha". Se guardan aparte para no cruzar suscripciones.
+
+export type StoredTeamPushSubscription = StoredPushSubscription & { agentId: string; savedAt: string };
+
+export async function saveTeamPushSubscription(agentId: string, sub: StoredPushSubscription): Promise<void> {
+  const key = `pushSubs:team:${agentId}`;
+  const existing = (await jget<StoredTeamPushSubscription[]>(key)) ?? [];
+  const now = new Date().toISOString();
+  const next: StoredTeamPushSubscription[] = [
+    { ...sub, agentId, savedAt: now },
+    ...existing.filter((s) => s.endpoint !== sub.endpoint),
+  ].slice(0, 10);
+  await jset(key, next);
+  // Índice de agentes con push activo (para poder listarlos en el fanout sin
+  // recorrer todas las claves KV).
+  const ids = new Set((await jget<string[]>("pushSubs:team:index")) ?? []);
+  ids.add(agentId);
+  await jset("pushSubs:team:index", Array.from(ids));
+}
+
+export async function listTeamPushSubscriptions(agentId: string): Promise<StoredTeamPushSubscription[]> {
+  return (await jget<StoredTeamPushSubscription[]>(`pushSubs:team:${agentId}`)) ?? [];
+}
+
+export async function listAllTeamPushSubscriptions(): Promise<StoredTeamPushSubscription[]> {
+  const ids = (await jget<string[]>("pushSubs:team:index")) ?? [];
+  if (!ids.length) return [];
+  const groups = await Promise.all(ids.map((id) => listTeamPushSubscriptions(id)));
+  return groups.flat();
+}
+
+export async function removeTeamPushSubscription(agentId: string, endpoint: string): Promise<void> {
+  const key = `pushSubs:team:${agentId}`;
+  const existing = (await jget<StoredTeamPushSubscription[]>(key)) ?? [];
+  const next = existing.filter((s) => s.endpoint !== endpoint);
+  await jset(key, next);
+  if (!next.length) {
+    const ids = ((await jget<string[]>("pushSubs:team:index")) ?? []).filter((id) => id !== agentId);
+    await jset("pushSubs:team:index", ids);
+  }
+}
+
+/* --------------------- Configuración de avisos al equipo --------------------- */
+
+const TEAM_NOTIFICATIONS_KEY = "config:team-notifications";
+
+export async function getTeamNotificationsConfig(): Promise<import("./teamNotifications").TeamNotificationsConfig> {
+  const { DEFAULT_TEAM_NOTIFICATIONS } = await import("./teamNotifications");
+  const stored = await jget<import("./teamNotifications").TeamNotificationsConfig>(TEAM_NOTIFICATIONS_KEY);
+  if (!stored) return DEFAULT_TEAM_NOTIFICATIONS;
+  return {
+    ...DEFAULT_TEAM_NOTIFICATIONS,
+    ...stored,
+    email: { ...DEFAULT_TEAM_NOTIFICATIONS.email, ...(stored.email ?? {}) },
+    push: { ...DEFAULT_TEAM_NOTIFICATIONS.push, ...(stored.push ?? {}) },
+  };
+}
+
+export async function saveTeamNotificationsConfig(
+  patch: Partial<import("./teamNotifications").TeamNotificationsConfig>
+): Promise<import("./teamNotifications").TeamNotificationsConfig> {
+  const current = await getTeamNotificationsConfig();
+  const next: import("./teamNotifications").TeamNotificationsConfig = {
+    ...current,
+    ...patch,
+    email: { ...current.email, ...(patch.email ?? {}) },
+    push: { ...current.push, ...(patch.push ?? {}) },
+    updatedAt: new Date().toISOString(),
+  };
+  await jset(TEAM_NOTIFICATIONS_KEY, next);
+  return next;
+}
+
 /* ---------------------------------- Tareas ------------------------------------ */
 
 export async function createTask(draft: TaskDraft): Promise<Task> {
@@ -1525,6 +2818,40 @@ export async function touchAgentLogin(id: string): Promise<void> {
   if (!a) return;
   a.lastLoginAt = new Date().toISOString();
   await jset(`agent:${id}`, a);
+}
+
+/* --------------------------- OTP 2FA para agentes --------------------------- */
+// Plus3: tras validar email+contraseña, generamos un OTP de 6 dígitos, lo
+// guardamos aquí con TTL 10min y single-use (se borra al verificar) y lo
+// enviamos por email. Solo cuando el agente pega el código creamos la
+// cookie de sesión. Blindar el 2FA es la defensa más importante contra
+// credenciales filtradas — password reuse sigue siendo la principal causa
+// de compromiso de cuentas admin (Verizon DBIR 2024).
+export type AdminOtpRecord = {
+  agentId: string;
+  codeHash: string; // SHA-256 hex del código, para no guardar el código en claro
+  attempts: number; // se bloquea a partir de 5 intentos
+  createdAt: string;
+};
+const OTP_TTL_SEC = 10 * 60;
+
+export async function saveAdminOtp(nonce: string, rec: AdminOtpRecord): Promise<void> {
+  await jsetTtl(`otp:admin:${nonce}`, rec, OTP_TTL_SEC);
+}
+export async function getAdminOtp(nonce: string): Promise<AdminOtpRecord | null> {
+  return jget<AdminOtpRecord>(`otp:admin:${nonce}`);
+}
+export async function bumpAdminOtpAttempts(nonce: string): Promise<void> {
+  const rec = await getAdminOtp(nonce);
+  if (!rec) return;
+  rec.attempts += 1;
+  // Se conserva el TTL restante — si Upstash pierde el TTL al re-escribir,
+  // el registro caduca a los 10 min desde createdAt via la comprobación en
+  // el endpoint de verificación (defensa en profundidad).
+  await jsetTtl(`otp:admin:${nonce}`, rec, OTP_TTL_SEC);
+}
+export async function deleteAdminOtp(nonce: string): Promise<void> {
+  await jdel(`otp:admin:${nonce}`);
 }
 
 /* ------------------------------ Registro de auditoría ------------------------------ */

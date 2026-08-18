@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
-import { getLead, updateLead, listProducts, assignLead, createAuditLog } from "@/lib/store";
+import { z } from "zod";
+import { getLead, updateLead, listProducts, assignLead, createAuditLog, getReferralAsReferido, getReferralByLeadId } from "@/lib/store";
 import { STATUSES, type Status, type LeadSubmission } from "@/lib/crm";
 import { requireModule } from "@/lib/agentAuth";
 import { saludPrice, vidaPrice } from "@/lib/quote";
+
+// Schema estricto: rechaza cualquier campo no listado para bloquear
+// mass-assignment de campos internos como submissions, createdAt, priceMatch,
+// consentimientos u otros bloques sensibles.
+const leadPatchSchema = z
+  .object({
+    status: z.string().max(60).optional(),
+    nextStep: z.string().max(2000).optional(),
+    note: z.string().max(4000).optional(),
+    contact: z
+      .object({
+        channel: z.string().max(30).optional(),
+        note: z.string().max(2000).optional(),
+      })
+      .strict()
+      .optional(),
+    agenteAsignadoId: z.string().max(80).optional(),
+    agenteAsignadoNombre: z.string().max(120).optional(),
+  })
+  .strict();
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,10 +57,43 @@ export async function GET(
   if (!auth.ok) return auth.response;
   const lead = await getLead(params.id);
   if (!lead) return NextResponse.json({ ok: false, error: "No encontrado." }, { status: 404 });
-  const submissions = await Promise.all(
-    (lead.submissions ?? []).map(async (s) => ({ ...s, precioAprox: await estimatePrice(s) }))
-  );
-  return NextResponse.json({ ok: true, lead: { ...lead, submissions } });
+  const [submissions, referidoInfo, referidorDoc] = await Promise.all([
+    Promise.all((lead.submissions ?? []).map(async (s) => ({ ...s, precioAprox: await estimatePrice(s) }))),
+    getReferralAsReferido(lead.id),
+    getReferralByLeadId(lead.id),
+  ]);
+  return NextResponse.json({
+    ok: true,
+    lead: { ...lead, submissions },
+    // Programa referidos: si este lead entró como amigo de alguien
+    // (referidoDe) y/o si él mismo ha generado su propio código para
+    // referir a otros (comoReferidor) — ver PresupuestosPanel-equivalente
+    // en la ficha de /admin. Ninguno de los dos es sensible (no expone
+    // importes de terceros, solo el nombre/código del propio programa).
+    referidoDe: referidoInfo
+      ? {
+          referidorLeadId: referidoInfo.doc.referidorLeadId,
+          referidorNombre: referidoInfo.doc.referidorNombre,
+          code: referidoInfo.doc.code,
+          status: referidoInfo.convertido.status,
+          cotizadoAt: referidoInfo.convertido.cotizadoAt,
+          optInAt: referidoInfo.convertido.optInAt ?? "",
+          contratadoAt: referidoInfo.convertido.contratadoAt ?? "",
+          pagadoReferidoAt: referidoInfo.convertido.pagadoReferidoAt ?? "",
+          pagadoReferidorAt: referidoInfo.convertido.pagadoReferidorAt ?? "",
+          ultimoErrorPago: referidoInfo.convertido.ultimoErrorPago ?? "",
+        }
+      : null,
+    comoReferidor: referidorDoc
+      ? {
+          code: referidorDoc.code,
+          bloqueado: referidorDoc.bloqueado,
+          totalConvertidos: referidorDoc.convertidos.length,
+          contratados: referidorDoc.convertidos.filter((c) => c.status === "contratado" || c.status === "pagado").length,
+          pagados: referidorDoc.convertidos.filter((c) => c.status === "pagado").length,
+        }
+      : null,
+  });
 }
 
 export async function PATCH(
@@ -49,15 +103,17 @@ export async function PATCH(
   const auth = await requireModule(request, "leads");
   if (!auth.ok) return auth.response;
 
-  let body: {
-    status?: string; nextStep?: string; note?: string; contact?: { channel?: string; note?: string };
-    agenteAsignadoId?: string; agenteAsignadoNombre?: string;
-  };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 });
   }
+  const parsed = leadPatchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Campos no válidos." }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const status =
     body.status && (STATUSES as readonly string[]).includes(body.status)

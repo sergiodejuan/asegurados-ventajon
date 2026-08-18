@@ -2,18 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
+import { PRICING_ZONAS, copagoTexto, type ProductPricing, type TramoEdad, type DescuentoAsegurados, type PricingZona, type CopagoModo } from "@/lib/catalog";
 
 type Product = {
   id: string;
   producto: "salud" | "vida" | "auto" | "decesos";
   compania: string;
+  titulo?: string;
   activo: boolean;
   destacado: boolean;
   orden: number;
   logoUrl?: string;
   precioConCopago?: number;
   precioSinCopago?: number;
+  modalidadCopago?: CopagoModo;
+  dental?: boolean;
   precio?: number;
+  pricing?: ProductPricing;
   condiciones: string;
   servicios: string[];
   updatedAt: string;
@@ -147,7 +152,7 @@ function ProductsAdmin() {
               <div className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {p.logoUrl && <img src={p.logoUrl} alt="" className="h-7 w-auto max-w-[80px] object-contain" />}
-                <p className="text-[16px] font-bold text-ink">{p.compania}</p>
+                <p className="text-[16px] font-bold text-ink">{p.compania}{p.titulo ? <span className="font-medium text-slate2"> · {p.titulo}</span> : null}</p>
                 {p.destacado && <span className="rounded-pill bg-brand-red/10 px-2 py-0.5 text-[11px] font-bold text-brand-red">Recomendado</span>}
                 {!p.activo && <span className="rounded-pill bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">Oculto</span>}
               </div>
@@ -195,12 +200,16 @@ function ProductsAdmin() {
 }
 
 function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: Partial<Product>) => Promise<boolean> }) {
+  const [titulo, setTitulo] = useState(product.titulo ?? "");
   const [conCopago, setConCopago] = useState(String(product.precioConCopago ?? ""));
   const [sinCopago, setSinCopago] = useState(String(product.precioSinCopago ?? ""));
+  const [modalidadCopago, setModalidadCopago] = useState<CopagoModo>(product.modalidadCopago ?? "sin");
+  const [dental, setDental] = useState<boolean>(product.dental ?? false);
   const [precio, setPrecio] = useState(String(product.precio ?? ""));
   const [orden, setOrden] = useState(String(product.orden ?? 1));
   const [condiciones, setCondiciones] = useState(product.condiciones ?? "");
   const [servicios, setServicios] = useState(product.servicios.join("\n"));
+  const [pricing, setPricing] = useState<ProductPricing>(product.pricing ?? { tramos: [], descuentos: [] });
   const [logoUrl, setLogoUrl] = useState(product.logoUrl ?? "");
   const [processingLogo, setProcessingLogo] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -223,12 +232,16 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
     setSaving(true); setSaved(false);
     const patch: Partial<Product> =
       product.producto === "salud"
-        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0 }
+        ? { precioConCopago: Number(conCopago) || 0, precioSinCopago: Number(sinCopago) || 0, modalidadCopago, dental }
         : { precio: Number(precio) || 0 };
+    patch.titulo = titulo.trim();
     patch.orden = Number(orden) || 1;
     patch.condiciones = condiciones;
     patch.servicios = servicios.split("\n").map((s) => s.trim()).filter(Boolean);
     patch.logoUrl = logoUrl;
+    // Guardamos siempre el objeto pricing (aunque venga vacío): con listas
+    // vacías la comparativa cae al precio plano de arriba.
+    patch.pricing = pricing;
     const ok = await onSave(patch);
     setSaving(false);
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1800); }
@@ -256,18 +269,48 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
         </p>
       </label>
 
+      <label>
+        <span className="mb-1 block text-[12px] font-semibold text-ink">Título / modalidad (se muestra en la tarjeta)</span>
+        <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="p.ej. Salud Completa Plus"
+          className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px]" />
+        <span className="mt-1 block text-[11px] leading-relaxed text-slate2">Aparece bajo la compañía en la comparativa, como la modalidad de las opciones de Codeoscopic.</span>
+      </label>
+
       {product.producto === "salud" ? (
-        <div className="flex gap-3">
-          <label className="flex-1">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Precio con copago (€/mes)</span>
-            <input inputMode="decimal" value={conCopago} onChange={(e) => setConCopago(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+        <div className="flex flex-col gap-3">
+          <label className="flex items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-ink">Incluye cobertura dental</span>
+              <span className="block text-[11px] text-slate2">Marca esta opción si el producto lleva dental; alimenta los filtros "Con dental" / "Sin dental".</span>
+            </span>
+            <input type="checkbox" checked={dental} onChange={(e) => setDental(e.target.checked)} className="h-5 w-5 shrink-0 accent-navy" />
           </label>
-          <label className="flex-1">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Precio sin copago (€/mes)</span>
-            <input inputMode="decimal" value={sinCopago} onChange={(e) => setSinCopago(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+          <label>
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Modalidad de copago</span>
+            <select value={modalidadCopago} onChange={(e) => setModalidadCopago(e.target.value as CopagoModo)}
+              className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] font-semibold">
+              <option value="sin">Sin copago (recomendado para negociadas)</option>
+              <option value="con">Con copago</option>
+              <option value="ambas">Con y sin copago (ambas)</option>
+            </select>
+            <span className="mt-1 block text-[11px] leading-relaxed text-slate2">{copagoTexto(modalidadCopago)}</span>
           </label>
+          <div className="flex gap-3">
+            {(modalidadCopago === "con" || modalidadCopago === "ambas") && (
+              <label className="flex-1">
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Precio con copago (€/mes)</span>
+                <input inputMode="decimal" value={conCopago} onChange={(e) => setConCopago(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+              </label>
+            )}
+            {(modalidadCopago === "sin" || modalidadCopago === "ambas") && (
+              <label className="flex-1">
+                <span className="mb-1 block text-[12px] font-semibold text-ink">Precio sin copago (€/mes)</span>
+                <input inputMode="decimal" value={sinCopago} onChange={(e) => setSinCopago(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
+              </label>
+            )}
+          </div>
         </div>
       ) : (
         <label>
@@ -276,6 +319,8 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
             className="w-full rounded-card border border-hair bg-white px-3 py-2 text-[14px] tnums" />
         </label>
       )}
+
+      <AdvancedPricingEditor producto={product.producto} pricing={pricing} onChange={setPricing} />
 
       <label>
         <span className="mb-1 block text-[12px] font-semibold text-ink">Orden en la comparativa (menor = primero)</span>
@@ -299,6 +344,133 @@ function ProductEditor({ product, onSave }: { product: Product; onSave: (patch: 
         className="flex items-center justify-center rounded-card bg-navy px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40">
         {saving ? "Guardando…" : saved ? "Guardado ✓" : "Guardar cambios"}
       </button>
+    </div>
+  );
+}
+
+// Configurador de precios por tramo de edad + zona (Canarias/Baleares/
+// Península) y de descuentos por nº de asegurados. Todo opcional: sin tramos
+// se usa el precio plano; los cambios se reflejan en la comparativa.
+function AdvancedPricingEditor({
+  producto, pricing, onChange,
+}: {
+  producto: "salud" | "vida" | "auto" | "decesos";
+  pricing: ProductPricing;
+  onChange: (p: ProductPricing) => void;
+}) {
+  const tramos = pricing.tramos ?? [];
+  const descuentos = pricing.descuentos ?? [];
+  const esSalud = producto === "salud";
+
+  const updateTramos = (next: TramoEdad[]) => onChange({ ...pricing, tramos: next });
+  const updateDescuentos = (next: DescuentoAsegurados[]) => onChange({ ...pricing, descuentos: next });
+
+  function setTramoEdad(i: number, field: "min" | "max", v: string) {
+    updateTramos(tramos.map((t, k) => (k === i ? { ...t, [field]: Number(v.replace(/\D/g, "")) || 0 } : t)));
+  }
+  function setZonaPrecio(i: number, zona: PricingZona, field: "conCopago" | "sinCopago" | "precio", v: string) {
+    const num = v === "" ? undefined : Number(v.replace(/[^\d.]/g, ""));
+    updateTramos(tramos.map((t, k) => {
+      if (k !== i) return t;
+      return { ...t, porZona: { ...t.porZona, [zona]: { ...(t.porZona[zona] ?? {}), [field]: num } } };
+    }));
+  }
+  function setDescuento(i: number, patch: Partial<DescuentoAsegurados>) {
+    updateDescuentos(descuentos.map((d, k) => (k === i ? { ...d, ...patch } : d)));
+  }
+
+  return (
+    <div className="rounded-card border border-hair bg-white p-3">
+      <p className="text-[13px] font-bold text-navy">Precios por tramo de edad y zona</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-slate2">
+        Opcional. Si no defines tramos, se usa el precio de arriba para todas las edades y zonas.
+        La comparativa elige el tramo según la edad del titular y su zona (Canarias / Baleares / Península).
+      </p>
+
+      <div className="mt-3 flex flex-col gap-3">
+        {tramos.map((t, i) => (
+          <div key={i} className="rounded-card border border-hair bg-mist/40 p-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-ink">Edad desde</span>
+                <input inputMode="numeric" value={String(t.min)} onChange={(e) => setTramoEdad(i, "min", e.target.value)}
+                  className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-ink">hasta</span>
+                <input inputMode="numeric" value={String(t.max)} onChange={(e) => setTramoEdad(i, "max", e.target.value)}
+                  className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+              </label>
+              <button type="button" onClick={() => updateTramos(tramos.filter((_, k) => k !== i))}
+                className="ml-auto rounded-pill px-2.5 py-1 text-[12px] font-semibold text-brand-red hover:bg-brand-red/10">
+                Eliminar tramo
+              </button>
+            </div>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {PRICING_ZONAS.map((z) => (
+                <div key={z.key} className="flex flex-wrap items-center gap-2">
+                  <span className="w-20 shrink-0 text-[12px] font-semibold text-ink">{z.label}</span>
+                  {esSalud ? (
+                    <>
+                      <label className="flex items-center gap-1">
+                        <span className="text-[11px] text-slate2">con</span>
+                        <input inputMode="decimal" value={t.porZona[z.key]?.conCopago ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "conCopago", e.target.value)}
+                          className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <span className="text-[11px] text-slate2">sin</span>
+                        <input inputMode="decimal" value={t.porZona[z.key]?.sinCopago ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "sinCopago", e.target.value)}
+                          className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                      </label>
+                    </>
+                  ) : (
+                    <label className="flex items-center gap-1">
+                      <span className="text-[11px] text-slate2">precio</span>
+                      <input inputMode="decimal" value={t.porZona[z.key]?.precio ?? ""} onChange={(e) => setZonaPrecio(i, z.key, "precio", e.target.value)}
+                        className="w-24 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" placeholder="€/mes" />
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={() => updateTramos([...tramos, { min: 0, max: 120, porZona: {} }])}
+          className="self-start rounded-card border border-dashed border-hair px-3 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+          + Añadir tramo de edad
+        </button>
+      </div>
+
+      <p className="mt-4 text-[13px] font-bold text-navy">Descuento por nº de asegurados</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-slate2">
+        Opcional. Se aplica a la prima mensual total cuando el nº de asegurados alcanza el umbral.
+        Si defines varios, se aplica el de umbral más alto que no supere el nº de asegurados.
+      </p>
+      <div className="mt-2 flex flex-col gap-2">
+        {descuentos.map((d, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] text-slate2">A partir de</span>
+            <input inputMode="numeric" value={String(d.desde)} onChange={(e) => setDescuento(i, { desde: Number(e.target.value.replace(/\D/g, "")) || 1 })}
+              className="w-16 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+            <span className="text-[12px] text-slate2">asegurados:</span>
+            <input inputMode="decimal" value={String(d.valor)} onChange={(e) => setDescuento(i, { valor: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })}
+              className="w-20 rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] tnums" />
+            <select value={d.tipo} onChange={(e) => setDescuento(i, { tipo: e.target.value as "eur" | "pct" })}
+              className="rounded-card border border-hair bg-white px-2 py-1.5 text-[13px] font-semibold">
+              <option value="pct">% de descuento</option>
+              <option value="eur">€ de descuento</option>
+            </select>
+            <button type="button" onClick={() => updateDescuentos(descuentos.filter((_, k) => k !== i))}
+              className="ml-auto rounded-pill px-2.5 py-1 text-[12px] font-semibold text-brand-red hover:bg-brand-red/10">
+              Eliminar
+            </button>
+          </div>
+        ))}
+        <button type="button" onClick={() => updateDescuentos([...descuentos, { desde: 2, tipo: "pct", valor: 0 }])}
+          className="self-start rounded-card border border-dashed border-hair px-3 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+          + Añadir descuento
+        </button>
+      </div>
     </div>
   );
 }

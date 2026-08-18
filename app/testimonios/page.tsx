@@ -6,6 +6,7 @@ import { TestimonioCard } from "@/components/TestimonioCard";
 import { FaqAccordion, type FaqItem } from "@/components/FaqAccordion";
 import { BRAND_NAME, SITE_URL } from "@/lib/brand";
 import { listTestimonios } from "@/lib/store";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 const TITLE = `Testimonios de clientes: conoce su historia — ${BRAND_NAME}`;
 const DESCRIPTION =
@@ -79,7 +80,7 @@ export default async function TestimoniosPage() {
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <Header />
       <main id="contenido">
         <section className="w-full bg-gradient-to-br from-navy to-navy-deep px-5 py-14 text-center text-white md:py-20">

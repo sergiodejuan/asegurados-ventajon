@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { emailConfigured, sendEmail } from "./email";
+import { emailConfigured, sendEmail, escapeHtml, tracked } from "./email";
 import { listProducts, getTheme, addEmailLog } from "./store";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify } from "./quote";
 import { BRAND_NAME, SITE_URL, CONTACT_HOURS } from "./brand";
@@ -51,15 +51,6 @@ const PRODUCTO_LABELS: Record<Producto, string> = {
 
 function euros(n: number): string {
   return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function escapeHtml(s: string): string {
-  const map: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-  return s.replace(/[&<>"']/g, (c) => map[c]);
-}
-
-function tracked(leadId: string, logId: string, path: string): string {
-  return `${SITE_URL}/api/email/click?lead=${encodeURIComponent(leadId)}&log=${encodeURIComponent(logId)}&url=${encodeURIComponent(path)}`;
 }
 
 function normalized(input: PriceInput) {

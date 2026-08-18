@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Close } from "./icons";
 
 export function Modal({
@@ -23,9 +24,9 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       role="presentation"
       onClick={onClose}
@@ -52,6 +53,7 @@ export function Modal({
         </div>
         <div className="mt-4 text-[14px] leading-relaxed text-slate2">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

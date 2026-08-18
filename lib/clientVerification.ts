@@ -94,7 +94,7 @@ function verificationEmailHtml(nombre: string, link: string): string {
 // clic. Con una página intermedia que exige un clic explícito ("Confirmar
 // acceso"), ese escaneo automático (que solo descarga el HTML, no simula
 // clics) deja de poder consumir el token.
-async function createVerificationLink(leadId: string): Promise<string | null> {
+export async function createVerificationLink(leadId: string, next?: string): Promise<string | null> {
   // Máximo 3 enlaces de verificación por ficha y hora (entre email y
   // WhatsApp juntos): evita que se pueda usar esto para bombardear de
   // mensajes a alguien solo con su teléfono.
@@ -103,7 +103,18 @@ async function createVerificationLink(leadId: string): Promise<string | null> {
 
   const token = crypto.randomBytes(24).toString("base64url");
   await storeToken(token, leadId);
-  return `${SITE_URL}/area-cliente/verificar?token=${token}`;
+  const base = `${SITE_URL}/area-cliente/verificar?token=${token}`;
+  return next ? `${base}&next=${encodeURIComponent(next)}` : base;
+}
+
+// Enlace de acceso que, tras el clic de confirmación de siempre, aterriza
+// directo en un presupuesto concreto del área de cliente (en vez de en el
+// listado general) — usado por el envío de emails manuales desde la ficha
+// del lead en /admin (ver app/api/admin/leads/[id]/enviar-email). Mismo
+// token de un solo uso y mismo límite de 3/hora que el resto de enlaces de
+// verificación: no es un mecanismo nuevo, solo un destino distinto.
+export async function createPresupuestoAccessLink(leadId: string, presupuestoId: string): Promise<string | null> {
+  return createVerificationLink(leadId, `/area-cliente?presupuesto=${encodeURIComponent(presupuestoId)}`);
 }
 
 // Punto único que llaman todas las rutas públicas que podrían estar tocando

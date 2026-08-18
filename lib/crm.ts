@@ -27,6 +27,21 @@ export const SOURCE_LABELS: Record<string, string> = {
   // CRM y la newsletter, pero sin la fricción de una llamada.
   "guia-seguro-salud-canarias-baleares": "Guía seguro de salud (Canarias/Baleares)",
   "checklist-seguro-auto-canarias-baleares": "Checklist seguro de auto (Canarias/Baleares)",
+  // Solicitud de "igualación de precio" desde /precio-mejor-garantizado o
+  // desde el módulo de rescate dentro de la comparativa. El lead trae el
+  // precio y compañía del presupuesto que el usuario ya tenía, para que el
+  // asesor le busque una alternativa igual o mejor.
+  "price-match": "Igualación de precio",
+  "price-match-comparativa": "Igualación de precio (desde comparativa)",
+  // Landing PAID de salud (/lp/salud). Al tener su propio tarificador y su
+  // propia página de "que me llamen" independientes, se miden aparte para
+  // saber el ROI real de las campañas de anuncios frente al tráfico orgánico.
+  "tarificador-salud-lp": "Tarificador salud (landing paid)",
+  "quiero-que-me-llamen-lp": "Quiero que me llamen (landing paid)",
+  // Lead entrante por programa "Amigos Ventajon" — venía desde
+  // ventajon.com/r/{slug}. El código del referidor viaja en utm.ref y se
+  // guarda en el submission del lead para atribución de bono.
+  "referido": "Referido por amigo",
 };
 
 export const STATUSES = ["nuevo", "contactado", "presupuestado", "ganado", "perdido"] as const;
@@ -42,7 +57,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 
 export type Activity = {
   at: string;
-  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact" | "rgpd";
+  type: "alta" | "form" | "status" | "nextstep" | "note" | "contact" | "rgpd" | "email";
   note: string;
   meta?: Record<string, unknown>;
 };
@@ -87,6 +102,19 @@ export type Lead = {
   telefono: string;
   email: string;
   codigoPostal: string;
+  // Identificación y datos preparados para la futura integración con
+  // Codescopic (por ahora solo se rellenan en salud — ver lib/schema.ts).
+  documentoTipo: string;
+  documento: string;
+  apellido1: string;
+  apellido2: string;
+  codigoPostalReal: string;
+  aseguradosAdicionales: { fechaNacimiento: string; sexo: string }[];
+  // Cotización Codeoscopic asociada al lead (salud). Se guarda AQUÍ, en el
+  // lead, y no en un presupuesto: un lead que solo ha tarificado no genera
+  // presupuesto hasta que muestra interés en una opción concreta ("Que te
+  // llamen"). Es el ancla del sondeo de precios reales en la comparativa.
+  codeoscopicInsuranceId?: string;
   // Salud
   inicio: string;
   numAsegurados: number | null;
@@ -119,6 +147,18 @@ export type Lead = {
   // Presupuesto (tarificador) al que se vincula la solicitud, si procede
   // (p.ej. una reprogramación de llamada lanzada desde el área de cliente).
   presupuestoId: string;
+  // Solicitud de "igualación de precio" del flujo /precio-mejor-garantizado.
+  // El usuario aporta el precio y compañía de su presupuesto actual (o de
+  // otra oferta que le hicieron) para que el equipo comercial le busque una
+  // alternativa. La captura es opcional (data URI del PDF/imagen).
+  priceMatch: {
+    companiaActual: string;
+    precioActual: number | null;
+    periodicidad: string; // 'mes' | 'año'
+    capturaUrl: string; // data URI o URL externa; "" = sin captura
+    comentario: string;
+    solicitadoAt: string; // marca cuándo se envió la solicitud
+  } | null;
   // Consentimientos (estado actual + auditoría completa)
   aceptaPrivacidad: boolean;
   autorizaContacto: boolean;
@@ -126,6 +166,11 @@ export type Lead = {
   consents: ConsentRecord[];
   // Atribución
   utm: Record<string, string | undefined>;
+  // Slug de la landing paid (/lp/[slug]) de la que vino el lead, si aplica —
+  // igual que utm, texto libre no validado, se rellena una sola vez (ver
+  // fillEmpty en lib/store.ts) y sirve para el dashboard de comparación de
+  // landings ("" = no vino de una landing paid).
+  landingSlug: string;
   activity: Activity[];
   // Histórico de tarificaciones / presupuestos (uno por envío de formulario).
   submissions: LeadSubmission[];
@@ -186,6 +231,13 @@ export const PRESUPUESTO_STATUSES = [
   "negociando",
   "ganado",
   "perdido",
+  // Estado propio (distinto de "perdido") para los presupuestos que nacieron
+  // en "nuevo" y nadie llegó a trabajar tras el plazo de caducidad: los
+  // marca automáticamente el cron de retención (ver expireStalePresupuestos
+  // en lib/store.ts). Se mantiene aparte de "perdido" a propósito, para no
+  // ensuciar la tasa de éxito (ganados/(ganados+perdidos)) con presupuestos
+  // que nunca entraron en el pipeline comercial.
+  "caducado",
 ] as const;
 export type PresupuestoStatus = (typeof PRESUPUESTO_STATUSES)[number];
 
@@ -196,6 +248,7 @@ export const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   negociando: "Negociando",
   ganado: "Ganado",
   perdido: "Perdido",
+  caducado: "Caducado",
 };
 
 export type PresupuestoNote = { id: string; at: string; texto: string; agente?: string };
@@ -377,6 +430,7 @@ export function npsCategory(score: number): NpsCategory {
 export const ADMIN_MODULES = [
   "leads", "presupuestos", "llamadas", "tareas", "blog", "campana",
   "productos", "informes", "rgpd", "configuracion", "agentes", "exitintents", "promociones", "testimonios",
+  "integraciones", "desarrollador",
 ] as const;
 export type AdminModule = (typeof ADMIN_MODULES)[number];
 
@@ -385,6 +439,12 @@ export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
   blog: "Blog", campana: "Campaña", productos: "Productos", informes: "Informes y analítica",
   rgpd: "RGPD", configuracion: "Configuración y diseño", agentes: "Agentes y permisos",
   exitintents: "Exit-intent (web general)", promociones: "Promociones", testimonios: "Testimonios",
+  integraciones: "Integraciones",
+  // Da acceso a /portal-desarrollo (documentación de onboarding técnico),
+  // independiente de "integraciones" (que además expone pruebas de conexión
+  // y estado operativo) — pensado para poder dárselo a un desarrollador
+  // externo sin abrir el resto del panel.
+  desarrollador: "Documentación técnica (desarrollador)",
 };
 
 export const AGENT_ROLES = ["admin", "agente"] as const;
@@ -445,7 +505,7 @@ export function toPublicAgent(a: Agent): PublicAgent {
 // CRM: quién hizo qué, cuándo y sobre qué ficha. Complementa (no sustituye)
 // las notas propias de cada lead/presupuesto/llamada.
 
-export type AuditAction = "crear" | "actualizar" | "eliminar" | "login" | "asignar" | "comentar";
+export type AuditAction = "crear" | "actualizar" | "eliminar" | "login" | "asignar" | "comentar" | "enviar-email";
 
 export type AuditLog = {
   id: string;

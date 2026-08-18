@@ -3,17 +3,17 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
-import { BRAND_NAME } from "@/lib/brand";
 import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, DECESOS_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
 import { QuoteLoadingOverlay } from "./QuoteLoadingOverlay";
-import { saveQuote } from "@/lib/quote";
+import { saveQuote, saveLeadDraft } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { ConsentNudgeModal } from "./ConsentNudgeModal";
+import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
 import { ExitIntentModal } from "./ExitIntentModal";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 type FieldErrors = Partial<Record<string, string>>;
 type SavedProgress = { stepIndex: number; data: FormData };
@@ -24,7 +24,7 @@ function progressKey(variant: string) {
 
 // Recibe solo un identificador serializable; la config (con funciones showIf)
 // se resuelve dentro del cliente para no cruzar el límite servidor→cliente.
-export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto" | "decesos"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" }) {
+export function StepForm({ variant, onStepChange, origen }: { variant: "salud" | "vida" | "auto" | "decesos"; onStepChange?: (idx: number) => void; origen?: "asistente" | "seo-landing" | "lp" }) {
   const config = variant === "vida" ? VIDA_CONFIG : variant === "auto" ? AUTO_CONFIG : variant === "decesos" ? DECESOS_CONFIG : SALUD_CONFIG;
   const router = useRouter();
 
@@ -37,9 +37,9 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   const [resumeData, setResumeData] = useState<SavedProgress | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
-  const [showConsentNudge, setShowConsentNudge] = useState(false);
   const [showExitIntent, setShowExitIntent] = useState(false);
   const [exitIntentArmed, setExitIntentArmed] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const doneRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
 
@@ -81,10 +81,21 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     setResumeData(null);
   }
 
-  const activeSteps = config.steps.filter((s) => !s.showIf || s.showIf(data));
+  // Unificación de flujo (2026-08): en salud/vida NO pedimos nombre/tel/email/
+  // consents aquí. El modal-gate de /comparativa recoge esa parte y crea el
+  // lead REAL. Aquí solo capturamos datos técnicos de tarificación, guardamos
+  // draft y navegamos. auto/decesos siguen con el flujo tradicional
+  // (endpoint POST con contacto) porque no tienen comparativa Codeoscopic.
+  const skipContactStep = variant === "salud" || variant === "vida";
+  const activeSteps = config.steps.filter((s) => {
+    if (skipContactStep && s.type === "contact") return false;
+    if (s.showIf && !s.showIf(data)) return false;
+    return true;
+  });
   const total = activeSteps.length;
   const idx = Math.min(stepIndex, total - 1);
   const current = activeSteps[idx];
+  const isLastStep = idx >= total - 1;
 
   useEffect(() => { topRef.current?.focus(); }, [idx]);
   useEffect(() => { onStepChange?.(idx); }, [idx, onStepChange]);
@@ -132,12 +143,39 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   }, [exitIntentArmed]);
 
   const set = (patch: FormData) => setData((d) => ({ ...d, ...patch }));
-  const next = () => { setErrors({}); setStepIndex((s) => Math.min(s + 1, total)); };
+  const next = () => {
+    setErrors({});
+    // En salud/vida el último step es técnico (no hay "contact"). Al avanzar
+    // desde ahí, en vez de saltar a un step inexistente, se guarda draft y
+    // se navega a /comparativa donde el modal-gate pide contacto y consents.
+    if (skipContactStep && isLastStep) { submitDraft(); return; }
+    setStepIndex((s) => Math.min(s + 1, total));
+  };
   const back = () => { setErrors({}); setSubmitError(null); setStepIndex((s) => Math.max(s - 1, 0)); };
 
-  function toggleConsent(key: "privacidadAt" | "contactoAt" | "comercialAt", field: string, checked: boolean) {
+  type ExtraInsured = { dd?: string; mm?: string; aaaa?: string; sexo?: "hombre" | "mujer" };
+  function updateExtraInsured(i: number, patch: Partial<ExtraInsured>) {
+    const arr = [...(((data.aseguradosExtra as ExtraInsured[]) ?? []))];
+    arr[i] = { ...(arr[i] ?? {}), ...patch };
+    set({ aseguradosExtra: arr });
+  }
+
+  function toggleConsent(key: "privacidadAt" | "contactoAt" | "comercialAt" | "datosSaludAt", field: string, checked: boolean) {
     set({ [field]: checked });
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
+  }
+
+  // Un único check cubre privacidad + autorización de contacto (o, en
+  // salud/vida, privacidad + datos de salud) — ver components/EssentialConsent.tsx.
+  function toggleEsencial(checked: boolean) {
+    set({ aceptaEsencial: checked });
+    const at = checked ? new Date().toISOString() : undefined;
+    const isHealthLike = variant === "salud" || variant === "vida";
+    setConsentTimes((c) => ({
+      ...c,
+      privacidadAt: at,
+      ...(isHealthLike ? { datosSaludAt: at } : { contactoAt: at }),
+    }));
   }
 
   /* ------------------------------ Validaciones ----------------------------- */
@@ -155,32 +193,110 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     return Object.keys(e).length === 0;
   }
 
+  function validateIdentificacion(): boolean {
+    const e: FieldErrors = {};
+    // Plus5: DNI/NIE ya no se pide en el tarificador — se recoge en el flujo
+    // post-elección. Solo validamos el código postal, que sí influye en tarifa.
+    if (!/^\d{5}$/.test(String(data.codigoPostalReal ?? ""))) e.codigoPostalReal = "El código postal debe tener 5 dígitos.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  // Salud/vida: al terminar los pasos técnicos, guardamos draft + navegamos
+  // a /comparativa. El modal-gate de allí crea el lead REAL con contacto y
+  // consents. No creamos lead aquí — antes se creaba con contacto y luego
+  // el modal lo repetía; ese doble paso confundía y era redundante.
+  function submitDraft() {
+    setSubmitError(null);
+    const draftData: Record<string, unknown> = {
+      ...data,
+      fechaNacimiento: `${data.dd ?? ""}/${data.mm ?? ""}/${data.aaaa ?? ""}`,
+      seguroActualServicios: (data.seguroActualServicios as string[]) ?? [],
+      aseguradosAdicionales: ((data.aseguradosExtra as ExtraInsured[]) ?? [])
+        .filter((a) => a.dd && a.mm && a.aaaa && a.sexo)
+        .map((a) => ({ fechaNacimiento: `${a.dd}/${a.mm}/${a.aaaa}`, sexo: a.sexo })),
+      company: "",
+      utm: getAttribution(),
+      turnstileToken,
+      ...(origen ? { origen } : {}),
+      ...(getAttribution().landingSlug ? { landingSlug: getAttribution().landingSlug } : {}),
+    };
+    // Quitar campos que se rellenan en el modal-gate para evitar arrastrar
+    // ceros o strings vacíos que la validación final rechazaría.
+    delete draftData.nombre;
+    delete draftData.apellido1;
+    delete draftData.apellido2;
+    delete draftData.telefono;
+    delete draftData.email;
+    delete draftData.aceptaEsencial;
+    delete draftData.aceptaPrivacidad;
+    delete draftData.autorizaContacto;
+    delete draftData.aceptaDatosSalud;
+    delete draftData.aceptaComercial;
+    delete draftData.dd; delete draftData.mm; delete draftData.aaaa;
+    delete draftData.aseguradosExtra;
+
+    saveLeadDraft({ producto: variant as "salud" | "vida", endpoint: config.endpoint, data: draftData });
+    // QuoteProfile parcial para que /comparativa pueda mostrar los filtros
+    // y llamadas de ayuda desde el minuto uno, sin esperar al backend.
+    const quoteProfile = {
+      id: "",
+      producto: variant as "salud" | "vida",
+      createdAt: new Date().toISOString(),
+      codigoPostal: String(data.codigoPostal ?? ""),
+      numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1 : undefined,
+      coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
+      fechaNacimiento: String(draftData.fechaNacimiento ?? ""),
+      sexo: data.sexo as "hombre" | "mujer" | undefined,
+      motivo: variant === "vida" ? String(data.motivo ?? "") : undefined,
+      fumador: variant === "vida" ? !!data.fumador : undefined,
+      inicio: variant === "salud" ? String(data.inicio ?? "") : undefined,
+    };
+    saveQuote(quoteProfile);
+    try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
+    pushDataLayerEvent("generate_lead_step", { producto: variant, form: "tarificador" });
+    pendingUrlRef.current = `/comparativa?producto=${variant}&draft=1`;
+    setFinalizing(true);
+  }
+
   async function submit() {
     setSubmitError(null);
     const e: FieldErrors = {};
     if (!String(data.nombre ?? "").trim() || String(data.nombre).trim().length < 2) e.nombre = "Dinos tu nombre.";
+    if (variant === "salud" && (!String(data.apellido1 ?? "").trim() || String(data.apellido1).trim().length < 2)) e.apellido1 = "Dinos tu primer apellido.";
     if (!/^[6-9]\d{8}$/.test(normalizePhone(String(data.telefono ?? "")))) e.telefono = "Introduce un móvil español válido (9 dígitos).";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email ?? "").trim())) e.email = "Revisa tu correo electrónico.";
-    if (!data.aceptaPrivacidad) e.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
-    if (!data.autorizaContacto) e.autorizaContacto = "Necesitamos tu autorización para poder llamarte.";
+    // Plus5: art. 9 RGPD — obligatorio consentimiento explícito de datos de
+    // salud solo cuando el producto los trata (salud, vida). Para el resto,
+    // el check esencial cubre privacidad + autorización de contacto.
+    if (!data.aceptaEsencial) {
+      e.aceptaEsencial = (variant === "salud" || variant === "vida")
+        ? "Debes autorizar el tratamiento de tus datos de salud (art. 9 RGPD)."
+        : "Necesitamos que aceptes la política de privacidad.";
+    }
     if (Object.keys(e).length) {
       setErrors(e);
-      // Si es el único motivo por el que no se puede enviar, en vez de solo
-      // el error en rojo explicamos brevemente por qué conviene marcarlo
-      // (nunca bloquea el envío: se puede cerrar y mandar sin marcarlo).
-      if (Object.keys(e).length === 1 && e.autorizaContacto) { setShowConsentNudge(true); return; }
-      const first = ["nombre", "telefono", "email", "aceptaPrivacidad", "autorizaContacto"].find((k) => e[k]);
+      const first = ["nombre", "apellido1", "telefono", "email"].find((k) => e[k]);
       if (first) document.getElementById(`f-${first}`)?.focus();
+      else if (e.aceptaEsencial) document.getElementById("f-consiente-esencial")?.focus();
       return;
     }
 
+    const isHealthLike = variant === "salud" || variant === "vida";
     const payload = {
       ...data,
       fechaNacimiento: `${data.dd ?? ""}/${data.mm ?? ""}/${data.aaaa ?? ""}`,
       seguroActualServicios: (data.seguroActualServicios as string[]) ?? [],
+      aseguradosAdicionales: ((data.aseguradosExtra as ExtraInsured[]) ?? [])
+        .filter((a) => a.dd && a.mm && a.aaaa && a.sexo)
+        .map((a) => ({ fechaNacimiento: `${a.dd}/${a.mm}/${a.aaaa}`, sexo: a.sexo })),
+      aceptaPrivacidad: true,
+      autorizaContacto: true,
+      ...(isHealthLike ? { aceptaDatosSalud: true } : {}),
       company: "",
       consent: consentTimes,
       utm: getAttribution(),
+      turnstileToken,
       ...(origen ? { origen } : {}),
     };
 
@@ -188,7 +304,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     try {
       const res = await fetch(config.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) {
-        const body = (await res.json().catch(() => null)) as { id?: string } | null;
+        const body = (await res.json().catch(() => null)) as { id?: string; presupuestoId?: string } | null;
         const quoteProfile = {
           id: body?.id ?? `local-${Date.now()}`,
           producto: variant,
@@ -221,7 +337,12 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
         saveClientProfile({ nombre: quoteProfile.nombre, telefono: quoteProfile.telefono, email: quoteProfile.email });
         try { sessionStorage.removeItem(progressKey(variant)); } catch { /* noop */ }
         pushDataLayerEvent("generate_lead", { producto: variant, form: "tarificador" });
-        pendingUrlRef.current = `/comparativa?producto=${variant}`;
+        // El pid deja rastro del presupuesto server-side para que /comparativa
+        // pueda pedir cotizaciones reales a Codeoscopic vía /api/quote/create.
+        // Sin pid (leads antiguos o Codeoscopic no configurado), la comparativa
+        // cae al catálogo mock — degradación silenciosa.
+        const pidParam = body?.presupuestoId ? `&pid=${encodeURIComponent(body.presupuestoId)}` : "";
+        pendingUrlRef.current = `/comparativa?producto=${variant}${pidParam}`;
         setFinalizing(true);
         return;
       }
@@ -331,6 +452,78 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
             </form>
           </Shell>
         );
+      case "choice2":
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (data[step.groupA.field] && data[step.groupB.field]) next(); }}>
+              <ChoiceGroup label={step.groupA.label} field={step.groupA.field} options={step.groupA.options} value={data[step.groupA.field]} onSelect={(v) => set({ [step.groupA.field]: v })} />
+              <div className="mt-5">
+                <ChoiceGroup label={step.groupB.label} field={step.groupB.field} options={step.groupB.options} value={data[step.groupB.field]} onSelect={(v) => set({ [step.groupB.field]: v })} />
+              </div>
+              <PrimaryButton disabled={!data[step.groupA.field] || !data[step.groupB.field]}>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      case "identificacion":
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (validateIdentificacion()) next(); }}>
+              {/* Plus5: DNI/NIE se pide en el flujo post-elección (contratación),
+                  no en el tarificador — minimización RGPD. */}
+              <div>
+                <Field id="f-codigoPostalReal" label="Código postal" type="text" inputMode="numeric" value={String(data.codigoPostalReal ?? "")}
+                  onChange={(v) => set({ codigoPostalReal: v.replace(/\D/g, "").slice(0, 5) })}
+                  autoComplete="postal-code" error={errors.codigoPostalReal} placeholder="35001…" />
+              </div>
+              <PrimaryButton>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      case "aseguradosExtra": {
+        const count = Math.max(0, (Number(data[step.countField]) || 1) - 1);
+        const arr = (data.aseguradosExtra as ExtraInsured[]) ?? [];
+        const complete = Array.from({ length: count }, (_, i) => arr[i]).every(
+          (a) => !!a?.dd && a.dd.length === 2 && !!a?.mm && a.mm.length === 2 && !!a?.aaaa && a.aaaa.length === 4 && (a?.sexo === "hombre" || a?.sexo === "mujer")
+        );
+        return (
+          <Shell title={step.title} helper={step.helper}>
+            <form onSubmit={(ev) => { ev.preventDefault(); if (complete) next(); }}>
+              <div className="flex flex-col gap-4">
+                {Array.from({ length: count }, (_, i) => i).map((i) => {
+                  const a = arr[i] ?? {};
+                  return (
+                    <div key={i} className="rounded-card border border-hair bg-mist/40 p-4">
+                      <p className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-navy">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy text-[12px] font-bold text-white">{i + 2}</span>
+                        Asegurado {i + 2}
+                      </p>
+                      <fieldset>
+                        <legend className="sr-only">Fecha de nacimiento del asegurado {i + 2}</legend>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1.5fr)] items-center gap-1 rounded-card border border-hair bg-white px-3 py-1">
+                          <Dob id={`f-extra-${i}-dd`} label="Día" placeholder="dd" max={2} value={String(a.dd ?? "")} onChange={(v) => updateExtraInsured(i, { dd: v })} />
+                          <span aria-hidden="true" className="px-0.5 text-slate2">/</span>
+                          <Dob id={`f-extra-${i}-mm`} label="Mes" placeholder="mm" max={2} value={String(a.mm ?? "")} onChange={(v) => updateExtraInsured(i, { mm: v })} />
+                          <span aria-hidden="true" className="px-0.5 text-slate2">/</span>
+                          <Dob id={`f-extra-${i}-aaaa`} label="Año" placeholder="aaaa" max={4} value={String(a.aaaa ?? "")} onChange={(v) => updateExtraInsured(i, { aaaa: v })} />
+                        </div>
+                      </fieldset>
+                      <div className="mt-2 flex gap-2">
+                        {(["hombre", "mujer"] as const).map((s) => (
+                          <button key={s} type="button" aria-pressed={a.sexo === s} onClick={() => updateExtraInsured(i, { sexo: s })}
+                            className={`flex-1 rounded-card border px-3 py-2.5 text-[14px] font-semibold capitalize transition-colors ${a.sexo === s ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <PrimaryButton disabled={!complete}>Continuar</PrimaryButton>
+            </form>
+          </Shell>
+        );
+      }
       case "dobsex":
         return (
           <Shell title={step.title} helper={step.helper}>
@@ -411,20 +604,30 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
                 <label htmlFor="f-company">No rellenar</label>
                 <input id="f-company" tabIndex={-1} autoComplete="off" onChange={() => {}} />
               </div>
-              <Field id="f-nombre" label="Nombre y apellidos" value={String(data.nombre ?? "")} onChange={(v) => set({ nombre: v })} autoComplete="name" error={errors.nombre} placeholder="María Pérez…" />
+              {/* El apellido separado solo se pide en salud, de cara a Codescopic (ver
+                  lib/schema.ts); el resto de tarificadores sigue pidiendo el nombre
+                  completo en un único campo, sin cambiar su formato de datos. */}
+              <Field id="f-nombre" label={variant === "salud" ? "Nombre" : "Nombre y apellidos"} value={String(data.nombre ?? "")} onChange={(v) => set({ nombre: v })} autoComplete={variant === "salud" ? "given-name" : "name"} error={errors.nombre} placeholder="María…" />
+              {variant === "salud" && (
+                <>
+                  <Field id="f-apellido1" label="Primer apellido" value={String(data.apellido1 ?? "")} onChange={(v) => set({ apellido1: v })} autoComplete="family-name" error={errors.apellido1} placeholder="Pérez…" />
+                  <Field id="f-apellido2" label="Segundo apellido (opcional)" value={String(data.apellido2 ?? "")} onChange={(v) => set({ apellido2: v })} autoComplete="additional-name" placeholder="García…" />
+                </>
+              )}
               <Field id="f-telefono" label="Teléfono móvil" type="tel" inputMode="tel" value={String(data.telefono ?? "")} onChange={(v) => set({ telefono: v })} autoComplete="tel" error={errors.telefono} placeholder="600 000 000…" />
               <Field id="f-email" label="Correo electrónico" type="email" inputMode="email" value={String(data.email ?? "")} onChange={(v) => set({ email: v })} autoComplete="email" spellCheck={false} autoCapitalize="none" error={errors.email} placeholder="maria@correo.com…" />
               <div className="mt-5 flex flex-col gap-3">
-                <Consent id="f-aceptaPrivacidad" checked={!!data.aceptaPrivacidad} onChange={(v) => toggleConsent("privacidadAt", "aceptaPrivacidad", v)} error={errors.aceptaPrivacidad}>
-                  He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a> y las <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">condiciones de uso</a>.
-                </Consent>
-                <Consent id="f-autorizaContacto" checked={!!data.autorizaContacto} onChange={(v) => toggleConsent("contactoAt", "autorizaContacto", v)} error={errors.autorizaContacto}>
-                  Autorizo a {BRAND_NAME} a contactarme por teléfono o WhatsApp para ayudarme a elegir mi seguro.
-                </Consent>
-                <Consent id="f-aceptaComercial" checked={!!data.aceptaComercial} onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}>
-                  Quiero recibir consejos y novedades de {BRAND_NAME} (opcional).
-                </Consent>
+                <EssentialConsentCheckbox
+                  idPrefix="f" datosSalud={variant === "salud" || variant === "vida"}
+                  checked={!!data.aceptaEsencial} onChange={toggleEsencial}
+                  error={errors.aceptaEsencial}
+                />
+                <ComercialConsentCheckbox
+                  idPrefix="f" checked={!!data.aceptaComercial}
+                  onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}
+                />
               </div>
+              <TurnstileWidget onToken={setTurnstileToken} />
               {submitError && <p role="alert" aria-live="polite" className="mt-4 rounded-lg bg-brand-red/10 px-4 py-3 text-[14px] font-medium text-brand-red-deep">{submitError}</p>}
               <PrimaryButton loading={submitting}>{submitting ? "Enviando…" : "Ver precios"}</PrimaryButton>
               <p className="mt-3 text-center text-[12px] leading-relaxed text-slate2">Verás una comparativa orientativa al momento. Un asesor te confirma el precio final cuando elijas tu opción.</p>
@@ -495,16 +698,6 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           anillo de foco global (si no, se ve como una línea azul suelta). */}
       <div ref={topRef} tabIndex={-1} className="outline-none focus:ring-0 focus-visible:ring-0" style={{ boxShadow: "none" }} />
       {current && <div key={current.key}>{renderStep(current)}</div>}
-      <ConsentNudgeModal
-        open={showConsentNudge}
-        onClose={() => setShowConsentNudge(false)}
-        onAccept={() => {
-          set({ autorizaContacto: true });
-          setConsentTimes((c) => ({ ...c, contactoAt: new Date().toISOString() }));
-          setErrors({});
-          setShowConsentNudge(false);
-        }}
-      />
       <ExitIntentModal
         open={showExitIntent}
         onClose={() => setShowExitIntent(false)}
@@ -577,6 +770,29 @@ function OptionCard({ onClick, children, selected }: { onClick: () => void; chil
     </button>
   );
 }
+// Un grupo de opciones de una sola respuesta, compacto para poder mostrar
+// dos grupos en la misma pantalla (ver el paso "choice2"). Misma lógica de
+// selección que OptionCard, con menos altura por opción.
+function ChoiceGroup({ label, field, options, value, onSelect }: {
+  label: string; field: string; options: { value: string; label: string }[]; value: unknown; onSelect: (v: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-[14px] font-semibold text-ink">{label}</legend>
+      <div className="flex flex-col gap-2">
+        {options.map((o) => (
+          <button
+            key={`${field}-${o.value}`} type="button" aria-pressed={value === o.value}
+            onClick={() => onSelect(o.value)}
+            className={`rounded-card border px-4 py-3 text-left text-[14px] font-medium transition-colors ${value === o.value ? "border-navy bg-navy text-white" : "border-hair bg-white text-ink hover:border-navy/40 hover:bg-mist"}`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 function YesNo({ onSelect, value }: { onSelect: (v: boolean) => void; value?: boolean }) {
   const opt = (v: boolean, label: string) => (
     <button type="button" onClick={() => onSelect(v)} aria-pressed={value === v}
@@ -610,19 +826,6 @@ function Field({ id, label, value, onChange, error, type = "text", inputMode, au
         spellCheck={spellCheck} autoCapitalize={autoCapitalize} value={value} onChange={(e) => onChange(e.target.value)}
         aria-invalid={!!error} aria-describedby={error ? errId : undefined}
         className={`w-full rounded-card border bg-white px-4 py-3.5 text-[16px] text-ink placeholder:text-slate2/60 ${error ? "border-brand-red" : "border-hair"}`} />
-      <FieldError id={errId} msg={error} />
-    </div>
-  );
-}
-function Consent({ id, checked, onChange, error, children }: { id: string; checked: boolean; onChange: (v: boolean) => void; error?: string; children: React.ReactNode }) {
-  const errId = `${id}-err`;
-  return (
-    <div>
-      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
-        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-invalid={!!error} aria-describedby={error ? errId : undefined}
-          className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-        <span className="text-[13px] leading-relaxed text-slate2">{children}</span>
-      </label>
       <FieldError id={errId} msg={error} />
     </div>
   );
