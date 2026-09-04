@@ -25,6 +25,7 @@ import { DEFAULT_PRICE_MATCH_LANDING, type PriceMatchLandingConfig } from "./pri
 import { DEFAULT_REFERRAL_LANDING, type ReferralLandingConfig } from "./referralLanding";
 import { saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber } from "./quote";
 import { DEFAULT_THEME, type SiteTheme } from "./theme";
+import { SITE_ACCESS_KV_KEY, EMPTY_SITE_ACCESS_CONFIG, type SiteAccessConfig } from "./siteAccess";
 
 function makeSubmissionId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -2898,6 +2899,29 @@ export async function assignLead(leadId: string, agenteId: string, agenteNombre:
   await jset(`lead:${leadId}`, lead);
   await zadd("leads:index", Date.parse(now), leadId);
   return lead;
+}
+
+/* ------------------------------ Site access ------------------------------ */
+// Configuración del bloqueo global de la web (contraseña única). El
+// middleware Edge la lee vía Upstash REST directamente (no puede importar
+// este módulo por el peso del bundle) — aquí ofrecemos los helpers para el
+// admin y el endpoint /api/acceso/login.
+
+export async function getSiteAccessConfig(): Promise<SiteAccessConfig> {
+  const stored = await jget<SiteAccessConfig>(SITE_ACCESS_KV_KEY);
+  if (!stored) return EMPTY_SITE_ACCESS_CONFIG;
+  return {
+    enabled: typeof stored.enabled === "boolean" ? stored.enabled : false,
+    passwordHash: typeof stored.passwordHash === "string" ? stored.passwordHash : null,
+    updatedAt: typeof stored.updatedAt === "string" ? stored.updatedAt : null,
+    updatedBy: typeof stored.updatedBy === "string" ? stored.updatedBy : null,
+  };
+}
+
+export async function saveSiteAccessConfig(next: SiteAccessConfig): Promise<SiteAccessConfig> {
+  const stamped: SiteAccessConfig = { ...next, updatedAt: new Date().toISOString() };
+  await jset(SITE_ACCESS_KV_KEY, stamped);
+  return stamped;
 }
 
 /* ------------------------------ Disponibilidad ------------------------------ */

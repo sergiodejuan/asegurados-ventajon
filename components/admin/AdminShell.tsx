@@ -132,6 +132,12 @@ const NAV: NavNode[] = [
       },
     ],
   },
+  {
+    kind: "group", label: "Seguridad", key: "grp-seguridad", icon: "shield",
+    children: [
+      leaf("/admin/seguridad/acceso", "Bloqueo de la web", "site-access", "configuracion"),
+    ],
+  },
 ];
 
 // Cadena de keys de todos los grupos ANTECESORES de la página activa, para
@@ -154,7 +160,8 @@ export type AdminActiveKey =
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
   | "integraciones" | "integraciones-codescopic" | "integraciones-tremendous" | "integraciones-api" | "integraciones-webhooks"
-  | "cookies" | "analitica" | "accesibilidad" | "avisos" | "plantillas-email" | "rgpd" | "agentes" | "permisos" | "registro";
+  | "cookies" | "analitica" | "accesibilidad" | "avisos" | "plantillas-email" | "rgpd" | "agentes" | "permisos" | "registro"
+  | "site-access";
 
 // Filtro de permisos recursivo: una hoja se ve si el agente tiene su módulo;
 // un grupo se ve solo si le queda al menos una hoja visible dentro.
