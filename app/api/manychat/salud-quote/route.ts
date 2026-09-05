@@ -30,6 +30,12 @@ export const dynamic = "force-dynamic";
 //
 // Autenticación: header `x-manychat-secret` (MANYCHAT_WEBHOOK_SECRET).
 
+// ManyChat interpola los merge tags como texto crudo dentro del JSON —
+// si un Custom Field está vacío, se convierte en "" (cuando el tag va
+// entre comillas) o en nada (si no lleva comillas, y ahí rompe el JSON).
+// Por eso aceptamos aquí strings, numbers y booleans en los tres campos
+// tipados y los coercionamos abajo. `unknown` para no tener que pelear
+// contra el sistema de tipos en cada caso.
 type Body = {
   telefono?: string;
   nombre?: string;
@@ -41,11 +47,33 @@ type Body = {
   documento?: string;
   documentoTipo?: string;   // "DNI" | "NIE" | "PASSPORT"
   codigoPostal?: string;
-  numAsegurados?: number;
-  coberturaDental?: boolean;
-  fumador?: boolean;
-  aceptaPrivacidad?: boolean;
+  numAsegurados?: unknown;    // number | "1".."9" | "" | null
+  coberturaDental?: unknown;  // boolean | "true"/"false"/"sí"/"no"/"" | null
+  fumador?: unknown;          // idem
+  aceptaPrivacidad?: unknown; // idem
 };
+
+function coerceNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v.trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// "true"/"false", "1"/"0", "sí"/"no", "yes"/"no", "" → null.
+function coerceBoolean(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (!s) return null;
+    if (["true", "1", "sí", "si", "yes", "y"].includes(s)) return true;
+    if (["false", "0", "no", "n"].includes(s)) return false;
+  }
+  return null;
+}
 
 // Respuesta pensada para ManyChat: solo campos escalares y un mensaje ya
 // formateado. Los arrays de ManyChat son incómodos de iterar en su UI.
@@ -141,10 +169,10 @@ export async function POST(request: Request) {
     documentoTipo: body.documentoTipo?.trim() ?? "",
     codigoPostal: body.codigoPostal?.trim() ?? "",
     codigoPostalReal: body.codigoPostal?.trim() ?? "",
-    numAsegurados: typeof body.numAsegurados === "number" ? body.numAsegurados : null,
-    coberturaDental: typeof body.coberturaDental === "boolean" ? body.coberturaDental : null,
-    fumador: typeof body.fumador === "boolean" ? body.fumador : null,
-    aceptaPrivacidad: !!body.aceptaPrivacidad,
+    numAsegurados: coerceNumber(body.numAsegurados),
+    coberturaDental: coerceBoolean(body.coberturaDental),
+    fumador: coerceBoolean(body.fumador),
+    aceptaPrivacidad: coerceBoolean(body.aceptaPrivacidad) === true,
     autorizaContacto: true, // llegó por WhatsApp opt-in, ya consintió el canal.
     utm: { source: "manychat" },
   };
