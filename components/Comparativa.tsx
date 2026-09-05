@@ -561,6 +561,26 @@ export function Comparativa() {
     }
   }
 
+  // El estado del gate depende de si el usuario ha desbloqueado o no. Se
+  // declara ANTES del early return porque el useEffect que bloquea el
+  // scroll del body también va antes — React requiere que el nº de
+  // hooks sea idéntico en cada render (si movemos este cálculo o el
+  // useEffect por debajo del early return, el hook se salta cuando
+  // cae por la rama de "no encontramos los datos" y peta la app en la
+  // segunda renderización con "Rendered fewer hooks than expected").
+  const gateBlocking = !unlocked;
+  const mainBlurred = gateBlocking ? "pointer-events-none select-none blur-md" : "";
+  // Bloquea el scroll del body mientras el gate esté visible — evita
+  // desplazamientos por debajo del modal (que además está en blur y
+  // aria-hidden). Al desbloquear, se restaura.
+  useEffect(() => {
+    if (!loaded || !gateBlocking) return;
+    const body = document.body;
+    const prev = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => { body.style.overflow = prev; };
+  }, [gateBlocking, loaded]);
+
   if (loaded && !quote && !hasDraft) {
     return (
       <>
@@ -584,21 +604,6 @@ export function Comparativa() {
   const waText = buildWhatsAppText({ producto, quote });
   const widgetWaText = buildWhatsAppText({ producto, quote, origen: "comparativa" });
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
-
-  // Blur pesado + no scroll + inerte cuando el gate está activo. El modal
-  // se renderiza APARTE (fuera del blur) para que sea nítido y usable.
-  const gateBlocking = !unlocked;
-  const mainBlurred = gateBlocking ? "pointer-events-none select-none blur-md" : "";
-  // Bloquea el scroll del body mientras el gate esté visible — evita
-  // desplazamientos por debajo del modal (que además está en blur y
-  // aria-hidden). Al desbloquear, se restaura.
-  useEffect(() => {
-    if (!loaded || !gateBlocking) return;
-    const body = document.body;
-    const prev = body.style.overflow;
-    body.style.overflow = "hidden";
-    return () => { body.style.overflow = prev; };
-  }, [gateBlocking, loaded]);
 
   return (
     <>
