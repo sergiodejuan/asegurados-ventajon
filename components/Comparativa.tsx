@@ -14,7 +14,7 @@ import { ZONA_OPTIONS } from "@/lib/forms";
 import { normalizePhone } from "@/lib/schema";
 import { copagoModoDe, copagoChip, copagoTexto, type Product } from "@/lib/catalog";
 import {
-  loadQuote, updateQuote, saludPriceAdvanced, resolveBasePrecio, applyNumInsuredDiscount,
+  loadQuote, updateQuote, saveQuote, saludPriceAdvanced, resolveBasePrecio, applyNumInsuredDiscount,
   vidaPrice, autoPrice, decesosPrice, quoteNumber, ageFromDob,
   buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
   loadLeadDraft, clearLeadDraft,
@@ -239,34 +239,74 @@ export function Comparativa() {
   const mustGate = hasDraft;
 
   useEffect(() => {
+    let cancelled = false;
+    // Aplica un QuoteProfile al estado local — se usa tanto para el load
+    // sincrónico desde sessionStorage como para el resultado async del
+    // hydrate por token.
+    const applyQuote = (q: QuoteProfile | null) => {
+      if (cancelled) return;
+      setQuote(q);
+      if (q) {
+        setCp(q.codigoPostal ?? "");
+        setN(q.numAsegurados ?? 1);
+        setDental(!!q.coberturaDental);
+        setFumador(!!q.fumador);
+        setCoberturaDeseada(q.coberturaDeseada ?? "");
+        setGateNombre(q.nombre ?? "");
+        setGateTelefono(q.telefono ?? "");
+        setGateEmail(q.email ?? "");
+      }
+    };
+
+    // 1) Intento síncrono desde sessionStorage (flujo web habitual).
     const q = loadQuote();
-    setQuote(q);
-    setLoaded(true);
-    if (q) {
-      setCp(q.codigoPostal ?? "");
-      setN(q.numAsegurados ?? 1);
-      setDental(!!q.coberturaDental);
-      setFumador(!!q.fumador);
-      setCoberturaDeseada(q.coberturaDeseada ?? "");
-      setGateNombre(q.nombre ?? "");
-      setGateTelefono(q.telefono ?? "");
-      setGateEmail(q.email ?? "");
-    }
-    // Detectar draft pendiente — significa que venimos del tarificador y
-    // aún no se ha creado el lead (flujo salud/vida unificado 2026-08).
+    applyQuote(q);
+
     const draft = loadLeadDraft();
     if (draft) {
       setHasDraft(true);
-    } else {
-      // El lead ya existe (volvemos de "Más información" o de una opción, o
-      // recargamos con ?pid=...). No hay que volver a bloquear ni re-pedir los
-      // datos: restauramos el pid y desbloqueamos si ya se pasó el gate antes
-      // (tenemos pid en la URL, o un presupuesto/contacto guardado).
-      const restoredLead = initialLead || q?.leadId || "";
-      if (restoredLead && !leadId) setLeadId(restoredLead);
-      const yaPasoGate = !!(restoredLead || (q?.nombre && q?.telefono && q?.email));
-      if (yaPasoGate) setUnlocked(true);
+      setLoaded(true);
+      return () => { cancelled = true; };
     }
+
+    // 2) ¿Vienen con token firmado desde WhatsApp? Si sí, y aún no
+    // tenemos quote local (o el quote local no coincide con el
+    // leadId del token), llamamos al endpoint de hidratación.
+    const token = searchParams.get("token");
+    if (token && (!q || (q.leadId ?? q.id) !== "hydrated")) {
+      // No bloquea el render: mostramos "cargando" mientras llega el
+      // fetch. Cuando llegue, guardamos el quote en sessionStorage
+      // y desbloqueamos el gate — el usuario NO reintroduce datos.
+      (async () => {
+        try {
+          const res = await fetch(`/api/client/hydrate-quote?token=${encodeURIComponent(token)}`, { cache: "no-store" });
+          const body = await res.json().catch(() => null) as { ok?: boolean; quote?: QuoteProfile } | null;
+          if (cancelled) return;
+          if (res.ok && body?.ok && body.quote) {
+            saveQuote(body.quote);
+            applyQuote(body.quote);
+            if (body.quote.leadId) setLeadId(body.quote.leadId);
+            setUnlocked(true);
+          }
+        } catch {
+          // Fallback silencioso: si falla, cae al mensaje "no encontramos
+          // los datos, calcula tu precio" (el gate estándar).
+        } finally {
+          if (!cancelled) setLoaded(true);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
+    // 3) Sin token y sin draft: comportamiento clásico. Restauramos
+    // leadId si venía como ?lead=/?pid= o del quote guardado, y
+    // desbloqueamos si ya se pasó el gate en otra visita.
+    const restoredLead = initialLead || q?.leadId || "";
+    if (restoredLead && !leadId) setLeadId(restoredLead);
+    const yaPasoGate = !!(restoredLead || (q?.nombre && q?.telefono && q?.email));
+    if (yaPasoGate) setUnlocked(true);
+    setLoaded(true);
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

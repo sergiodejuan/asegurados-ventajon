@@ -7,6 +7,25 @@ import { buildHealthPayload } from "@/lib/codeoscopicMap";
 import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
 import type { CodeoscopicQuoteSummary } from "@/lib/store";
 import type { LeadDraft } from "@/lib/crm";
+import { createQuoteAccessToken } from "@/lib/quoteTokens";
+import { SITE_URL } from "@/lib/brand";
+
+// Construye el link firmado a /comparativa que el flow envía por WhatsApp.
+// El token cifra el leadId; la comparativa lo intercambia por el `quote`
+// hidratado — el usuario NO vuelve a introducir sus datos.
+function buildComparativaUrl(leadId: string): string {
+  if (!leadId) return "";
+  try {
+    const token = createQuoteAccessToken(leadId);
+    const base = SITE_URL.replace(/\/+$/, "");
+    return `${base}/comparativa?producto=salud&token=${encodeURIComponent(token)}`;
+  } catch (err) {
+    // Sin QUOTE_TOKEN_SECRET en prod: no devolvemos URL — el asesor
+    // toma el relevo. Nunca respondemos con un link sin firmar.
+    console.error("[manychat/salud-quote] no se pudo firmar token:", (err as Error).message);
+    return "";
+  }
+}
 
 export const runtime = "nodejs";
 // Codeoscopic tarda entre 5 y 40 segundos en devolver las primeras ofertas
@@ -88,6 +107,10 @@ type ResponseShape = {
   producto: string;
   precio: number | null; // €/mes
   precioTexto: string;   // "23,45€/mes" o "" si no hay
+  // URL firmada que puede enviarse por WhatsApp para abrir la comparativa
+  // completa con los datos ya precargados (sin volver a pedir al usuario).
+  // TTL 30 días. Sólo se rellena cuando hay `leadId`.
+  urlComparativa: string;
   error?: string;
 };
 
@@ -142,7 +165,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "error", error: "Cuerpo no válido.",
       mensaje: "Ups, no me ha llegado bien la información. Escríbeme otra vez, por favor.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: "",
     }, 400);
   }
 
@@ -151,7 +174,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "faltan_datos", error: "Falta el teléfono.",
       mensaje: "Necesito tu teléfono para poder enviarte la tarifa.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: "",
     }, 400);
   }
 
@@ -184,7 +207,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "error", error: "No se pudo crear el lead.",
       mensaje: "Uy, ha habido un problema técnico. Un asesor te contactará enseguida.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: "",
     }, 500);
   }
 
@@ -193,7 +216,7 @@ export async function POST(request: Request) {
   if (!codeoscopicConfigured()) {
     return respond({
       ok: true, estado: "calculando", leadId: lead.id, insuranceId: "",
-      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: buildComparativaUrl(lead.id),
       mensaje: "Perfecto, ya tengo tus datos. Un asesor te enviará la tarifa personalizada en unos minutos.",
     });
   }
@@ -203,7 +226,7 @@ export async function POST(request: Request) {
     return respond({
       ok: true, estado: "faltan_datos", error: mapped.reason,
       leadId: lead.id, insuranceId: "",
-      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: buildComparativaUrl(lead.id),
       mensaje: `Para darte el precio exacto todavía necesito un dato: ${mapped.reason} ¿Me lo puedes dar?`,
     });
   }
@@ -227,7 +250,7 @@ export async function POST(request: Request) {
       console.error("[manychat/salud-quote] POST /insurances falló:", (err as Error).message);
       return respond({
         ok: true, estado: "calculando", leadId: lead.id, insuranceId: "",
-        compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+        compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: buildComparativaUrl(lead.id),
         mensaje: "Estoy calculando tu tarifa. Un asesor te la enviará en breve.",
       });
     }
@@ -243,7 +266,7 @@ export async function POST(request: Request) {
   // encarga (el snapshot queda cacheado en Codeoscopic, no se pierde).
   return respond({
     ok: true, estado: "calculando", leadId: lead.id, insuranceId,
-    compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
+    compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: buildComparativaUrl(lead.id),
     mensaje: "Estoy calculando tus tarifas. En un par de minutos te envío las mejores opciones por aquí mismo.",
   });
 }
@@ -256,9 +279,14 @@ function buildQuoteResponse(leadId: string, insuranceId: string, best: Codeoscop
   const mensaje = precio != null
     ? `Tu mejor tarifa ahora mismo:\n\n• ${compania}${producto ? ` — ${producto}` : ""}\n• Desde ${precioTexto}\n\n¿Quieres que un asesor te cierre la póliza con esta compañía?`
     : `Tenemos oferta de ${compania}${producto ? ` (${producto})` : ""} pero necesito confirmar el precio. Un asesor te lo envía enseguida.`;
+  const urlComparativa = buildComparativaUrl(leadId);
+  const mensajeConLink = urlComparativa
+    ? `${mensaje}\n\n🔗 Ver todas las opciones y coberturas: ${urlComparativa}`
+    : mensaje;
   return {
     ok: true, estado: "cotizado", leadId, insuranceId,
-    compania, producto, precio, precioTexto, mensaje,
+    compania, producto, precio, precioTexto, mensaje: mensajeConLink,
     quoteId: String(best.id ?? ""),
+    urlComparativa,
   };
 }
