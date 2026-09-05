@@ -82,6 +82,7 @@ type ResponseShape = {
   mensaje: string;
   leadId: string;
   insuranceId: string;
+  quoteId: string;       // id de la cotización ganadora, para /coverages
   estado: "cotizado" | "calculando" | "faltan_datos" | "error";
   compania: string;
   producto: string;
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "error", error: "Cuerpo no válido.",
       mensaje: "Ups, no me ha llegado bien la información. Escríbeme otra vez, por favor.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
     }, 400);
   }
 
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "faltan_datos", error: "Falta el teléfono.",
       mensaje: "Necesito tu teléfono para poder enviarte la tarifa.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
     }, 400);
   }
 
@@ -183,7 +184,7 @@ export async function POST(request: Request) {
     return respond({
       ok: false, estado: "error", error: "No se pudo crear el lead.",
       mensaje: "Uy, ha habido un problema técnico. Un asesor te contactará enseguida.",
-      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "",
+      leadId: "", insuranceId: "", compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
     }, 500);
   }
 
@@ -192,7 +193,7 @@ export async function POST(request: Request) {
   if (!codeoscopicConfigured()) {
     return respond({
       ok: true, estado: "calculando", leadId: lead.id, insuranceId: "",
-      compania: "", producto: "", precio: null, precioTexto: "",
+      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
       mensaje: "Perfecto, ya tengo tus datos. Un asesor te enviará la tarifa personalizada en unos minutos.",
     });
   }
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
     return respond({
       ok: true, estado: "faltan_datos", error: mapped.reason,
       leadId: lead.id, insuranceId: "",
-      compania: "", producto: "", precio: null, precioTexto: "",
+      compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
       mensaje: `Para darte el precio exacto todavía necesito un dato: ${mapped.reason} ¿Me lo puedes dar?`,
     });
   }
@@ -226,7 +227,7 @@ export async function POST(request: Request) {
       console.error("[manychat/salud-quote] POST /insurances falló:", (err as Error).message);
       return respond({
         ok: true, estado: "calculando", leadId: lead.id, insuranceId: "",
-        compania: "", producto: "", precio: null, precioTexto: "",
+        compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
         mensaje: "Estoy calculando tu tarifa. Un asesor te la enviará en breve.",
       });
     }
@@ -242,7 +243,7 @@ export async function POST(request: Request) {
   // encarga (el snapshot queda cacheado en Codeoscopic, no se pierde).
   return respond({
     ok: true, estado: "calculando", leadId: lead.id, insuranceId,
-    compania: "", producto: "", precio: null, precioTexto: "",
+    compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
     mensaje: "Estoy calculando tus tarifas. En un par de minutos te envío las mejores opciones por aquí mismo.",
   });
 }
@@ -258,5 +259,6 @@ function buildQuoteResponse(leadId: string, insuranceId: string, best: Codeoscop
   return {
     ok: true, estado: "cotizado", leadId, insuranceId,
     compania, producto, precio, precioTexto, mensaje,
+    quoteId: String(best.id ?? ""),
   };
 }
