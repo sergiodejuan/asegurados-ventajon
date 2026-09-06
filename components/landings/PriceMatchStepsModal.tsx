@@ -43,8 +43,6 @@ const COMPANIAS_SUGERIDAS = [
   "Línea Directa", "Mutua Madrileña", "Zurich", "Allianz",
 ];
 
-const ZONA_OPTIONS = ["Islas Canarias", "Islas Baleares", "Península"] as const;
-
 type Form = {
   producto: ProductoValor;
   companiaActual: string;
@@ -55,7 +53,8 @@ type Form = {
   nombre: string;
   telefono: string;
   email: string;
-  codigoPostal: typeof ZONA_OPTIONS[number] | "";
+  // CP real (5 dígitos). La zona la deriva el backend con zonaFromCP.
+  codigoPostalReal: string;
   // Un único check cubre privacidad + autorización de contacto — ver
   // components/EssentialConsent.tsx.
   aceptaEsencial: boolean;
@@ -72,7 +71,7 @@ const INITIAL_FORM: Form = {
   nombre: "",
   telefono: "",
   email: "",
-  codigoPostal: "",
+  codigoPostalReal: "",
   aceptaEsencial: false,
   aceptaComercial: false,
 };
@@ -156,7 +155,7 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
       if (form.nombre.trim().length < 2) errs.nombre = "Dinos tu nombre.";
       if (!/^[6-9]\d{8}$/.test(normalizePhone(form.telefono))) errs.telefono = "Introduce un móvil español válido.";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errs.email = "Revisa tu correo.";
-      if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
+      if (!/^\d{5}$/.test(form.codigoPostalReal)) errs.codigoPostalReal = "El código postal debe tener 5 dígitos.";
     }
     if (step === "envio") {
       if (!form.aceptaEsencial) errs.aceptaEsencial = "Es necesario aceptar la política.";
@@ -214,7 +213,7 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
         nombre: form.nombre.trim(),
         telefono: normalizePhone(form.telefono),
         email: form.email.trim(),
-        codigoPostal: form.codigoPostal,
+        codigoPostalReal: form.codigoPostalReal,
         aceptaPrivacidad: form.aceptaEsencial,
         autorizaContacto: form.aceptaEsencial,
         aceptaComercial: true,
@@ -426,18 +425,12 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
                       {errors.email && <span className="text-[13px] font-semibold text-brand-red">{errors.email}</span>}
                     </label>
                     <label className="flex flex-col gap-1.5">
-                      <span className="text-[14px] font-semibold text-ink">¿Dónde vives?</span>
-                      <div className="relative">
-                        <select value={form.codigoPostal} onChange={(e) => set("codigoPostal", e.target.value as Form["codigoPostal"])}
-                          className="w-full appearance-none rounded-[12px] border border-hair bg-white px-4 py-3.5 pr-10 text-[16px] focus:border-navy focus:outline-none">
-                          <option value="">Selecciona una zona</option>
-                          {ZONA_OPTIONS.map((z) => <option key={z} value={z}>{z}</option>)}
-                        </select>
-                        <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate2">
-                          <ChevronDown width={16} height={16} />
-                        </span>
-                      </div>
-                      {errors.codigoPostal && <span className="text-[13px] font-semibold text-brand-red">{errors.codigoPostal}</span>}
+                      <span className="text-[14px] font-semibold text-ink">Código postal</span>
+                      <input value={form.codigoPostalReal}
+                        onChange={(e) => set("codigoPostalReal", e.target.value.replace(/\D/g, "").slice(0, 5))}
+                        inputMode="numeric" autoComplete="postal-code" placeholder="35001…"
+                        className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] focus:border-navy focus:outline-none" />
+                      {errors.codigoPostalReal && <span className="text-[13px] font-semibold text-brand-red">{errors.codigoPostalReal}</span>}
                     </label>
                   </div>
                 </div>

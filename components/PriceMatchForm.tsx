@@ -29,8 +29,6 @@ const PRODUCTO_OPTIONS: { value: "salud" | "vida" | "auto" | "decesos" | "hogar"
   { value: "hogar", label: "Seguro de hogar" },
 ];
 
-const ZONA_OPTIONS = ["Islas Canarias", "Islas Baleares", "Península"] as const;
-
 export type PriceMatchFormProps = {
   // Contexto: 'landing' para /precio-mejor-garantizado, 'comparativa' para
   // el modal de rescate dentro de /comparativa. Cambia el source del lead
@@ -61,7 +59,8 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [codigoPostal, setCodigoPostal] = useState<typeof ZONA_OPTIONS[number] | "">("");
+  // CP real (5 dígitos). La zona la deriva el backend con zonaFromCP.
+  const [codigoPostalReal, setCodigoPostalReal] = useState("");
   // Un único check cubre privacidad + autorización de contacto — ver
   // components/EssentialConsent.tsx.
   const [esencial, setEsencial] = useState(false);
@@ -108,7 +107,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
     if (!nombre.trim() || nombre.trim().length < 2) errs.nombre = "Dinos tu nombre.";
     if (!/^[6-9]\d{8}$/.test(normalizePhone(telefono))) errs.telefono = "Introduce un móvil español válido.";
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errs.email = "Revisa tu correo electrónico.";
-    if (!codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
+    if (!/^\d{5}$/.test(codigoPostalReal)) errs.codigoPostalReal = "El código postal debe tener 5 dígitos.";
     if (!esencial) errs.aceptaPrivacidad = "Necesitamos que aceptes la política de privacidad.";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -119,7 +118,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
         producto, companiaActual: companiaActual.trim(), precioActual: precioNum, periodicidad, capturaUrl,
         comentario: comentario.trim(),
         nombre: nombre.trim(), telefono: normalizePhone(telefono), email: email.trim(),
-        codigoPostal, aceptaPrivacidad: esencial, autorizaContacto: esencial, aceptaComercial: comercial,
+        codigoPostalReal, aceptaPrivacidad: esencial, autorizaContacto: esencial, aceptaComercial: comercial,
         consent: consentTimes, company: "", utm: getAttribution(), turnstileToken, origen,
       };
       const res = await fetch("/api/lead/price-match", {
@@ -240,13 +239,12 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
           {errors.email && <p role="alert" className="mt-1 text-[12px] font-medium text-brand-red">{errors.email}</p>}
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-[13px] font-semibold text-ink">¿Dónde vives?</span>
-          <select value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value as typeof codigoPostal)}
-            className="w-full rounded-card border border-hair bg-white px-3 py-3 text-[15px]">
-            <option value="">Selecciona…</option>
-            {ZONA_OPTIONS.map((z) => <option key={z} value={z}>{z}</option>)}
-          </select>
-          {errors.codigoPostal && <p role="alert" className="mt-1 text-[12px] font-medium text-brand-red">{errors.codigoPostal}</p>}
+          <span className="mb-1.5 block text-[13px] font-semibold text-ink">Código postal</span>
+          <input value={codigoPostalReal}
+            onChange={(e) => setCodigoPostalReal(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            inputMode="numeric" autoComplete="postal-code" placeholder="35001…"
+            className="w-full rounded-card border border-hair bg-white px-3 py-3 text-[15px]" />
+          {errors.codigoPostalReal && <p role="alert" className="mt-1 text-[12px] font-medium text-brand-red">{errors.codigoPostalReal}</p>}
         </label>
       </div>
 

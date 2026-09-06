@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizePhone } from "@/lib/schema";
+import { zonaFromCP } from "@/lib/zonaFromCP";
 import { SALUD_CONFIG, VIDA_CONFIG, AUTO_CONFIG, DECESOS_CONFIG, type FormData, type Step } from "@/lib/forms";
 import { ArrowRight, ChevronLeft, Spinner } from "./icons";
 import { DatePicker } from "./DatePicker";
@@ -248,7 +249,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
       id: "",
       producto: variant as "salud" | "vida",
       createdAt: new Date().toISOString(),
-      codigoPostal: String(data.codigoPostal ?? ""),
+      codigoPostal: String(data.codigoPostal ?? zonaFromCP(String(data.codigoPostalReal ?? "")) ?? ""),
       numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1 : undefined,
       coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
       fechaNacimiento: String(draftData.fechaNacimiento ?? ""),
@@ -314,7 +315,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
           id: body?.id ?? `local-${Date.now()}`,
           producto: variant,
           createdAt: new Date().toISOString(),
-          codigoPostal: String(data.codigoPostal ?? ""),
+          codigoPostal: String(data.codigoPostal ?? zonaFromCP(String(data.codigoPostalReal ?? "")) ?? ""),
           numAsegurados: variant === "salud" ? Number(data.numAsegurados) || 1
             : variant === "decesos" ? Number(data.numAsegurados) || 1 : undefined,
           coberturaDental: variant === "salud" ? !!data.coberturaDental : undefined,
@@ -707,7 +708,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
         onClose={() => setShowExitIntent(false)}
         nombre={String(data.nombre ?? "")}
         telefono={String(data.telefono ?? "")}
-        codigoPostal={String(data.codigoPostal ?? "")}
+        codigoPostal={String(data.codigoPostal ?? zonaFromCP(String(data.codigoPostalReal ?? "")) ?? "")}
         producto={variant}
       />
     </section>

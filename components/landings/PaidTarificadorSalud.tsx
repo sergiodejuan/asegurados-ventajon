@@ -7,6 +7,7 @@ import { BRAND_NAME, DIAS_LLAMADA, TURNOS_LLAMADA } from "@/lib/brand";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { normalizePhone } from "@/lib/schema";
+import { zonaFromCP } from "@/lib/zonaFromCP";
 import { saveQuote, saveCallResult, saveLeadDraft } from "@/lib/quote";
 import { saveClientProfile } from "@/lib/clientArea";
 import { Check, ChevronDown, ChevronLeft, Phone, Spinner } from "@/components/icons";
@@ -154,7 +155,6 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
       if (incompleto) errs.aseguradosAdicionales = "Completa la fecha de nacimiento y el sexo de cada asegurado.";
     }
     if (step === "zona") {
-      if (!form.codigoPostal) errs.codigoPostal = "Selecciona dónde vives.";
       if (!/^\d{5}$/.test(form.codigoPostalReal)) errs.codigoPostalReal = "5 dígitos.";
     }
     setErrors(errs);
@@ -184,9 +184,10 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
     try {
       // Payload draft — todo lo técnico. El modal-gate de /comparativa
       // añadirá nombre/telefono/email/consents antes de crear el lead real.
+      const zonaDerivada = zonaFromCP(form.codigoPostalReal) ?? "";
       const draftData = {
         inicio: form.inicio,
-        codigoPostal: form.codigoPostal,
+        codigoPostal: zonaDerivada,
         numAsegurados: form.numAsegurados,
         fechaNacimiento: form.fechaNacimiento,
         sexo: form.sexo,
@@ -209,7 +210,7 @@ export function PaidTarificadorSalud({ phone, logoUrl, slug }: { phone: string; 
       // pueda mostrar los filtros de arriba sin esperar al backend.
       saveQuote({
         producto: "salud",
-        codigoPostal: form.codigoPostal,
+        codigoPostal: zonaDerivada,
         numAsegurados: form.numAsegurados,
         coberturaDental: form.coberturaDental,
         fechaNacimiento: form.fechaNacimiento,
@@ -577,21 +578,7 @@ function ZonaStep({ form, set, errors }: {
       <p className="mt-3 text-[15px] leading-relaxed text-slate2">
         Nos ayuda a ajustar tu comparativa a las aseguradoras disponibles en tu zona.
       </p>
-      <div className="mt-6 grid gap-5 md:grid-cols-2">
-        <Field label="¿Dónde vives?" error={errors.codigoPostal}>
-          <div className="relative">
-            <select value={form.codigoPostal} onChange={(e) => set("codigoPostal", e.target.value as Form["codigoPostal"])}
-              className="w-full appearance-none rounded-[12px] border border-hair bg-white px-4 py-3.5 pr-10 text-[16px] focus:border-navy focus:outline-none">
-              <option value="">Selecciona una zona</option>
-              <option value="Islas Canarias">Islas Canarias</option>
-              <option value="Islas Baleares">Islas Baleares</option>
-              <option value="Península">Península</option>
-            </select>
-            <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate2">
-              <ChevronDown width={16} height={16} />
-            </span>
-          </div>
-        </Field>
+      <div className="mt-6">
         <Field label="Código postal" hint="5 dígitos" error={errors.codigoPostalReal}>
           <input inputMode="numeric" value={form.codigoPostalReal} onChange={(e) => set("codigoPostalReal", e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="00000" autoComplete="postal-code"
             className="w-full rounded-[12px] border border-hair bg-white px-4 py-3.5 text-[16px] tnums focus:border-navy focus:outline-none" />

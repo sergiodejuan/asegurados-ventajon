@@ -15,9 +15,16 @@ const phoneField = z
 // campo/variable que antes llevaba un código postal de 5 dígitos, ahora con
 // la zona de residencia — así no hace falta tocar la automatización de
 // ManyChat, que ya lee esta variable.
-const zonaField = z.enum(["Islas Canarias", "Islas Baleares", "Península"], {
-  errorMap: () => ({ message: "Selecciona dónde vives." }),
-});
+//
+// Desde 2026-09 el tarificador ya no pide la zona a mano: pide sólo el
+// CP real de 5 dígitos y el backend deriva la zona con `zonaFromCP()`.
+// Por eso `zonaField` acepta también la cadena vacía y sin valor — el
+// handler del endpoint la rellena tras el parse.
+const zonaValues = ["Islas Canarias", "Islas Baleares", "Península"] as const;
+const zonaField = z
+  .union([z.enum(zonaValues), z.literal(""), z.undefined()])
+  .optional()
+  .transform((v) => (v && v.length ? v : ""));
 
 const utmField = z
   .object({
@@ -115,6 +122,14 @@ const documentoField = z
   .transform(normalizeDocumento)
   .refine((v) => /^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(v), { message: "Revisa el DNI o NIE (formato no válido)." });
 const codigoPostalRealField = z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos.");
+// Igual que el anterior, pero opcional — para tarificadores donde el CP se
+// pide en lugar de la zona pero no siempre viene (flujos legacy, campañas
+// que aún envían solo la zona a mano). Cuando venga, sirve para derivar
+// `codigoPostal` (zona) automáticamente en el endpoint.
+const codigoPostalRealOptionalField = z
+  .union([z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos."), z.literal("")])
+  .optional()
+  .default("");
 
 // Asegurados adicionales (más allá del titular): solo género y fecha de
 // nacimiento, recogidos de forma ligera dentro del propio tarificador — el
@@ -182,6 +197,7 @@ export type LeadInput = z.input<typeof leadSchema>;
 export const vidaSchema = z.object({
   motivo: z.enum(["familia", "hipoteca", "ahorro", "otro"]),
   codigoPostal: zonaField,
+  codigoPostalReal: codigoPostalRealOptionalField,
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
   fumador: z.boolean(),
@@ -214,6 +230,7 @@ export const decesosSchema = z.object({
     z.number().int().min(1).max(9)
   ).optional().default(1),
   codigoPostal: zonaField,
+  codigoPostalReal: codigoPostalRealOptionalField,
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
   yaTieneSeguro: z.boolean(),
@@ -243,6 +260,7 @@ export const autoSchema = z.object({
   anioVehiculo: z.string().trim().max(4).optional().default(""),
   usoVehiculo: z.enum(["particular", "trabajo", "vtc_taxi"]),
   codigoPostal: zonaField,
+  codigoPostalReal: codigoPostalRealOptionalField,
   fechaNacimiento: dobField,
   sexo: z.enum(["hombre", "mujer"]),
   antiguedadCarnet: z.enum(["menos_2", "2_5", "mas_5"]),
@@ -390,6 +408,7 @@ export const priceMatchSchema = z.object({
   telefono: phoneField,
   email: z.string().trim().toLowerCase().email("Revisa tu correo electrónico."),
   codigoPostal: zonaField,
+  codigoPostalReal: codigoPostalRealOptionalField,
   // Contexto opcional: le sirve al asesor para dimensionar el caso (renovar
   // caro, un asegurado con enfermedad preexistente...). Máx. 500 caracteres
   // para que no se convierta en un chat.

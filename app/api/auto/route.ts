@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { autoSchema } from "@/lib/schema";
+import { zonaFromCP } from "@/lib/zonaFromCP";
 import { upsertLead, createPresupuesto } from "@/lib/store";
 import { buildConsent } from "@/lib/consent";
 import { retellConfigured, triggerOutboundCall } from "@/lib/retell";
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, errors: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const d = parsed.data;
+  // Zona derivada del CP — el tarificador ya no la pide a mano.
+  if (!d.codigoPostal) { d.codigoPostal = zonaFromCP(d.codigoPostalReal) ?? "Península"; }
   if (d.company) return NextResponse.json({ ok: true });
 
   const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));

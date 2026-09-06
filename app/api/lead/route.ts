@@ -18,6 +18,7 @@ import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
 import { notifyTeamNewLead } from "@/lib/notifyTeam";
+import { zonaFromCP } from "@/lib/zonaFromCP";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, errors: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const d = parsed.data;
+  // Zona derivada del CP: el tarificador ya no la pide a mano — solo pide
+  // los 5 dígitos y aquí resolvemos "Islas Canarias / Baleares / Península"
+  // por provincia INE. Si por lo que sea no viene ninguno de los dos,
+  // caemos a "Península" como valor conservador (mayoritario). El catálogo
+  // interno (lib/catalog) y la automatización de ManyChat siguen leyendo
+  // este mismo campo `codigoPostal` sin cambios.
+  if (!d.codigoPostal) {
+    d.codigoPostal = zonaFromCP(d.codigoPostalReal) ?? "Península";
+  }
   if (d.company) return NextResponse.json({ ok: true }); // honeypot
 
   const humano = await verifyTurnstile(d.turnstileToken, getClientIp(request));
