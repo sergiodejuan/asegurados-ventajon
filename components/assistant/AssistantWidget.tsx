@@ -9,7 +9,7 @@ import { getAttribution, withUtmParams } from "@/lib/attribution";
 import { loadClientProfile, saveClientProfile } from "@/lib/clientArea";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Close, IconByName, Spinner, ChevronLeft, ChevronRight, Phone } from "@/components/icons";
-import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "@/components/EssentialConsent";
+import { EssentialConsentCheckbox } from "@/components/EssentialConsent";
 import { getProductPage, quoteHref } from "@/lib/productPages";
 import {
   isAssistantAllowed,
@@ -927,19 +927,18 @@ function TicketConfirm({
         </>
       )}
 
-      <div className="mt-4 flex flex-col gap-2.5">
+      <div className="mt-4">
+        {/* Consentimiento único (decisión producto 2026-09) — ver AVISO
+            LEGAL en components/EssentialConsent.tsx. */}
         <EssentialConsentCheckbox
           idPrefix="a-ticket" size="sm" checked={esencial}
           onChange={(v) => {
             setEsencial(v);
+            setComercial(v);
             const at = v ? new Date().toISOString() : undefined;
-            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at, comercialAt: at }));
           }}
           error={errors.aceptaPrivacidad ?? errors.autorizaContacto}
-        />
-        <ComercialConsentCheckbox
-          idPrefix="a-ticket" size="sm" checked={comercial}
-          onChange={(v) => { setComercial(v); setConsentTimes((c) => ({ ...c, comercialAt: v ? new Date().toISOString() : undefined })); }}
         />
       </div>
 
@@ -1061,19 +1060,18 @@ function ContactCapture({ intent, answers, onDone }: { intent: Intent; answers: 
         {errors.codigoPostal && <p id="a-cp-err" role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{errors.codigoPostal}</p>}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2.5">
+      <div className="mt-4">
+        {/* Consentimiento único (decisión producto 2026-09) — ver AVISO
+            LEGAL en components/EssentialConsent.tsx. */}
         <EssentialConsentCheckbox
           idPrefix="a-capture" size="sm" checked={esencial}
           onChange={(v) => {
             setEsencial(v);
+            setComercial(v);
             const at = v ? new Date().toISOString() : undefined;
-            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+            setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at, comercialAt: at }));
           }}
           error={errors.aceptaPrivacidad ?? errors.autorizaContacto}
-        />
-        <ComercialConsentCheckbox
-          idPrefix="a-capture" size="sm" checked={comercial}
-          onChange={(v) => { setComercial(v); setConsentTimes((c) => ({ ...c, comercialAt: v ? new Date().toISOString() : undefined })); }}
         />
       </div>
 

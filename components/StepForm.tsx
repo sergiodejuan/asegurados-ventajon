@@ -11,7 +11,7 @@ import { saveQuote, saveLeadDraft } from "@/lib/quote";
 import { addClientQuote, saveClientProfile } from "@/lib/clientArea";
 import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
-import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
+import { EssentialConsentCheckbox } from "./EssentialConsent";
 import { ExitIntentModal } from "./ExitIntentModal";
 import { TurnstileWidget } from "./TurnstileWidget";
 
@@ -165,16 +165,21 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
   }
 
-  // Un único check cubre privacidad + autorización de contacto (o, en
-  // salud/vida, privacidad + datos de salud) — ver components/EssentialConsent.tsx.
+  // Un único check cubre privacidad + autorización de contacto + comunicaciones
+  // comerciales (+ datos de salud en salud/vida). Ver AVISO LEGAL en
+  // components/EssentialConsent.tsx — decisión producto 2026-09.
+  // Al marcarlo firmamos DOBLE timestamp (contactoAt + comercialAt) y
+  // también marcamos aceptaComercial=true en el estado del form.
   function toggleEsencial(checked: boolean) {
-    set({ aceptaEsencial: checked });
+    set({ aceptaEsencial: checked, aceptaComercial: checked });
     const at = checked ? new Date().toISOString() : undefined;
     const isHealthLike = variant === "salud" || variant === "vida";
     setConsentTimes((c) => ({
       ...c,
       privacidadAt: at,
-      ...(isHealthLike ? { datosSaludAt: at } : { contactoAt: at }),
+      contactoAt: at,
+      comercialAt: at,
+      ...(isHealthLike ? { datosSaludAt: at } : {}),
     }));
   }
 
@@ -616,15 +621,14 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
               )}
               <Field id="f-telefono" label="Teléfono móvil" type="tel" inputMode="tel" value={String(data.telefono ?? "")} onChange={(v) => set({ telefono: v })} autoComplete="tel" error={errors.telefono} placeholder="600 000 000…" />
               <Field id="f-email" label="Correo electrónico" type="email" inputMode="email" value={String(data.email ?? "")} onChange={(v) => set({ email: v })} autoComplete="email" spellCheck={false} autoCapitalize="none" error={errors.email} placeholder="maria@correo.com…" />
-              <div className="mt-5 flex flex-col gap-3">
+              <div className="mt-5">
+                {/* Consentimiento único (decisión producto 2026-09): el
+                    check esencial abarca también las comunicaciones
+                    comerciales. Ver AVISO LEGAL en EssentialConsent.tsx. */}
                 <EssentialConsentCheckbox
                   idPrefix="f" datosSalud={variant === "salud" || variant === "vida"}
                   checked={!!data.aceptaEsencial} onChange={toggleEsencial}
                   error={errors.aceptaEsencial}
-                />
-                <ComercialConsentCheckbox
-                  idPrefix="f" checked={!!data.aceptaComercial}
-                  onChange={(v) => toggleConsent("comercialAt", "aceptaComercial", v)}
                 />
               </div>
               <TurnstileWidget onToken={setTurnstileToken} />

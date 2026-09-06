@@ -10,7 +10,7 @@ import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { Check, ChevronDown, ChevronLeft, Close, Spinner } from "@/components/icons";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { resizeImageFile, MAX_IMAGE_FILE_BYTES } from "@/components/admin/ImageField";
-import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "@/components/EssentialConsent";
+import { EssentialConsentCheckbox } from "@/components/EssentialConsent";
 
 // Modal a pantalla completa con wizard de 4 pasos para el flujo "igualación
 // de precio" (/precio-mejor-garantizado). Mismo patrón de pasos que el
@@ -196,9 +196,13 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
     setSubmitError(null);
     setSubmitting(true);
     try {
+      // Consentimiento único (decisión producto 2026-09): el check
+      // esencial engloba también publicidad. Doble stamp
+      // contactoAt + comercialAt bajo el mismo `now`.
       const consent = {
-        privacidadAt: now, contactoAt: now,
-        ...(form.aceptaComercial ? { comercialAt: now } : {}),
+        privacidadAt: now,
+        contactoAt: now,
+        comercialAt: now,
       };
       const payload = {
         producto: form.producto,
@@ -213,7 +217,7 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
         codigoPostal: form.codigoPostal,
         aceptaPrivacidad: form.aceptaEsencial,
         autorizaContacto: form.aceptaEsencial,
-        aceptaComercial: form.aceptaComercial,
+        aceptaComercial: true,
         consent,
         company: "",
         utm: getAttribution(),
@@ -447,15 +451,14 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
                   <p className="mt-3 text-[15px] leading-relaxed text-slate2 md:text-[16px]">
                     Confirma que aceptas nuestros términos y enviamos tu solicitud. Un asesor te contacta en menos de 24 horas laborables.
                   </p>
-                  <div className="mt-6 flex flex-col gap-4">
+                  <div className="mt-6">
+                    {/* Consentimiento único (decisión producto 2026-09) —
+                        ver AVISO LEGAL en EssentialConsent.tsx. Al marcarlo
+                        también se firma el comercial en el submit. */}
                     <EssentialConsentCheckbox
                       idPrefix="pm-modal" checked={form.aceptaEsencial}
-                      onChange={(v) => set("aceptaEsencial", v)}
+                      onChange={(v) => { set("aceptaEsencial", v); set("aceptaComercial", v); }}
                       error={errors.aceptaEsencial}
-                    />
-                    <ComercialConsentCheckbox
-                      idPrefix="pm-modal" checked={form.aceptaComercial}
-                      onChange={(v) => set("aceptaComercial", v)}
                     />
                   </div>
 

@@ -6,18 +6,22 @@ import { BRAND_NAME } from "@/lib/brand";
 // tarificadores que crean un lead completo (ComparativaGate, CallRequestForm,
 // PriceMatchForm, PriceMatchStepsModal, StepForm, AssistantWidget).
 //
-// Antes cada uno pedía 3-4 checks sueltos (privacidad, autorización de
-// contacto, datos de salud, comercial) y eso generaba fricción real en el
-// envío de leads. Se fusiona en un único check "esencial" que cubre a la vez
-// la información de privacidad y la autorización de contacto necesaria para
-// atender la propia solicitud (no requiere consentimiento aparte: es
-// tratamiento necesario para prestar el servicio pedido, art. 6.1.b RGPD) y,
-// cuando el producto trata datos de salud (salud/vida — fumador/motivo
-// cuentan como datos de salud a efectos legales), el consentimiento explícito
-// y separado que exige el art. 9 RGPD para categorías especiales. El check de
-// comunicaciones comerciales sigue aparte, opcional y desmarcado por
-// defecto — nunca se mezcla con el esencial (RGPD exige consentimientos
-// granulares por finalidad).
+// ⚠️ AVISO LEGAL (decisión producto 2026-09):
+// El único check que se muestra al usuario en los tarificadores agrupa
+// la información de privacidad + autorización de contacto + comunicaciones
+// comerciales. Cuando el usuario lo marca, el frontend graba DOBLE
+// timestamp (contactoAt + comercialAt) y envía aceptaComercial=true al
+// backend.
+//
+// Esta agrupación es DELIBERADA a nivel producto pese al riesgo RGPD
+// documentado (AEPD sanciona el consentimiento no libre / no granular
+// cuando publicidad va atada al servicio). Se conserva la clase
+// `ComercialConsentCheckbox` por si se decidiera separarlos en el
+// futuro, pero los tarificadores no la pintan actualmente.
+//
+// Producto de datos de salud (salud/vida — fumador/motivo cuentan como
+// datos de salud): añadimos también el consentimiento explícito art. 9
+// RGPD dentro del mismo check.
 export type EssentialConsentProps = {
   idPrefix: string;
   datosSalud?: boolean;
@@ -49,9 +53,9 @@ export function EssentialConsentCheckbox({
           He sido informado sobre el tratamiento de mis datos conforme a la{" "}
           <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>
           {datosSalud ? (
-            <> y consiento expresamente el tratamiento de mis <strong className="text-navy">datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi seguro.</>
+            <>, consiento expresamente el tratamiento de mis <strong className="text-navy">datos de salud</strong> (art. 9.2.a RGPD) para calcular y comparar mi seguro, y autorizo a {BRAND_NAME} a contactarme por teléfono, WhatsApp o email para gestionar mi solicitud y para enviarme comunicaciones comerciales de sus productos.</>
           ) : (
-            <> y autorizo que {BRAND_NAME} me contacte por teléfono, WhatsApp o email para gestionar mi solicitud.</>
+            <> y autorizo a {BRAND_NAME} a contactarme por teléfono, WhatsApp o email para gestionar mi solicitud y para enviarme comunicaciones comerciales de sus productos.</>
           )}
         </span>
       </label>
@@ -60,6 +64,10 @@ export function EssentialConsentCheckbox({
   );
 }
 
+// Se mantiene por compatibilidad — hoy no lo pinta ningún tarificador
+// (el consentimiento comercial va embebido en el check esencial, ver
+// AVISO LEGAL arriba). Si el equipo legal exige separarlos otra vez,
+// vuelve a añadirlo al lado del EssentialConsentCheckbox en cada form.
 export function ComercialConsentCheckbox({
   idPrefix, checked, onChange, size = "md",
 }: {

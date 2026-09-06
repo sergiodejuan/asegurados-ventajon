@@ -7,7 +7,7 @@ import { getAttribution } from "@/lib/attribution";
 import { pushDataLayerEvent } from "@/lib/dataLayer";
 import { TurnstileWidget } from "./TurnstileWidget";
 import { Spinner } from "./icons";
-import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
+import { EssentialConsentCheckbox } from "./EssentialConsent";
 import { resizeImageFile, MAX_IMAGE_FILE_BYTES } from "./admin/ImageField";
 
 type FieldErrors = Partial<Record<string, string>>;
@@ -88,10 +88,14 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
     setConsentTimes((c) => ({ ...c, [key]: checked ? new Date().toISOString() : undefined }));
   }
 
+  // Consentimiento único (decisión producto 2026-09): al marcar el
+  // check esencial también se firma el comercial. Ver AVISO LEGAL en
+  // components/EssentialConsent.tsx.
   function toggleEsencial(checked: boolean) {
     setEsencial(checked);
+    setComercial(checked);
     const at = checked ? new Date().toISOString() : undefined;
-    setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at }));
+    setConsentTimes((c) => ({ ...c, privacidadAt: at, contactoAt: at, comercialAt: at }));
   }
 
   async function submit(e: React.FormEvent) {
@@ -246,15 +250,11 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
         </label>
       </div>
 
-      {/* Consentimientos */}
-      <div className="flex flex-col gap-2 rounded-card border border-hair bg-mist/40 p-3">
+      {/* Consentimiento único (ver AVISO LEGAL en EssentialConsent.tsx). */}
+      <div className="rounded-card border border-hair bg-mist/40 p-3">
         <EssentialConsentCheckbox
           idPrefix="pm" size="sm" checked={esencial} onChange={toggleEsencial}
           error={errors.aceptaPrivacidad}
-        />
-        <ComercialConsentCheckbox
-          idPrefix="pm" size="sm" checked={comercial}
-          onChange={(v) => toggleConsent("comercialAt", v, setComercial)}
         />
       </div>
 

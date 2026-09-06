@@ -343,11 +343,16 @@ export function Comparativa() {
       if (draft) {
         // Nuevo flujo: creamos el lead REAL con datos combinados. El
         // backend ya valida strict con los schemas Zod correspondientes.
+        //
+        // Consentimiento único (ver AVISO LEGAL en EssentialConsent.tsx):
+        // el check esencial también otorga el comercial. Se firma con
+        // doble timestamp — contactoAt para el tratamiento necesario y
+        // comercialAt para publicidad — bajo el MISMO instante `nowIso`.
         const consent = {
           privacidadAt: nowIso,
           contactoAt: nowIso,
+          comercialAt: nowIso,
           ...(isHealthLike ? { datosSaludAt: nowIso } : {}),
-          ...(gateAceptaComercial ? { comercialAt: nowIso } : {}),
         };
         const payload = {
           ...draft.data,
@@ -360,7 +365,7 @@ export function Comparativa() {
           aceptaPrivacidad: true,
           autorizaContacto: true,
           ...(isHealthLike ? { aceptaDatosSalud: true } : {}),
-          aceptaComercial: gateAceptaComercial,
+          aceptaComercial: true,
           consent,
         };
         const res = await fetch(draft.endpoint, {
@@ -411,7 +416,7 @@ export function Comparativa() {
           body: JSON.stringify({
             lookupPhone: quote?.telefono,
             lookupEmail: quote?.email,
-            patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: gateAceptaComercial },
+            patch: { nombre: gateNombre, telefono: gateTelefono, email: gateEmail, aceptaComercial: true },
           }),
         });
         const next = updateQuote({ nombre: gateNombre, telefono: gateTelefono, email: gateEmail });
@@ -1425,12 +1430,15 @@ function ComparativaGate({
             {BRAND_NAME}, como responsable del tratamiento, usará tus datos para tarificar tu seguro y que un asesor te confirme el precio final.{" "}
             <a href="/legal#privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">Leer más</a>
           </p>
+          {/* Consentimiento único (decisión producto 2026-09): el check
+              esencial engloba también la aceptación de comunicaciones
+              comerciales — al marcarlo, `aceptaComercial` se activa
+              automáticamente en el submit y se firma doble timestamp
+              contactoAt + comercialAt. Ver AVISO LEGAL en
+              components/EssentialConsent.tsx. */}
           <EssentialConsentCheckbox
             idPrefix="comparativa-gate" datosSalud={isHealthLike}
             checked={aceptaEsencial} onChange={onAceptaEsencial}
-          />
-          <ComercialConsentCheckbox
-            idPrefix="comparativa-gate" checked={aceptaComercial} onChange={onAceptaComercial}
           />
 
           {error && <p role="alert" className="mt-1 rounded-[10px] bg-brand-red/10 px-4 py-2.5 text-[13px] font-medium text-brand-red-deep">{error}</p>}
