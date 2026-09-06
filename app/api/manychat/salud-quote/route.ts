@@ -129,21 +129,46 @@ function pickBestQuote(quotes: CodeoscopicQuoteSummary[]): CodeoscopicQuoteSumma
   return [...bucket].sort((a, b) => (a.premium ?? Infinity) - (b.premium ?? Infinity))[0];
 }
 
-// Espera hasta `deadlineMs` a que Codeoscopic tenga al menos una oferta
-// con precio. Poll cada 2s con `getInsurance` — barato, la sesión Redis
-// del helper Codeoscopic se cachea entre llamadas.
-async function waitForFirstQuote(insuranceId: string, deadlineMs: number): Promise<CodeoscopicQuoteSummary | null> {
+// Codeoscopic va devolviendo cada aseguradora en momentos distintos
+// (Generali suele responder la primera, ~3-5s; Adeslas/Asisa pueden
+// tardar 15-30s). Devolver la primera firme que aparece sesgaría siempre
+// el resultado a Generali. Estrategia:
+//
+//   1) Poll cada 2s hasta que summary.done === true (todas firmes), o
+//   2) mínimo `minWaitMs` de espera aunque ya haya alguna firme, para
+//      dar tiempo a que lleguen las otras compañías, o
+//   3) todas las compañías esperadas ya llegaron firmes (>= minFirmQuotes).
+//
+// Luego devuelve la MÁS BARATA entre todas las firmes que hayan llegado.
+// Timeout duro en `deadlineMs`: pasado ese punto, devolvemos lo que
+// tengamos (o null si no llegó ninguna).
+async function waitForBestQuote(
+  insuranceId: string,
+  deadlineMs: number,
+  opts: { minWaitMs?: number; minFirmQuotes?: number } = {},
+): Promise<CodeoscopicQuoteSummary | null> {
+  const minWaitMs = opts.minWaitMs ?? 18_000;    // 18 s: da margen a 3-4 aseguradoras
+  const minFirmQuotes = opts.minFirmQuotes ?? 5; // 5 firmes = ya no vale la pena esperar más
+  const started = Date.now();
+  let best: CodeoscopicQuoteSummary | null = null;
+  let firmCount = 0;
+
   while (Date.now() < deadlineMs) {
     try {
       const snap = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(insuranceId)}`);
-      const best = pickBestQuote(summarizeInsurance(snap).quotes);
-      if (best) return best;
+      const summary = summarizeInsurance(snap);
+      const current = pickBestQuote(summary.quotes);
+      if (current) best = current;
+      firmCount = summary.quotes.filter((q) => !q.estimate && typeof q.premium === "number" && q.premium! > 0).length;
+      const elapsed = Date.now() - started;
+      const okToReturn = summary.done || firmCount >= minFirmQuotes || (best && elapsed >= minWaitMs);
+      if (okToReturn && best) return best;
     } catch (err) {
       console.error("[manychat/salud-quote] poll fallo:", (err as Error).message);
     }
     await new Promise((r) => setTimeout(r, 2000));
   }
-  return null;
+  return best;
 }
 
 function respond(payload: ResponseShape, status = 200) {
@@ -241,11 +266,13 @@ export async function POST(request: Request) {
       if (!created?.id) throw new CodeoscopicError(502, "Codeoscopic no devolvió un id.");
       insuranceId = created.id;
       await setLeadCodeoscopicInsuranceId(lead.id, insuranceId);
-
-      // A veces el POST ya devuelve alguna oferta firme — usarla ahorra el
-      // primer poll y respondemos más rápido a WhatsApp.
-      const inline = pickBestQuote(summarizeInsurance(created).quotes);
-      if (inline) return respond(buildQuoteResponse(lead.id, insuranceId, inline));
+      // Antes había un atajo aquí: si el POST /insurances ya traía alguna
+      // oferta inline, respondíamos con ella. Ese atajo sesgaba SIEMPRE
+      // a la aseguradora que Codeoscopic devolvía primera (Generali),
+      // ignorando las demás que llegan a los pocos segundos. Ahora
+      // dejamos que waitForBestQuote() decida — espera un mínimo de
+      // ~18 s para dar tiempo a que respondan varias compañías y elige
+      // la más barata entre todas.
     } catch (err) {
       console.error("[manychat/salud-quote] POST /insurances falló:", (err as Error).message);
       return respond({
@@ -259,7 +286,7 @@ export async function POST(request: Request) {
   // Deadline: dejamos 8s de margen sobre maxDuration para que la respuesta
   // salga a tiempo aunque el último poll haya empezado.
   const deadline = Date.now() + 48_000;
-  const best = await waitForFirstQuote(insuranceId, deadline);
+  const best = await waitForBestQuote(insuranceId, deadline);
   if (best) return respond(buildQuoteResponse(lead.id, insuranceId, best));
 
   // Timeout sin ofertas: respondemos calculando y el follow-up humano se
