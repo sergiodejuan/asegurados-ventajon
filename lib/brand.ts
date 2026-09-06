@@ -27,6 +27,12 @@ export const SITE_URL =
       ? `https://${process.env.VERCEL_URL}`
       : "https://asegurados-ventajon.vercel.app");
 
+// Número de WhatsApp del asesor comercial (una única línea para toda la
+// web pública — Header, menú móvil, landings, quienes-somos, testimonios,
+// preguntas frecuentes, área cliente, etc.). Se sobreescribe con
+// NEXT_PUBLIC_WHATSAPP_NUMBER cuando exista; el fallback es el real de
+// producción para que un despliegue sin variables definidas no acabe
+// dirigiendo tráfico a un número que no es nuestro.
 export const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34637143809";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
