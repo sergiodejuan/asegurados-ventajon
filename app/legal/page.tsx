@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
-import { BRAND_NAME, CONTACT_HOURS, PARTNERS, SITE_URL } from "@/lib/brand";
+import {
+  BRAND_NAME,
+  CONTACT_HOURS,
+  DGSFP_KEY,
+  LEGAL_ADDRESS,
+  LEGAL_ADDRESS_ONELINE,
+  LEGAL_CIF,
+  LEGAL_NAME,
+  PARTNERS,
+  SITE_URL,
+} from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `Información legal — ${BRAND_NAME}`,
@@ -36,12 +46,13 @@ export default function Legal() {
         <h1 className="text-[26px] font-extrabold text-navy">Información legal</h1>
 
         <div className="mt-4 rounded-card border border-brand-red/30 bg-brand-red/5 p-4">
-          <p className="text-[14px] font-semibold text-brand-red-deep">Pendiente de completar</p>
+          <p className="text-[14px] font-semibold text-brand-red-deep">Datos pendientes</p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Este texto ya cubre la estructura y las cláusulas exigidas por el RGPD, la LOPDGDD, la
-            LSSI-CE y la normativa de distribución de seguros (RD-ley 3/2020). Los datos identificativos
-            concretos de la correduría, marcados en rojo, deben completarse con la información real antes
-            de publicar — y conviene una revisión final de un asesor legal.
+            Los datos identificativos y registrales de la correduría ya están cumplimentados. Quedan
+            marcados en rojo únicamente los datos operativos que aún faltan por confirmar (emails de
+            contacto legal, DPO, atención al cliente, ejercicio de derechos, baja comercial, aseguradora
+            del seguro de RC profesional, inscripción en el Registro Mercantil y teléfono legal). Antes
+            de publicar conviene una revisión final de un asesor legal.
           </p>
         </div>
 
@@ -62,9 +73,11 @@ export default function Legal() {
         <P>
           En cumplimiento del artículo 10 de la Ley 34/2002, de Servicios de la Sociedad de la
           Información y de Comercio Electrónico, se informa de los siguientes datos: este sitio web
-          (<span translate="no">{SITE_URL}</span>) es titularidad de <strong translate="no">{BRAND_NAME}</strong>,
-          con CIF <Pendiente>CIF de la correduría</Pendiente>, domicilio social en{" "}
-          <Pendiente>domicilio social completo</Pendiente>, inscrita en el Registro Mercantil de{" "}
+          (<span translate="no">{SITE_URL}</span>) es titularidad de{" "}
+          <strong translate="no">{LEGAL_NAME}</strong> (que opera comercialmente bajo la marca{" "}
+          <span translate="no">{BRAND_NAME}</span>), con CIF{" "}
+          <span translate="no">{LEGAL_CIF}</span>, domicilio social en{" "}
+          <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>, inscrita en el Registro Mercantil de{" "}
           <Pendiente>provincia, tomo, folio, hoja</Pendiente>. Correo electrónico de contacto:{" "}
           <Pendiente>email de contacto legal</Pendiente>. Teléfono: <Pendiente>teléfono de contacto</Pendiente>.
         </P>
@@ -80,8 +93,8 @@ export default function Legal() {
         <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-relaxed text-slate2">
           <li>
             Se encuentra inscrita en el Registro Administrativo Especial de Distribuidores de Seguros y
-            Reaseguros de la Dirección General de Seguros y Fondos de Pensiones (DGSFP) con el número{" "}
-            <Pendiente>nº de registro DGSFP</Pendiente>, registro que puede consultarse en{" "}
+            Reaseguros de la Dirección General de Seguros y Fondos de Pensiones (DGSFP) con clave{" "}
+            <span translate="no">{DGSFP_KEY}</span>, registro que puede consultarse en{" "}
             <a href="https://sedeelectronica.dgsfp.mineco.es/" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">
               sedeelectronica.dgsfp.mineco.es
             </a>.
@@ -114,8 +127,9 @@ export default function Legal() {
 
         <H3>3.1 Responsable del tratamiento</H3>
         <P>
-          <strong translate="no">{BRAND_NAME}</strong>, CIF <Pendiente>CIF</Pendiente>, domicilio en{" "}
-          <Pendiente>domicilio social</Pendiente>. Contacto para cuestiones de protección de datos:{" "}
+          <strong translate="no">{LEGAL_NAME}</strong>, CIF <span translate="no">{LEGAL_CIF}</span>,
+          domicilio en <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>. Contacto para cuestiones de
+          protección de datos:{" "}
           <Pendiente>email del delegado de protección de datos o responsable de privacidad</Pendiente>.
         </P>
 
@@ -287,7 +301,7 @@ export default function Legal() {
           Estas condiciones se rigen por la legislación española. Para cualquier controversia que no
           pueda resolverse por vía amistosa, y sin perjuicio del derecho del usuario consumidor a acudir
           al fuero de su domicilio, las partes se someten a los Juzgados y Tribunales de{" "}
-          <Pendiente>ciudad del domicilio social</Pendiente>.
+          <span translate="no">{LEGAL_ADDRESS.province}</span>.
         </P>
 
         {/* 6. COMUNICACIONES COMERCIALES */}

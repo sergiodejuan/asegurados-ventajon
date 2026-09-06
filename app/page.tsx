@@ -12,7 +12,7 @@ import { InsuranceQuoteCta } from "@/components/InsuranceQuoteCta";
 import { Check, IconByName, ArrowRight } from "@/components/icons";
 import { PartnerBadge } from "@/components/PartnerBadge";
 import { SocialProofBadge } from "@/components/SocialProofBadge";
-import { BRAND_NAME, SITE_URL, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS } from "@/lib/brand";
+import { BRAND_NAME, SITE_URL, PARTNERS, ECOSYSTEM_MEMBERS, VENTAJAS, TRUST_STATS, LEGAL_NAME, LEGAL_ADDRESS } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { getTheme } from "@/lib/store";
 import { safeJsonLd } from "@/lib/safeJsonLd";
@@ -58,8 +58,17 @@ export default async function Home() {
       {
         "@type": "InsuranceAgency",
         name: BRAND_NAME,
+        legalName: LEGAL_NAME,
         url: SITE_URL,
         description: HOME_DESCRIPTION,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: LEGAL_ADDRESS.street,
+          postalCode: LEGAL_ADDRESS.postalCode,
+          addressLocality: LEGAL_ADDRESS.city,
+          addressRegion: LEGAL_ADDRESS.province,
+          addressCountry: "ES",
+        },
         areaServed: [
           { "@type": "AdministrativeArea", name: "Islas Canarias" },
           { "@type": "AdministrativeArea", name: "Islas Baleares" },

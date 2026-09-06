@@ -7,6 +7,30 @@
  */
 export const BRAND_NAME = "Asegurados Ventajon";
 
+/* ------------------------- Identidad fiscal y registral ------------------
+ * Datos oficiales de la correduría que titulan el sitio y aparecen en el
+ * aviso legal, el JSON-LD de organización y allí donde la ley obliga a
+ * identificarnos (art. 10 LSSI-CE, RD-ley 3/2020 de distribución de
+ * seguros). BRAND_NAME es la marca comercial; LEGAL_NAME es la razón
+ * social — no se pueden intercambiar en el aviso legal.
+ */
+export const LEGAL_NAME = "Ventajon Asegurados, S.L.";
+export const LEGAL_CIF = "B35064799";
+// Clave DGSFP de correduría. Se consulta en sedeelectronica.dgsfp.mineco.es.
+export const DGSFP_KEY = "J-2921";
+export const LEGAL_ADDRESS = {
+  street: "Autovía Las Palmas-Gando Km 12",
+  postalCode: "35219",
+  city: "Telde",
+  province: "Las Palmas",
+  country: "España",
+};
+export const LEGAL_ADDRESS_ONELINE =
+  `${LEGAL_ADDRESS.street}, ${LEGAL_ADDRESS.postalCode} ${LEGAL_ADDRESS.city}, ${LEGAL_ADDRESS.province}`;
+// CNAE 6622 — Actividades de agentes y corredores de seguros.
+export const LEGAL_CNAE = "6622";
+export const LEGAL_ACTIVITY = "Correduría de seguros";
+
 // Dominio absoluto para JSON-LD (url, breadcrumbs), links firmados que
 // se envían por email/WhatsApp, y cualquier URL absoluta que salga del
 // servidor. Prioridad:
