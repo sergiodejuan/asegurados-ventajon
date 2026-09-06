@@ -115,7 +115,110 @@ export function clasificaCopagoTexto(text: string): CopagoModo | null {
 
 const now = new Date().toISOString();
 
+// Precio NACIONAL sin copago (mismo en las 3 zonas) para un tramo de edad.
+// Las opciones negociadas de Asegurados Ventajón no varían por comunidad, así
+// que rellenamos las 3 zonas con el mismo valor.
+const nz = (sinCopago: number): TramoEdad["porZona"] => ({
+  canarias: { sinCopago },
+  baleares: { sinCopago },
+  peninsula: { sinCopago },
+});
+
+// Opciones NEGOCIADAS por Asegurados Ventajón (sin copagos), tarifario por
+// tramo de edad. NO se muestran en la comparativa pública (`activo: false`):
+// se usan solo para el mensaje de WhatsApp (/api/manychat/salud-negociadas),
+// que elige la ficha según el copago (siempre sin), el dental (según lo que
+// el usuario marca en el flow) y el nº de asegurados (1 vs 2+). Editables en
+// /admin/productos como cualquier otro producto. Convención de id:
+//   neg-<compania>-<cd|sd>[-<1|n>]   cd=con dental, sd=sin dental, 1=individual, n=familia
+// Adeslas solo tiene tarifa "un asegurado", así que no lleva sufijo de nº.
+const NEGOCIADAS_SALUD: Product[] = [
+  // ---- MAPFRE (sin copagos) ----
+  {
+    id: "neg-mapfre-cd-1", producto: "salud", compania: "Mapfre", titulo: "MAPFRE · Con dental · 1 asegurado",
+    activo: false, destacado: false, orden: 90, modalidadCopago: "sin", dental: true,
+    precioSinCopago: 49,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 0, porZona: nz(69) },
+      { min: 1, max: 34, porZona: nz(49) },
+      { min: 35, max: 50, porZona: nz(55) },
+      { min: 51, max: 54, porZona: nz(78) },
+      { min: 55, max: 65, porZona: nz(130) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · con dental · 1 asegurado. Precio por asegurado/mes.",
+    servicios: ["Sin copagos", "Con cobertura dental"], updatedAt: now,
+  },
+  {
+    id: "neg-mapfre-cd-n", producto: "salud", compania: "Mapfre", titulo: "MAPFRE · Con dental · 2+ asegurados",
+    activo: false, destacado: false, orden: 91, modalidadCopago: "sin", dental: true,
+    precioSinCopago: 39,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 0, porZona: nz(52) },
+      { min: 1, max: 34, porZona: nz(39) },
+      { min: 35, max: 50, porZona: nz(46) },
+      { min: 51, max: 54, porZona: nz(63) },
+      { min: 55, max: 65, porZona: nz(112) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · con dental · 2+ asegurados. Precio por asegurado/mes.",
+    servicios: ["Sin copagos", "Con cobertura dental"], updatedAt: now,
+  },
+  {
+    id: "neg-mapfre-sd-1", producto: "salud", compania: "Mapfre", titulo: "MAPFRE · Sin dental · 1 asegurado",
+    activo: false, destacado: false, orden: 92, modalidadCopago: "sin", dental: false,
+    precioSinCopago: 43.22,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 0, porZona: nz(63.22) },
+      { min: 1, max: 34, porZona: nz(43.22) },
+      { min: 35, max: 50, porZona: nz(49.22) },
+      { min: 51, max: 54, porZona: nz(72.22) },
+      { min: 55, max: 65, porZona: nz(124.22) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · sin dental · 1 asegurado. Precio por asegurado/mes.",
+    servicios: ["Sin copagos"], updatedAt: now,
+  },
+  {
+    id: "neg-mapfre-sd-n", producto: "salud", compania: "Mapfre", titulo: "MAPFRE · Sin dental · 2+ asegurados",
+    activo: false, destacado: false, orden: 93, modalidadCopago: "sin", dental: false,
+    precioSinCopago: 33.22,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 0, porZona: nz(46.22) },
+      { min: 1, max: 34, porZona: nz(33.22) },
+      { min: 35, max: 50, porZona: nz(40.22) },
+      { min: 51, max: 54, porZona: nz(57.22) },
+      { min: 55, max: 65, porZona: nz(106.22) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · sin dental · 2+ asegurados. Precio por asegurado/mes.",
+    servicios: ["Sin copagos"], updatedAt: now,
+  },
+  // ---- ADESLAS (sin copagos) · solo tarifa "un asegurado" (vale para cualquier nº) ----
+  {
+    id: "neg-adeslas-cd", producto: "salud", compania: "Adeslas", titulo: "ADESLAS · Con dental",
+    activo: false, destacado: false, orden: 94, modalidadCopago: "sin", dental: true,
+    precioSinCopago: 46,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 50, porZona: nz(46) },
+      { min: 51, max: 65, porZona: nz(93.44) },
+      { min: 66, max: 70, porZona: nz(182) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · con dental. Precio por asegurado/mes.",
+    servicios: ["Sin copagos", "Con cobertura dental"], updatedAt: now,
+  },
+  {
+    id: "neg-adeslas-sd", producto: "salud", compania: "Adeslas", titulo: "ADESLAS · Sin dental",
+    activo: false, destacado: false, orden: 95, modalidadCopago: "sin", dental: false,
+    precioSinCopago: 44.5,
+    pricing: { descuentos: [], tramos: [
+      { min: 0, max: 50, porZona: nz(44.5) },
+      { min: 51, max: 65, porZona: nz(80) },
+      { min: 66, max: 70, porZona: nz(170) },
+    ] },
+    condiciones: "Opción negociada Asegurados Ventajón · sin copagos · sin dental. Precio por asegurado/mes.",
+    servicios: ["Sin copagos"], updatedAt: now,
+  },
+];
+
 export const DEFAULT_PRODUCTS: Product[] = [
+  ...NEGOCIADAS_SALUD,
   {
     id: "salud-asisa", producto: "salud", compania: "Asisa", activo: true, destacado: true, orden: 1,
     precioConCopago: 29, precioSinCopago: 52,
