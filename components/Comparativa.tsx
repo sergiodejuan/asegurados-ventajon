@@ -531,9 +531,15 @@ export function Comparativa() {
         while (!local.stop && Date.now() - started < TIMEOUT_MS) {
           await new Promise((r) => setTimeout(r, INTERVAL_MS));
           if (local.stop) return;
-          // El polling se autoriza por la cookie de sesión de cliente (el lead
-          // dueño de este insurance). No hace falta pasar ids en la URL.
-          const pollRes = await fetch(`/api/quote/${encodeURIComponent(insuranceId)}`);
+          // El polling se autoriza por la cookie de sesión de cliente (flujo
+          // web) o por el `?token=` firmado si el usuario llegó desde
+          // WhatsApp — en ese caso re-inyectamos el token para que el
+          // endpoint valide al dueño del lead.
+          const tokenParam = searchParams.get("token");
+          const pollUrl = tokenParam
+            ? `/api/quote/${encodeURIComponent(insuranceId)}?token=${encodeURIComponent(tokenParam)}`
+            : `/api/quote/${encodeURIComponent(insuranceId)}`;
+          const pollRes = await fetch(pollUrl);
           const pollBody = (await pollRes.json().catch(() => null)) as
             | { ok: true; done: boolean; snapshot: unknown }
             | { ok: false }

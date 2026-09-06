@@ -6,6 +6,7 @@ import { getLead, getHiddenBrands } from "@/lib/store";
 import { rateLimitFail } from "@/lib/rateLimit";
 import { CLIENT_SESSION_COOKIE, verifySessionToken } from "@/lib/clientSession";
 import { resolveIdentity } from "@/lib/agentAuth";
+import { verifyQuoteAccessToken } from "@/lib/quoteTokens";
 
 // Polling endpoint: la comparativa lo llama cada N segundos hasta que las
 // cotizaciones dejen de estar en estimate/procesándose. Además refresca el
@@ -34,14 +35,27 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
   // se carga el lead de la sesión de cliente y se comprueba que su
   // codeoscopicInsuranceId coincide con el que se pide. Así un id de otro
   // cliente nunca expone su cotización (API1:2023 BOLA).
+  //
+  // Tres formas válidas de autorización, en orden de preferencia:
+  //   1) admin (token o sesión de agente).
+  //   2) cookie de sesión de cliente (flujo web habitual).
+  //   3) ?token=<quoteAccessToken>: token HMAC firmado que el flow de
+  //      ManyChat envía al usuario por WhatsApp. Sirve exactamente lo
+  //      mismo — dueño del lead ligado al insurance — sin necesidad de
+  //      que el visitante entre por el flow web y coja la cookie.
   const identity = await resolveIdentity(req).catch(() => null);
   const isAdmin = !!identity;
   if (!isAdmin) {
-    const clientLeadId = verifySessionToken(cookies().get(CLIENT_SESSION_COOKIE)?.value);
-    if (!clientLeadId) {
+    let ownerLeadId: string | null = verifySessionToken(cookies().get(CLIENT_SESSION_COOKIE)?.value);
+    if (!ownerLeadId) {
+      const tokenParam = req.nextUrl.searchParams.get("token");
+      const fromToken = verifyQuoteAccessToken(tokenParam);
+      if (fromToken) ownerLeadId = fromToken.leadId;
+    }
+    if (!ownerLeadId) {
       return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
     }
-    const lead = await getLead(clientLeadId).catch(() => null);
+    const lead = await getLead(ownerLeadId).catch(() => null);
     if (!lead || lead.codeoscopicInsuranceId !== insuranceId) {
       return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
     }
