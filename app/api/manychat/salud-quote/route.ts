@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 // La respuesta síncrona debe salir por debajo de los ~10s en que ManyChat
 // corta la External Request (ver MANYCHAT_SYNC_BUDGET_MS). La lambda vive un
 // poco más por si acaso, pero nunca esperamos a agotar este maxDuration para
-// responder: lo que no llegue a tiempo lo recoge /salud-quote-poll.
+// responder: lo que no llegue a tiempo lo cierra el follow-up humano.
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
@@ -198,7 +198,7 @@ export async function POST(request: Request) {
   // del POST /insurances cuente contra el mismo techo. Con esto devolvemos la
   // mejor oferta firme que haya llegado (normalmente Generali ~3-5s, y las que
   // acompañen); si aún no hay ninguna, respondemos "calculando" con el
-  // insuranceId y el paso /salud-quote-poll recoge la tarifa definitiva.
+  // insuranceId y el follow-up humano cierra con la tarifa definitiva.
   const deadline = requestStarted + MANYCHAT_SYNC_BUDGET_MS;
   const best = await waitForBestQuote(insuranceId, deadline);
   if (best) return respond(buildQuoteResponse(lead.id, insuranceId, best));

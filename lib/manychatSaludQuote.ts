@@ -1,31 +1,28 @@
-// Lógica compartida entre los dos pasos del flow de tarificación de salud
-// por WhatsApp (ManyChat):
+// Lógica de la tarificación de salud por WhatsApp (ManyChat), paso único
+// POST /api/manychat/salud-quote: arranca el cálculo en Codeoscopic y
+// devuelve la mejor oferta firme que haya llegado dentro del presupuesto
+// síncrono.
 //
-//   1) POST /api/manychat/salud-quote      → arranca el cálculo y devuelve
-//      la mejor oferta que haya llegado dentro del presupuesto síncrono.
-//   2) POST /api/manychat/salud-quote-poll → se llama tras un Smart Delay
-//      para recuperar la mejor oferta cuando ya han respondido las
-//      aseguradoras lentas.
-//
-// ¿Por qué dos pasos? ManyChat aborta cualquier "External Request" a los
-// ~10 s (timeout de plataforma, NO configurable — el error que ve el
+// ¿Por qué un presupuesto? ManyChat aborta cualquier "External Request" a
+// los ~10 s (timeout de plataforma, NO configurable — el error que ve el
 // usuario es "Operation timed out after 10002 milliseconds with 0 bytes
 // received"). Codeoscopic, en cambio, tarda entre 3 y 40 s en tener firmes
 // TODAS las compañías (Generali ~3-5 s; Adeslas/Asisa 15-30 s). No se puede
-// esperar a todas dentro de una sola petición síncrona: por eso el paso 1
-// responde rápido con lo que haya y el paso 2 (opcional) afina.
+// esperar a todas dentro de la petición síncrona: respondemos rápido con la
+// más barata que haya llegado y, si aún no hay ninguna, con "calculando".
 
 import { codeoscopicFetch, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
 import type { CodeoscopicQuoteSummary } from "@/lib/store";
 import { createQuoteAccessToken } from "@/lib/quoteTokens";
 import { SITE_URL } from "@/lib/brand";
+import { clasificaCopagoTexto, copagoChip, type CopagoModo } from "@/lib/catalog";
 
 // ManyChat corta la External Request a los ~10 s. Dejamos un colchón amplio
-// para el viaje de red y la serialización: la respuesta síncrona del paso 1
-// debe salir MUY por debajo de ese límite. 8,5 s desde que entra la petición
-// (incluye el POST /insurances) es el techo seguro. Si a esa altura no hay
-// oferta firme, se responde "calculando" y el paso 2 recupera la tarifa.
+// para el viaje de red y la serialización: la respuesta síncrona debe salir
+// MUY por debajo de ese límite. 8,5 s desde que entra la petición (incluye el
+// POST /insurances) es el techo seguro. Si a esa altura no hay oferta firme,
+// se responde "calculando" y el follow-up humano cierra.
 export const MANYCHAT_SYNC_BUDGET_MS = 8_500;
 
 // Respuesta pensada para ManyChat: solo campos escalares y un mensaje ya
@@ -41,6 +38,15 @@ export type ResponseShape = {
   producto: string;
   precio: number | null; // €/mes
   precioTexto: string;   // "23,45€/mes" o "" si no hay
+  // Modalidad de copago DEDUCIDA del nombre de la modalidad de Codeoscopic
+  // (ver clasificaCopagoTexto). Merge tags para el flow:
+  //   - `copago`: "con" | "sin" | "ambas" | "" (vacío = no se pudo deducir).
+  //   - `copagoEtiqueta`: chip listo para pintar ("Con copago"/"Sin copagos"/
+  //     "Con y sin copago") o "" si no consta.
+  // Útil para contrastar con el siguiente mensaje (opciones negociadas de
+  // Asegurados Ventajón, sin copagos).
+  copago?: CopagoModo | "";
+  copagoEtiqueta?: string;
   // URL firmada que puede enviarse por WhatsApp para abrir la comparativa
   // completa con los datos ya precargados (sin volver a pedir al usuario).
   // TTL 30 días. Sólo se rellena cuando hay `leadId`.
@@ -130,22 +136,29 @@ export async function waitForBestQuote(
   return best;
 }
 
-// Lee el snapshot UNA vez (sin bucle de espera) y devuelve la mejor oferta
-// firme que haya en ese momento. Pensado para el paso de poll, donde el
-// Smart Delay del flow ya dio tiempo a las aseguradoras y solo queremos una
-// lectura rápida (bien dentro de los 10 s de ManyChat).
-export async function readBestQuoteOnce(insuranceId: string): Promise<CodeoscopicQuoteSummary | null> {
-  const snap = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(insuranceId)}`);
-  return pickBestQuote(summarizeInsurance(snap).quotes);
-}
-
 export function buildQuoteResponse(leadId: string, insuranceId: string, best: CodeoscopicQuoteSummary): ResponseShape {
   const precio = typeof best.premium === "number" ? best.premium : null;
   const precioTexto = fmtEUR(precio);
   const compania = best.compania || "";
   const producto = best.producto || "";
+
+  // Copago deducido del nombre de la modalidad/producto/categoría. Puede ser
+  // null si Codeoscopic no lo declara en el texto — en ese caso no lo pintamos.
+  const modo = clasificaCopagoTexto(`${best.producto} ${best.modalidad} ${best.categoria ?? ""}`);
+  const copagoEtiqueta = modo ? copagoChip(modo) : "";
+  // Línea de copago para el mensaje: destacamos "con copago" (es la palanca
+  // para presentar luego las opciones negociadas SIN copagos) y confirmamos
+  // "sin copagos" cuando ya lo es.
+  const copagoLinea = modo === "con"
+    ? "\n• ⚠️ Modalidad *con copago* (pagas una parte por cada visita o prueba)"
+    : modo === "sin"
+      ? "\n• ✅ Modalidad *sin copagos* (no pagas por cada visita)"
+      : modo === "ambas"
+        ? "\n• Disponible *con y sin copago*"
+        : "";
+
   const mensaje = precio != null
-    ? `Tu mejor tarifa ahora mismo:\n\n• ${compania}${producto ? ` — ${producto}` : ""}\n• Desde ${precioTexto}\n\n¿Quieres que un asesor te cierre la póliza con esta compañía?`
+    ? `Tu mejor tarifa ahora mismo:\n\n• ${compania}${producto ? ` — ${producto}` : ""}\n• Desde ${precioTexto}${copagoLinea}\n\n¿Quieres que un asesor te cierre la póliza con esta compañía?`
     : `Tenemos oferta de ${compania}${producto ? ` (${producto})` : ""} pero necesito confirmar el precio. Un asesor te lo envía enseguida.`;
   const urlComparativa = buildComparativaUrl(leadId);
   const mensajeConLink = urlComparativa
@@ -154,18 +167,8 @@ export function buildQuoteResponse(leadId: string, insuranceId: string, best: Co
   return {
     ok: true, estado: "cotizado", leadId, insuranceId,
     compania, producto, precio, precioTexto, mensaje: mensajeConLink,
+    copago: modo ?? "", copagoEtiqueta,
     quoteId: String(best.id ?? ""),
     urlComparativa,
-  };
-}
-
-// Respuesta "sigo calculando" — se usa cuando ninguna oferta firme llegó a
-// tiempo. Trae el insuranceId para que el paso de poll pueda retomar.
-export function buildCalculandoResponse(leadId: string, insuranceId: string, mensaje: string): ResponseShape {
-  return {
-    ok: true, estado: "calculando", leadId, insuranceId,
-    compania: "", producto: "", precio: null, precioTexto: "", quoteId: "",
-    urlComparativa: buildComparativaUrl(leadId),
-    mensaje,
   };
 }

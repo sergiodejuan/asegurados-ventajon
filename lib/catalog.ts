@@ -95,6 +95,24 @@ export function copagoTexto(modo: CopagoModo): string {
   return "Disponible con y sin copago: elige pagar menos al mes (con copago) o no pagar por cada visita (sin copago).";
 }
 
+// Deduce la modalidad de copago de una cotización de Codeoscopic a partir de
+// su texto (producto + modalidad + categoría). Codeoscopic NO declara el
+// copago en un campo estructurado, así que se infiere del nombre — mismo
+// criterio que los filtros de la comparativa (classifyText en Comparativa.tsx):
+//   - "sin copago" / "reembolso" / "reintegro" → sin copago
+//   - "copago" (sin el "sin" delante)          → con copago
+// Devuelve null cuando el nombre no da ninguna pista: NO inventamos una
+// modalidad que no consta (mejor no etiquetar que etiquetar mal).
+export function clasificaCopagoTexto(text: string): CopagoModo | null {
+  const t = (text || "").toLowerCase();
+  const sin = t.includes("sin copago") || t.includes("reembolso") || t.includes("reintegro");
+  const con = t.includes("copago") && !t.includes("sin copago");
+  if (sin && con) return "ambas";
+  if (sin) return "sin";
+  if (con) return "con";
+  return null;
+}
+
 const now = new Date().toISOString();
 
 export const DEFAULT_PRODUCTS: Product[] = [
