@@ -31,6 +31,27 @@ export const LEGAL_ADDRESS_ONELINE =
 export const LEGAL_CNAE = "6622";
 export const LEGAL_ACTIVITY = "Correduría de seguros";
 
+// Email oficial de atención al cliente. También canaliza las bajas del
+// contacto comercial y las reclamaciones previas al Servicio de
+// Reclamaciones de la DGSFP (ver /legal).
+export const CUSTOMER_SUPPORT_EMAIL = "atencion@ventajon.com";
+
+// Inscripción registral vigente en el Registro Mercantil de Las Palmas
+// (última inscripción 17ª de 15/01/2025 sobre la Hoja GC-5032). Se muestra
+// literal en el aviso legal (art. 10 LSSI-CE).
+export const REGISTRO_MERCANTIL = {
+  provincia: "Las Palmas",
+  tomo: "1331",
+  libro: "0",
+  folio: "103",
+  hoja: "GC-5032",
+  seccion: "8",
+};
+export const REGISTRO_MERCANTIL_ONELINE =
+  `Registro Mercantil de ${REGISTRO_MERCANTIL.provincia}, Tomo ${REGISTRO_MERCANTIL.tomo}, ` +
+  `Libro ${REGISTRO_MERCANTIL.libro}, Folio ${REGISTRO_MERCANTIL.folio}, ` +
+  `Sección ${REGISTRO_MERCANTIL.seccion}, Hoja ${REGISTRO_MERCANTIL.hoja}`;
+
 // Dominio absoluto para JSON-LD (url, breadcrumbs), links firmados que
 // se envían por email/WhatsApp, y cualquier URL absoluta que salga del
 // servidor. Prioridad:

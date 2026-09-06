@@ -3,12 +3,14 @@ import { Header } from "@/components/Header";
 import {
   BRAND_NAME,
   CONTACT_HOURS,
+  CUSTOMER_SUPPORT_EMAIL,
   DGSFP_KEY,
   LEGAL_ADDRESS,
   LEGAL_ADDRESS_ONELINE,
   LEGAL_CIF,
   LEGAL_NAME,
   PARTNERS,
+  REGISTRO_MERCANTIL_ONELINE,
   SITE_URL,
 } from "@/lib/brand";
 
@@ -48,11 +50,12 @@ export default function Legal() {
         <div className="mt-4 rounded-card border border-brand-red/30 bg-brand-red/5 p-4">
           <p className="text-[14px] font-semibold text-brand-red-deep">Datos pendientes</p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Los datos identificativos y registrales de la correduría ya están cumplimentados. Quedan
-            marcados en rojo únicamente los datos operativos que aún faltan por confirmar (emails de
-            contacto legal, DPO, atención al cliente, ejercicio de derechos, baja comercial, aseguradora
-            del seguro de RC profesional, inscripción en el Registro Mercantil y teléfono legal). Antes
-            de publicar conviene una revisión final de un asesor legal.
+            Los datos identificativos y registrales de la correduría ya están cumplimentados, incluida
+            la inscripción en el Registro Mercantil y el email de atención al cliente. Quedan marcados
+            en rojo únicamente los datos operativos que aún faltan por confirmar (teléfono legal, email
+            del DPO/responsable de privacidad, email específico para ejercicio de derechos RGPD y
+            aseguradora del seguro de RC profesional). Antes de publicar conviene una revisión final de
+            un asesor legal.
           </p>
         </div>
 
@@ -77,9 +80,11 @@ export default function Legal() {
           <strong translate="no">{LEGAL_NAME}</strong> (que opera comercialmente bajo la marca{" "}
           <span translate="no">{BRAND_NAME}</span>), con CIF{" "}
           <span translate="no">{LEGAL_CIF}</span>, domicilio social en{" "}
-          <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>, inscrita en el Registro Mercantil de{" "}
-          <Pendiente>provincia, tomo, folio, hoja</Pendiente>. Correo electrónico de contacto:{" "}
-          <Pendiente>email de contacto legal</Pendiente>. Teléfono: <Pendiente>teléfono de contacto</Pendiente>.
+          <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>, inscrita en el{" "}
+          <span translate="no">{REGISTRO_MERCANTIL_ONELINE}</span>. Correo electrónico de contacto:{" "}
+          <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+            {CUSTOMER_SUPPORT_EMAIL}
+          </a>. Teléfono: <Pendiente>teléfono de contacto</Pendiente>.
         </P>
 
         {/* 2. CORREDURÍA */}
@@ -116,7 +121,10 @@ export default function Legal() {
           </li>
           <li>
             Para quejas y reclamaciones relacionadas con la actividad de mediación, puede dirigirse al
-            departamento de atención al cliente en <Pendiente>email del servicio de atención al cliente</Pendiente>,
+            departamento de atención al cliente en{" "}
+            <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+              {CUSTOMER_SUPPORT_EMAIL}
+            </a>,
             y, en caso de no obtener respuesta satisfactoria, ante el Servicio de Reclamaciones de la
             DGSFP.
           </li>
@@ -312,7 +320,9 @@ export default function Legal() {
           para comunicaciones comerciales; en ambos casos te lo indicamos con claridad en el propio
           formulario antes de enviarlo. Puedes revocar tu autorización en cualquier momento indicándolo
           en la propia llamada, respondiendo "BAJA" por WhatsApp, o escribiendo a{" "}
-          <Pendiente>email para darte de baja del contacto comercial</Pendiente>. En cumplimiento de la
+          <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+            {CUSTOMER_SUPPORT_EMAIL}
+          </a>. En cumplimiento de la
           Ley General de Telecomunicaciones, las llamadas comerciales se realizan desde numeración
           identificable como tal; puedes consultar los números concretos desde los que te llamamos en la
           página de agradecimiento tras completar un formulario. Si consideras que hemos vulnerado tu
