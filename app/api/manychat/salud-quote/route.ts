@@ -4,35 +4,21 @@ import { rateLimitFail } from "@/lib/rateLimit";
 import { upsertLead, getLead, setLeadCodeoscopicInsuranceId } from "@/lib/store";
 import { codeoscopicConfigured, codeoscopicFetch, CodeoscopicError, type CodeoscopicInsurance } from "@/lib/codeoscopic";
 import { buildHealthPayload } from "@/lib/codeoscopicMap";
-import { summarizeInsurance } from "@/lib/codeoscopicSnapshot";
-import type { CodeoscopicQuoteSummary } from "@/lib/store";
 import type { LeadDraft } from "@/lib/crm";
-import { createQuoteAccessToken } from "@/lib/quoteTokens";
-import { SITE_URL } from "@/lib/brand";
-
-// Construye el link firmado a /comparativa que el flow envía por WhatsApp.
-// El token cifra el leadId; la comparativa lo intercambia por el `quote`
-// hidratado — el usuario NO vuelve a introducir sus datos.
-function buildComparativaUrl(leadId: string): string {
-  if (!leadId) return "";
-  try {
-    const token = createQuoteAccessToken(leadId);
-    const base = SITE_URL.replace(/\/+$/, "");
-    return `${base}/comparativa?producto=salud&token=${encodeURIComponent(token)}`;
-  } catch (err) {
-    // Sin QUOTE_TOKEN_SECRET en prod: no devolvemos URL — el asesor
-    // toma el relevo. Nunca respondemos con un link sin firmar.
-    console.error("[manychat/salud-quote] no se pudo firmar token:", (err as Error).message);
-    return "";
-  }
-}
+import {
+  MANYCHAT_SYNC_BUDGET_MS,
+  waitForBestQuote,
+  buildQuoteResponse,
+  buildComparativaUrl,
+  type ResponseShape,
+} from "@/lib/manychatSaludQuote";
 
 export const runtime = "nodejs";
-// Codeoscopic tarda entre 5 y 40 segundos en devolver las primeras ofertas
-// firmes. Damos hasta 55s para responder algo útil por WhatsApp; si no
-// llega ninguna oferta a tiempo, respondemos con el mensaje "seguimos
-// calculando" y el asesor cierra en el siguiente paso.
-export const maxDuration = 60;
+// La respuesta síncrona debe salir por debajo de los ~10s en que ManyChat
+// corta la External Request (ver MANYCHAT_SYNC_BUDGET_MS). La lambda vive un
+// poco más por si acaso, pero nunca esperamos a agotar este maxDuration para
+// responder: lo que no llegue a tiempo lo recoge /salud-quote-poll.
+export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 // POST /api/manychat/salud-quote
@@ -94,88 +80,12 @@ function coerceBoolean(v: unknown): boolean | null {
   return null;
 }
 
-// Respuesta pensada para ManyChat: solo campos escalares y un mensaje ya
-// formateado. Los arrays de ManyChat son incómodos de iterar en su UI.
-type ResponseShape = {
-  ok: boolean;
-  mensaje: string;
-  leadId: string;
-  insuranceId: string;
-  quoteId: string;       // id de la cotización ganadora, para /coverages
-  estado: "cotizado" | "calculando" | "faltan_datos" | "error";
-  compania: string;
-  producto: string;
-  precio: number | null; // €/mes
-  precioTexto: string;   // "23,45€/mes" o "" si no hay
-  // URL firmada que puede enviarse por WhatsApp para abrir la comparativa
-  // completa con los datos ya precargados (sin volver a pedir al usuario).
-  // TTL 30 días. Sólo se rellena cuando hay `leadId`.
-  urlComparativa: string;
-  error?: string;
-};
-
-function fmtEUR(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "";
-  return `${n.toFixed(2).replace(".", ",")}€/mes`;
-}
-
-// De todas las ofertas del snapshot, quédate con la más barata firme
-// (`estimate=false, premium>0`). Si no hay firmes, cae a la estimada más
-// barata; si ni eso, devuelve null.
-function pickBestQuote(quotes: CodeoscopicQuoteSummary[]): CodeoscopicQuoteSummary | null {
-  const firm = quotes.filter((q) => !q.estimate && typeof q.premium === "number" && q.premium! > 0);
-  const bucket = firm.length ? firm : quotes.filter((q) => typeof q.premium === "number" && q.premium! > 0);
-  if (!bucket.length) return null;
-  return [...bucket].sort((a, b) => (a.premium ?? Infinity) - (b.premium ?? Infinity))[0];
-}
-
-// Codeoscopic va devolviendo cada aseguradora en momentos distintos
-// (Generali suele responder la primera, ~3-5s; Adeslas/Asisa pueden
-// tardar 15-30s). Devolver la primera firme que aparece sesgaría siempre
-// el resultado a Generali. Estrategia:
-//
-//   1) Poll cada 2s hasta que summary.done === true (todas firmes), o
-//   2) mínimo `minWaitMs` de espera aunque ya haya alguna firme, para
-//      dar tiempo a que lleguen las otras compañías, o
-//   3) todas las compañías esperadas ya llegaron firmes (>= minFirmQuotes).
-//
-// Luego devuelve la MÁS BARATA entre todas las firmes que hayan llegado.
-// Timeout duro en `deadlineMs`: pasado ese punto, devolvemos lo que
-// tengamos (o null si no llegó ninguna).
-async function waitForBestQuote(
-  insuranceId: string,
-  deadlineMs: number,
-  opts: { minWaitMs?: number; minFirmQuotes?: number } = {},
-): Promise<CodeoscopicQuoteSummary | null> {
-  const minWaitMs = opts.minWaitMs ?? 18_000;    // 18 s: da margen a 3-4 aseguradoras
-  const minFirmQuotes = opts.minFirmQuotes ?? 5; // 5 firmes = ya no vale la pena esperar más
-  const started = Date.now();
-  let best: CodeoscopicQuoteSummary | null = null;
-  let firmCount = 0;
-
-  while (Date.now() < deadlineMs) {
-    try {
-      const snap = await codeoscopicFetch<CodeoscopicInsurance>(`/insurances/${encodeURIComponent(insuranceId)}`);
-      const summary = summarizeInsurance(snap);
-      const current = pickBestQuote(summary.quotes);
-      if (current) best = current;
-      firmCount = summary.quotes.filter((q) => !q.estimate && typeof q.premium === "number" && q.premium! > 0).length;
-      const elapsed = Date.now() - started;
-      const okToReturn = summary.done || firmCount >= minFirmQuotes || (best && elapsed >= minWaitMs);
-      if (okToReturn && best) return best;
-    } catch (err) {
-      console.error("[manychat/salud-quote] poll fallo:", (err as Error).message);
-    }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  return best;
-}
-
 function respond(payload: ResponseShape, status = 200) {
   return NextResponse.json(payload, { status });
 }
 
 export async function POST(request: Request) {
+  const requestStarted = Date.now();
   const denied = manychatAuthFail(request);
   if (denied) return denied;
 
@@ -283,37 +193,22 @@ export async function POST(request: Request) {
     }
   }
 
-  // Deadline: dejamos 8s de margen sobre maxDuration para que la respuesta
-  // salga a tiempo aunque el último poll haya empezado.
-  const deadline = Date.now() + 48_000;
+  // Deadline síncrono: respondemos dentro del presupuesto de ManyChat (~10s).
+  // Lo medimos desde que ENTRÓ la petición (no desde aquí) para que el tiempo
+  // del POST /insurances cuente contra el mismo techo. Con esto devolvemos la
+  // mejor oferta firme que haya llegado (normalmente Generali ~3-5s, y las que
+  // acompañen); si aún no hay ninguna, respondemos "calculando" con el
+  // insuranceId y el paso /salud-quote-poll recoge la tarifa definitiva.
+  const deadline = requestStarted + MANYCHAT_SYNC_BUDGET_MS;
   const best = await waitForBestQuote(insuranceId, deadline);
   if (best) return respond(buildQuoteResponse(lead.id, insuranceId, best));
 
-  // Timeout sin ofertas: respondemos calculando y el follow-up humano se
-  // encarga (el snapshot queda cacheado en Codeoscopic, no se pierde).
+  // Aún sin ofertas firmes dentro del presupuesto: respondemos calculando.
+  // El snapshot queda cacheado en Codeoscopic (no se pierde) y el paso de
+  // poll — o el follow-up humano — cierra con la mejor tarifa.
   return respond({
     ok: true, estado: "calculando", leadId: lead.id, insuranceId,
     compania: "", producto: "", precio: null, precioTexto: "", quoteId: "", urlComparativa: buildComparativaUrl(lead.id),
-    mensaje: "Estoy calculando tus tarifas. En un par de minutos te envío las mejores opciones por aquí mismo.",
+    mensaje: "Estoy calculando tus tarifas. En un momento te envío las mejores opciones por aquí mismo.",
   });
-}
-
-function buildQuoteResponse(leadId: string, insuranceId: string, best: CodeoscopicQuoteSummary): ResponseShape {
-  const precio = typeof best.premium === "number" ? best.premium : null;
-  const precioTexto = fmtEUR(precio);
-  const compania = best.compania || "";
-  const producto = best.producto || "";
-  const mensaje = precio != null
-    ? `Tu mejor tarifa ahora mismo:\n\n• ${compania}${producto ? ` — ${producto}` : ""}\n• Desde ${precioTexto}\n\n¿Quieres que un asesor te cierre la póliza con esta compañía?`
-    : `Tenemos oferta de ${compania}${producto ? ` (${producto})` : ""} pero necesito confirmar el precio. Un asesor te lo envía enseguida.`;
-  const urlComparativa = buildComparativaUrl(leadId);
-  const mensajeConLink = urlComparativa
-    ? `${mensaje}\n\n🔗 Ver todas las opciones y coberturas: ${urlComparativa}`
-    : mensaje;
-  return {
-    ok: true, estado: "cotizado", leadId, insuranceId,
-    compania, producto, precio, precioTexto, mensaje: mensajeConLink,
-    quoteId: String(best.id ?? ""),
-    urlComparativa,
-  };
 }
