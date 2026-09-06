@@ -7,13 +7,25 @@
  */
 export const BRAND_NAME = "Asegurados Ventajon";
 
-// Dominio absoluto para JSON-LD (url, breadcrumbs) en las landings SEO.
-// ⚠️ PENDIENTE (Sergio): confirma el dominio de producción definitivo con
-// NEXT_PUBLIC_SITE_URL — mientras tanto usa el dominio de Vercel visto en
-// los despliegues de este PR.
+// Dominio absoluto para JSON-LD (url, breadcrumbs), links firmados que
+// se envían por email/WhatsApp, y cualquier URL absoluta que salga del
+// servidor. Prioridad:
+//   1) NEXT_PUBLIC_SITE_URL — el dominio limpio configurado a mano.
+//   2) VERCEL_PROJECT_PRODUCTION_URL — el alias estable del proyecto en
+//      Vercel ("asegurados-ventajon.vercel.app"). Sirve tanto en el
+//      deployment de production como en previews.
+//   3) VERCEL_URL — hostname del deployment específico (con hash,
+//      dhnk0v9fk...). Es lo que uses en local con `vercel dev`, pero en
+//      producción NO queremos que aparezca en enlaces que se envían al
+//      usuario — se parece a un phishing y caduca al siguiente push.
+//   4) Fallback duro al alias de este proyecto.
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://asegurados-ventajon.vercel.app");
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://asegurados-ventajon.vercel.app");
 
 export const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34600000000";
