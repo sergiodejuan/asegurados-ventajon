@@ -28,8 +28,17 @@ export const SITE_URL =
       : "https://asegurados-ventajon.vercel.app");
 
 export const WHATSAPP_NUMBER =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34600000000";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34637143809";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
+
+// Enlace de WhatsApp que arranca el funnel de ManyChat de tarifa de SALUD.
+// El texto prellenado es el disparador (keyword) que ManyChat detecta para
+// lanzar el flow "Tarifa Salud". El widget de ayuda de la comparativa de
+// salud enruta aquí en vez de al wa.me genérico, para que el usuario caiga
+// directo en el bot. Configurable por env sin tocar código.
+export const WHATSAPP_FUNNEL_SALUD_URL =
+  process.env.NEXT_PUBLIC_WHATSAPP_FUNNEL_SALUD_URL ??
+  "https://wa.me/34637143809?text=Quiero%20seguir%20avanzando%20con%20mi%20comparativa";
 
 // Enlace de WhatsApp con mensaje prellenado para los puntos de contacto
 // genéricos previos a cualquier registro del usuario (header, menú móvil,

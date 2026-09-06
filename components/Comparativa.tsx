@@ -9,7 +9,7 @@ import { ComparativaHelpBar } from "./ComparativaHelpBar";
 import { Check, Phone } from "./icons";
 import { PriceMatchForm } from "./PriceMatchForm";
 import { EssentialConsentCheckbox, ComercialConsentCheckbox } from "./EssentialConsent";
-import { BRAND_NAME, PARTNERS } from "@/lib/brand";
+import { BRAND_NAME, PARTNERS, WHATSAPP_FUNNEL_SALUD_URL } from "@/lib/brand";
 import { ZONA_OPTIONS } from "@/lib/forms";
 import { normalizePhone } from "@/lib/schema";
 import { copagoModoDe, copagoChip, copagoTexto, type Product } from "@/lib/catalog";
@@ -649,6 +649,10 @@ export function Comparativa() {
   const age = ageFromDob(quote?.fechaNacimiento);
   const waText = buildWhatsAppText({ producto, quote });
   const widgetWaText = buildWhatsAppText({ producto, quote, origen: "comparativa" });
+  // En salud, el widget de ayuda enruta al funnel de ManyChat (tarifa por
+  // WhatsApp) en vez de a una conversación sin contexto. En el resto de
+  // productos se mantiene el wa.me con el texto dinámico del presupuesto.
+  const widgetWaHref = producto === "salud" ? WHATSAPP_FUNNEL_SALUD_URL : whatsAppUrl(widgetWaText);
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
 
   return (
@@ -1149,7 +1153,7 @@ export function Comparativa() {
           onSkip={skipGate}
         />
       )}
-      {!gateBlocking && <WhatsAppHelpWidget raised message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={whatsAppUrl(widgetWaText)} />}
+      {!gateBlocking && <WhatsAppHelpWidget raised message={firstName ? `${firstName}, ¿necesitas ayuda para elegir?` : "¿Necesitas ayuda para elegir?"} waHref={widgetWaHref} />}
       {!gateBlocking && <ComparativaHelpBar quote={quote} producto={producto} />}
     </>
   );
