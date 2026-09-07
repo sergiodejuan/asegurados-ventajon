@@ -20,12 +20,16 @@ export const TREMENDOUS_ENV_VARS: { nombre: string; descripcion: string; obligat
 ];
 
 /* ------------------------------ Codescopic -------------------------------- */
-// Aún no hay integración real: no existe lib/codescopic.ts ni variables de
-// entorno para ello. Lo que sí existe es la preparación hecha en el
-// tarificador de salud (ver lib/schema.ts, lib/forms.ts, components/
-// StepForm.tsx) para que, en cuanto Sergio tenga las credenciales y la
-// documentación de acceso reales de Codescopic, solo falte escribir el
-// cliente HTTP que traduzca estos datos a su payload.
+// La integración YA está construida y cableada de punta a punta: el cliente
+// HTTP vive en lib/codeoscopic.ts (OAuth2 client_credentials, caché de token),
+// el mapper del lead → payload en lib/codeoscopicMap.ts, y la resolución de
+// CP → town.id en lib/codeoscopicTowns.ts. La comparativa de salud consulta
+// precios reales en vivo (POST /api/quote/create → polling GET
+// /api/quote/[insuranceId]) y el tarificador conversacional de WhatsApp hace
+// lo mismo (POST /api/manychat/salud-quote). Lo ÚNICO pendiente para
+// producción son las credenciales reales de Codeoscopic (las CODESCOPIC_* de
+// abajo): mientras no estén, todo el flujo degrada en silencio al catálogo
+// mock de /admin/productos, sin mostrar error al usuario (fail-open).
 
 export type CodescopicFieldMap = {
   campoCodescopic: string;
@@ -119,6 +123,31 @@ export const API_CATEGORIES: ApiCategory[] = [
       { method: "POST", path: "/api/exit-intent", resumen: "Callback exprés al detectar abandono de un tarificador a medias.", auth: "Turnstile + rate limit", request: "exitIntentSchema — solo teléfono (+ nombre/zona/producto si ya se conocían).", response: "{ ok, id, deduped }" },
       { method: "POST", path: "/api/calculadora-ahorro", resumen: "Calculadora de ahorro embebida en landings SEO.", auth: "Turnstile + rate limit", request: "savingsCalculatorSchema — pago actual, nº asegurados, slug de landing, teléfono.", response: "{ ok, id, deduped, precioEstimado, ahorro }" },
       { method: "POST", path: "/api/lead-magnet", resumen: "Descarga de guía/checklist a cambio del email.", auth: "Rate limit (10/h por IP, sin Turnstile)", request: "leadMagnetSchema — nombre, email, guía (salud/auto), consentimientos.", response: "{ ok, downloadUrl }" },
+      { method: "POST", path: "/api/lead/price-match", resumen: "\"Precio mejor garantizado\": el usuario envía su presupuesto actual (compañía, precio, captura) para que un asesor lo mejore.", auth: "Turnstile + rate limit", request: "priceMatchSchema — producto, compañía actual, precio/periodicidad, captura (data URI), comentario, contacto, consentimientos.", response: "{ ok, id, deduped }" },
+    ],
+  },
+  {
+    categoria: "Comparativa y cotización (Codeoscopic)",
+    descripcion: "Alimentan la comparativa de salud con precios reales de las aseguradoras en vivo, vía el cliente de Codeoscopic (lib/codeoscopic.ts). Con acceso estricto al lead (BOLA): admin, cookie de cliente dueño del lead, o token HMAC firmado (llegada desde WhatsApp).",
+    endpoints: [
+      { method: "POST", path: "/api/quote/create", resumen: "Crea el proyecto de cotización en Codeoscopic (POST /insurances) al montar la comparativa y guarda su insuranceId en el lead.", auth: "Dueño del lead (sesión de cliente / admin / token)", request: "{ leadId, recalcular? }", response: "{ ok, insuranceId } | { ok:false, reason }" },
+      { method: "GET", path: "/api/quote/[insuranceId]", resumen: "Polling del estado de las cotizaciones (la comparativa lo llama cada 4s hasta 90s) hasta que dejan de ser estimadas.", auth: "Dueño del lead (cookie o ?token= / ?quoteAccessToken=)", request: "—", response: "{ ok, quotes[], done }" },
+      { method: "GET", path: "/api/quote/[insuranceId]/coverages", resumen: "Coberturas normalizadas por categoría de la oferta elegida (modal \"Ver coberturas\").", auth: "Dueño del lead", request: "?offerId=", response: "{ ok, coberturas }" },
+      { method: "POST", path: "/api/quote/interes", resumen: "El usuario muestra interés en una opción → se crea el PRESUPUESTO con la compañía/precio elegidos y snapshot de Codeoscopic.", auth: "Dueño del lead", request: "{ leadId, compania, precio, insuranceId?, quoteId? }", response: "{ ok, presupuestoId }" },
+      { method: "POST", path: "/api/product-form", resumen: "Proxy autenticado del widget AvantProductForm de Codeoscopic (el client_secret nunca llega al navegador).", auth: "Server-side (credenciales Codeoscopic)", request: "Datos del widget.", response: "Respuesta de Codeoscopic" },
+      { method: "POST", path: "/api/presupuesto/pdf", resumen: "Genera el PDF de un presupuesto/comparativa para descargar desde /comparativa/[compania].", auth: "Pública (datos del propio presupuesto)", request: "{ ... }", response: "application/pdf" },
+    ],
+  },
+  {
+    categoria: "WhatsApp / ManyChat (server-to-server)",
+    descripcion: "Endpoints que consume ManyChat como paso \"External Request\" de sus flows de WhatsApp. Autenticación por cabecera estática x-manychat-secret (MANYCHAT_WEBHOOK_SECRET) — ManyChat no soporta firma HMAC. Exentos del bloqueo global de la web.",
+    endpoints: [
+      { method: "POST", path: "/api/manychat/prefill-salud", resumen: "Primer paso del funnel: con el teléfono del contacto de WhatsApp, busca si ya tarificó en la web y devuelve su perfil para prerrellenar los campos y saltarse preguntas.", auth: "x-manychat-secret", request: "{ telefono }", response: "{ existe, nombre, apellido1/2, email, documento, fechaNacimiento, ... } (vacío si no existe)" },
+      { method: "POST", path: "/api/manychat/salud-quote", resumen: "Tarificador de salud en tiempo real por WhatsApp: da de alta el lead, cotiza en Codeoscopic, espera a que respondan varias compañías (mín. ~5s, dentro del presupuesto de ~10s de ManyChat) y devuelve la más barata firme —con y sin copago— + enlace firmado a /comparativa.", auth: "x-manychat-secret + rate limit (20/h por IP)", request: "{ telefono, nombre, apellido1/2, fechaNacimiento, sexo, documento(+tipo), codigoPostal, numAsegurados, coberturaDental, fumador, aceptaPrivacidad }", response: "Plano: { estado, mensaje, precio, precioTexto, compania, leadId, insuranceId, quoteId, urlComparativa }" },
+      { method: "POST", path: "/api/manychat/salud-negociadas", resumen: "Mensaje de las opciones NEGOCIADAS por Asegurados Ventajon (Mapfre/Adeslas, sin copagos), personalizado por edad, dental y nº de asegurados. Se envía tras la tarifa de Codeoscopic como gancho.", auth: "x-manychat-secret", request: "{ leadId } | { fechaNacimiento, coberturaDental, numAsegurados }", response: "{ estado, mensaje, negociadasTexto, mejorCompania }" },
+      { method: "POST", path: "/api/manychat/salud-coverages", resumen: "Coberturas de la oferta ganadora formateadas como texto WhatsApp (sin markdown, truncado a 3800 car.).", auth: "x-manychat-secret + rate limit (30/h por IP)", request: "{ insuranceId, quoteId }", response: "{ estado, mensaje, totalCubiertas, totalNoCubiertas }" },
+      { method: "POST", path: "/api/manychat/cliente", resumen: "Dado un teléfono, dice si ya es cliente y devuelve sus presupuestos/llamadas (aplanados para ManyChat).", auth: "x-manychat-secret", request: "{ telefono }", response: "{ esCliente, presupuestos[], llamadas[], resumenTexto }" },
+      { method: "PATCH", path: "/api/manychat/llamadas/[id]", resumen: "Cancelar o reprogramar una llamada desde WhatsApp (propiedad verificada por teléfono; idempotente).", auth: "x-manychat-secret (propiedad por teléfono)", request: "{ accion: cancelar|reprogramar, fechaProgramada?, turnoLlamada? }", response: "{ ok }" },
     ],
   },
   {
@@ -142,6 +171,7 @@ export const API_CATEGORIES: ApiCategory[] = [
       { method: "GET", path: "/api/client/notifications", resumen: "Centro de notificaciones del área de cliente.", auth: "Cookie de sesión de cliente", request: "—", response: "{ ok, notifications }" },
       { method: "POST", path: "/api/client/push-subscribe", resumen: "Suscripción a notificaciones push del navegador.", auth: "Cookie de sesión de cliente", request: "PushSubscription", response: "{ ok }" },
       { method: "POST", path: "/api/client/logout", resumen: "Cierra la sesión de cliente.", auth: "Cookie de sesión de cliente", request: "—", response: "{ ok }" },
+      { method: "GET", path: "/api/client/hydrate-quote", resumen: "Rehidrata la comparativa desde el enlace firmado de WhatsApp: verifica el token, carga el lead y devuelve su perfil (sin datos sensibles) para que el usuario no reintroduzca nada.", auth: "Token HMAC firmado (TTL 30 días)", request: "?token=<leadId>.<expires>.<sig>", response: "{ ok, quote }" },
     ],
   },
   {
@@ -149,6 +179,8 @@ export const API_CATEGORIES: ApiCategory[] = [
     descripcion: "Bajo /api/admin/*, protegidos por ADMIN_TOKEN o sesión de agente + permiso de módulo (ver lib/agentAuth.ts). No pensados para integraciones externas — los usa exclusivamente este panel.",
     endpoints: [
       { method: "GET/PATCH/DELETE", path: "/api/admin/leads, /leads/[id], /leads/[id]/anonymize, /leads/[id]/export", resumen: "Listado, ficha, RGPD (anonimizar) y exportación de un lead.", auth: "Módulo \"leads\" (o \"rgpd\" para anonimizar)", request: "—", response: "—" },
+      { method: "POST", path: "/api/admin/leads/[id]/codeoscopic-quote, /codeoscopic-rerate, /codeoscopic-report", resumen: "Desde la ficha: relanzar cotización, pasar de precio estimado a firme (re-rate) y generar el informe PDF de Codeoscopic.", auth: "Módulo \"leads\"", request: "—", response: "—" },
+      { method: "POST", path: "/api/admin/leads/[id]/enviar-email", resumen: "El agente envía un email manual al lead desde su ficha.", auth: "Módulo \"leads\"", request: "{ asunto, cuerpo }", response: "{ ok }" },
       { method: "GET/POST/PATCH", path: "/api/admin/presupuestos, /presupuestos/[id], /presupuestos/export", resumen: "Gestión de presupuestos y exportación CSV.", auth: "Módulo \"presupuestos\"", request: "—", response: "—" },
       { method: "GET/POST/PATCH", path: "/api/admin/llamadas, /llamadas/[id]", resumen: "Gestión de \"quiero que me llamen\".", auth: "Módulo \"llamadas\"", request: "—", response: "—" },
       { method: "GET/POST/PATCH/DELETE", path: "/api/admin/tasks, /tasks/[id]", resumen: "Tareas y recordatorios del equipo.", auth: "Módulo \"tareas\"", request: "—", response: "—" },
@@ -162,9 +194,26 @@ export const API_CATEGORIES: ApiCategory[] = [
       { method: "GET", path: "/api/admin/export", resumen: "Exportación CSV general de leads.", auth: "Módulo \"leads\"", request: "—", response: "CSV" },
       { method: "GET/POST/PATCH/DELETE", path: "/api/admin/agentes, /agentes/[id]", resumen: "Alta, edición y permisos de agentes.", auth: "Rol \"admin\" (no delegable por módulo)", request: "—", response: "—" },
       { method: "GET", path: "/api/admin/registro", resumen: "Registro de auditoría de acciones del equipo.", auth: "Rol \"admin\"", request: "—", response: "—" },
-      { method: "POST", path: "/api/admin/auth/login, /auth/logout", resumen: "Login/logout de agente (email + contraseña).", auth: "Rate limit en login", request: "{ email, password }", response: "{ ok }" },
+      { method: "POST", path: "/api/admin/auth/login, /auth/otp-verify, /auth/logout", resumen: "Login de agente en 2 pasos: contraseña (scrypt) → OTP de 6 dígitos por email → cookie de sesión. Logout cierra la sesión.", auth: "Rate limit por IP y por cuenta", request: "login: { email, password } → { nonce }; otp-verify: { nonce, code }", response: "{ ok }" },
       { method: "GET", path: "/api/admin/auth/me", resumen: "Identidad de quien está usando el panel ahora mismo.", auth: "ADMIN_TOKEN o cookie de agente", request: "—", response: "{ ok, identity }" },
       { method: "POST", path: "/api/admin/manychat/enviar", resumen: "Envía un WhatsApp de seguimiento directo por ManyChat.", auth: "Módulo \"presupuestos\"", request: "{ telefono, texto, ... }", response: "{ ok }" },
+      { method: "GET/POST/PATCH", path: "/api/admin/aseguradoras, /api/admin/email-templates, /email-templates/[id]", resumen: "Catálogo unificado de aseguradoras por ramo (marcas visibles/ocultas en la comparativa) y plantillas de email transaccional.", auth: "Módulo \"productos\" / \"configuracion\"", request: "—", response: "—" },
+      { method: "GET/POST/PATCH/DELETE", path: "/api/admin/landings, /landings/[id](/duplicate), /landings/slug-check, /landings/stats, /landings/precio-mejor, /landings/referidos", resumen: "Editor de landings de pago (/lp/[slug]) y de las landings de price-match y referidos, con duplicado, comprobación de slug y estadísticas.", auth: "Módulo \"campana\"", request: "—", response: "—" },
+      { method: "GET/PATCH", path: "/api/admin/inactivity-modal", resumen: "Configuración del modal de inactividad (copy, páginas, captura de teléfono).", auth: "Módulo \"exitintents\"", request: "—", response: "—" },
+      { method: "GET", path: "/api/admin/informes/codeoscopic, /informes/price-match, /informes/referidos", resumen: "Informes de negocio: uso y resultados de Codeoscopic, embudo de price-match y estado del programa de referidos.", auth: "Módulo \"informes\"", request: "—", response: "—" },
+      { method: "GET/POST", path: "/api/admin/integraciones/status, /integraciones/test, /integraciones/pdf, /integraciones/codescopic/catalog", resumen: "Estado real de cada integración (derivado de env), prueba de conexión (round-trip real), PDF de esta documentación y diagnóstico de catálogos de Codeoscopic.", auth: "Módulo \"desarrollador\"", request: "—", response: "—" },
+      { method: "GET/PATCH", path: "/api/admin/site-access", resumen: "Activa/desactiva el bloqueo global de la web con contraseña y fija la contraseña.", auth: "Módulo \"configuracion\"", request: "{ activo, password? }", response: "{ ok }" },
+      { method: "GET/POST", path: "/api/admin/referral/[code], /referral/[code]/retry", resumen: "Ficha de un referido y reintento manual del pago de su bono (Tremendous).", auth: "Módulo \"referidos\"", request: "—", response: "—" },
+      { method: "GET/POST", path: "/api/admin/notifications, /notifications/push-subscribe", resumen: "Centro de notificaciones del equipo y suscripción a push del navegador admin (avisos de lead nuevo).", auth: "ADMIN_TOKEN o cookie de agente", request: "—", response: "—" },
+    ],
+  },
+  {
+    categoria: "Programa de referidos (\"Amigos Ventajon\")",
+    descripcion: "Doble incentivo de 20€ en vale Amazon (al amigo tras el doble opt-in; al cliente que refiere cuando el amigo contrata y supera 30 días), pagado vía Tremendous. Ver docs/referrals.md.",
+    endpoints: [
+      { method: "POST", path: "/api/referral/generate", resumen: "Un cliente con póliza vigente genera su código/enlace de referido.", auth: "Rate limit (5/5min) + Turnstile (valida elegibilidad)", request: "{ email | telefono }", response: "{ ok, code, url }" },
+      { method: "POST", path: "/api/referral/opt-in", resumen: "Doble opt-in del amigo referido: canjea el token y dispara el bono de bienvenida (vale Amazon).", auth: "Token HMAC de un solo uso (TTL 14 días)", request: "{ token }", response: "{ ok }" },
+      { method: "GET", path: "/api/referral/process-payouts", resumen: "Cron diario (04:00 UTC): paga a los referidores cuyos amigos ya superaron el periodo de gracia. Idempotente (external_id determinista).", auth: "Authorization: Bearer CRON_SECRET", request: "—", response: "{ ok, pagados }" },
     ],
   },
   {
@@ -172,6 +221,9 @@ export const API_CATEGORIES: ApiCategory[] = [
     descripcion: "",
     endpoints: [
       { method: "GET", path: "/api/theme, /api/theme/logo", resumen: "Lectura pública del tema activo (usada por la propia web para pintarse).", auth: "Pública", request: "—", response: "SiteTheme" },
+      { method: "GET", path: "/api/inactivity-modal", resumen: "Configuración pública del modal de inactividad activo.", auth: "Pública", request: "—", response: "{ ok, config }" },
+      { method: "POST", path: "/api/landing/track", resumen: "Beacon de analítica propia de las landings de pago (dispositivo + franja horaria, clasificados en servidor).", auth: "Pública", request: "{ slug, evento }", response: "204" },
+      { method: "POST", path: "/api/acceso/login, /api/acceso/logout", resumen: "Login/logout del bloqueo global de la web con contraseña (cuando está activo).", auth: "Contraseña + anti-fuerza-bruta (8/15min por IP)", request: "{ password }", response: "{ ok }" },
       { method: "GET", path: "/api/products", resumen: "Catálogo de productos activos (precio aproximado por producto).", auth: "Pública", request: "—", response: "{ ok, products }" },
       { method: "GET", path: "/api/campaign", resumen: "Slides activos de la campaña de la home.", auth: "Pública", request: "—", response: "{ ok, config }" },
       { method: "GET/POST", path: "/api/exit-intents", resumen: "Campañas de exit-intent activas para la web general.", auth: "Pública (lectura)", request: "—", response: "{ ok, config }" },
@@ -200,6 +252,22 @@ export const WEBHOOKS: WebhookDoc[] = [
     resumen: "Cada vez que se da de alta o actualiza un lead desde /api/lead, /api/vida, /api/auto, /api/decesos o /api/call-request, la web hace un POST con los datos del envío a esta URL — pensado para conectar un CRM externo, Zapier/Make, una hoja de cálculo, etc.",
     payload: '{ "id": "<leadId>", "source": "tarificador-salud", ...resto de campos del formulario }',
     seguridad: "Ninguna firma propia: es un POST simple. Si el receptor necesita verificar el origen, debe hacerlo por otro medio (p.ej. un secreto en la propia URL).",
+  },
+  {
+    direccion: "saliente",
+    nombre: "Sincronización de lead a ManyChat (WhatsApp)",
+    endpoint: "api.manychat.com (con MANYCHAT_API_TOKEN)",
+    resumen: "Al crear un lead desde la web (si autoriza contacto), lib/manychat.ts lo da de alta como suscriptor de WhatsApp en ManyChat, rellena sus campos personalizados (nombre, producto, CP, precio aprox., id de presupuesto, utm_*), le pone la etiqueta web-<source> y dispara el Flow de agradecimiento/resumen.",
+    payload: 'Subscriber + custom fields + tag + trigger de Flow (MANYCHAT_THANKYOU_FLOW_NS / _VERIFICATION_FLOW_NS)',
+    seguridad: "Bearer MANYCHAT_API_TOKEN. Best-effort: si el número ya existía en ManyChat (típico de Meta Ads) o falla, no rompe el alta del lead.",
+  },
+  {
+    direccion: "entrante",
+    nombre: "ManyChat — tarificador y consultas por WhatsApp",
+    endpoint: "/api/manychat/salud-quote · /salud-coverages · /cliente · /llamadas/[id]",
+    resumen: "ManyChat llama a estos endpoints como paso \"External Request\" de sus flows para tarificar salud en tiempo real, pedir coberturas, reconocer a un cliente existente y cancelar/reprogramar llamadas — todo dentro de la conversación de WhatsApp.",
+    payload: 'JSON escalar (sin arrays anidados) para pegar cada campo en un custom field de ManyChat.',
+    seguridad: "Cabecera estática x-manychat-secret = MANYCHAT_WEBHOOK_SECRET (timing-safe; ManyChat no soporta firma HMAC). Idempotencia en la acción de llamadas. Exentos del bloqueo global de la web.",
   },
   {
     direccion: "entrante",

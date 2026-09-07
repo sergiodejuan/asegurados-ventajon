@@ -22,18 +22,18 @@ export type SiteNode = {
 const TARIFICADORES: SiteNode[] = [
   {
     label: "Salud", path: "/tarificador", kind: "tarificador",
-    funcion: "El único ya preparado para Codescopic: documento (DNI/NIE), apellidos separados, CP real, fumador y asegurados adicionales (fecha nac. + sexo).",
+    funcion: "El ramo integrado con Codeoscopic: recoge CP real, fumador y asegurados adicionales (fecha nac. + sexo); el documento (DNI/NIE) y los dos apellidos se piden en el gate de la comparativa.",
     children: [
-      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Inicio deseado, zona (Canarias/Baleares/Península), nº de asegurados." },
-      { label: "Fase 2 · Tus datos", kind: "seccion", funcion: "Titular (fecha nac. + sexo), identificación, ¿fuma?, asegurados adicionales, dental, seguro actual." },
-      { label: "Fase 3 · Tu precio", kind: "seccion", funcion: "Contacto + consentimientos + Turnstile → envía a POST /api/lead." },
+      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Inicio deseado y nº de asegurados (la zona se deriva del CP real, sin paso aparte)." },
+      { label: "Fase 2 · Tus datos", kind: "seccion", funcion: "Titular (fecha nac. + sexo), CP real, ¿fuma?, asegurados adicionales, dental, seguro actual." },
+      { label: "Fase 3 · Tu precio", kind: "seccion", funcion: "En el gate de la comparativa: contacto + consentimiento + Turnstile → POST /api/lead." },
     ],
   },
   {
     label: "Vida", path: "/tarificador-vida", kind: "tarificador",
     funcion: "Motivo del seguro (familia/hipoteca/ahorro), fumador, sin nº de asegurados (es individual).",
     children: [
-      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Motivo, zona." },
+      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Motivo (la zona se deriva del CP real)." },
       { label: "Fase 2 · Tus datos", kind: "seccion", funcion: "Titular, ¿fuma?, seguro actual." },
       { label: "Fase 3 · Tu precio", kind: "seccion", funcion: "Contacto + consentimientos + Turnstile → envía a POST /api/vida." },
     ],
@@ -43,7 +43,7 @@ const TARIFICADORES: SiteNode[] = [
     funcion: "El más largo: vehículo, matrícula, uso, carnet y cobertura fusionados en un único paso para no alargarlo más.",
     children: [
       { label: "Fase 1 · Tu vehículo", kind: "seccion", funcion: "Tipo, matrícula (o marca/modelo/año si no la tiene), uso." },
-      { label: "Fase 2 · Tu seguro", kind: "seccion", funcion: "Zona, conductor, carnet + cobertura (mismo paso), seguro actual." },
+      { label: "Fase 2 · Tu seguro", kind: "seccion", funcion: "Conductor, carnet + cobertura (mismo paso), seguro actual (la zona se deriva del CP real)." },
       { label: "Fase 3 · Tu precio", kind: "seccion", funcion: "Contacto + consentimientos + Turnstile → envía a POST /api/auto." },
     ],
   },
@@ -51,7 +51,7 @@ const TARIFICADORES: SiteNode[] = [
     label: "Decesos", path: "/tarificador-decesos", kind: "tarificador",
     funcion: "Para quién es (uno mismo/familiar/toda la familia); el nº de asegurados solo se pregunta si no es \"para mí\".",
     children: [
-      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Para quién, zona, nº de asegurados (condicional)." },
+      { label: "Fase 1 · Tu seguro", kind: "seccion", funcion: "Para quién, CP real y nº de asegurados (condicional); la zona se deriva del CP." },
       { label: "Fase 2 · Tus datos", kind: "seccion", funcion: "Titular, seguro actual." },
       { label: "Fase 3 · Tu precio", kind: "seccion", funcion: "Contacto + consentimientos + Turnstile → envía a POST /api/decesos." },
     ],

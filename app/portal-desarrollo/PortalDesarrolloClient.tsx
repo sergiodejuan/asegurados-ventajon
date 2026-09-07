@@ -49,9 +49,10 @@ function PortalContent() {
       <h1 className="mt-1 text-[28px] font-extrabold leading-tight text-navy">Documentación de APIs e integraciones</h1>
       <p className="mt-3 text-[14px] leading-relaxed text-slate2">
         Bienvenido/a al equipo de desarrollo de {BRAND_NAME}. Esta página reúne todo lo que necesitas para empezar a
-        trabajar con el sitio: cómo está organizado (páginas, tarificadores), el motor de tarificación externo
-        Codescopic, la API propia de la web y los webhooks salientes/entrantes. Es una página no enlazada desde
-        ningún menú — guárdala en marcadores.
+        trabajar con el sitio: cómo está organizado (páginas, los 4 tarificadores, comparativa y área de cliente),
+        el motor de tarificación de Codeoscopic —ya integrado y cableado de punta a punta, tanto en la web como en el
+        tarificador conversacional de WhatsApp (ManyChat)—, la API propia de la web y sus webhooks salientes y
+        entrantes. Es una página no enlazada desde ningún menú — guárdala en marcadores.
       </p>
 
       <div className="mt-5">
@@ -88,11 +89,16 @@ function PortalContent() {
       </section>
 
       <section id="codescopic" className="mt-10 scroll-mt-6">
-        <h2 className="text-[20px] font-extrabold text-navy">2. Codescopic</h2>
+        <h2 className="text-[20px] font-extrabold text-navy">2. Codeoscopic</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
-          Motor de tarificación externo, todavía no conectado. El tarificador de salud ya recoge todos los datos
-          personales que pide su payload de referencia (ver abajo); falta la documentación de acceso de Codescopic
-          (autenticación, URL base y catálogo de municipios para resolver el código postal a su <code className="rounded bg-mist px-1 py-0.5 text-[12px]">town.id</code>).
+          Motor de tarificación real de las aseguradoras (Avant2 / API Integra), <b className="text-ink">ya integrado y
+          cableado de punta a punta</b>: el cliente HTTP (OAuth2) vive en <code className="rounded bg-mist px-1 py-0.5 text-[12px]">lib/codeoscopic.ts</code>,
+          el mapeo del lead en <code className="rounded bg-mist px-1 py-0.5 text-[12px]">lib/codeoscopicMap.ts</code> y la
+          resolución de código postal a <code className="rounded bg-mist px-1 py-0.5 text-[12px]">town.id</code> en <code className="rounded bg-mist px-1 py-0.5 text-[12px]">lib/codeoscopicTowns.ts</code>.
+          La comparativa de salud consulta precios en vivo (<code className="rounded bg-mist px-1 py-0.5 text-[12px]">POST /api/quote/create</code> → polling)
+          y el tarificador de WhatsApp hace lo mismo. Lo único pendiente para producción son las <b className="text-ink">credenciales
+          reales</b> (las variables de abajo): mientras no estén, todo el flujo degrada en silencio al catálogo mock de
+          /admin/productos, sin error para el usuario.
         </p>
 
         <h3 className="mt-5 text-[14px] font-bold text-navy">Variables de entorno previstas</h3>
@@ -173,8 +179,9 @@ function PortalContent() {
       <section id="webhooks" className="mt-10 scroll-mt-6">
         <h2 className="text-[20px] font-extrabold text-navy">4. Webhooks</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-slate2">
-          Un webhook saliente (avisa a un sistema externo de cada lead nuevo) y dos entrantes (Retell y Bland avisan
-          del resultado de una llamada).
+          Dos salientes (aviso genérico de cada lead nuevo y sincronización del lead a ManyChat/WhatsApp) y tres
+          entrantes (Retell y Bland avisan del resultado de una llamada; ManyChat consulta el tarificador y las
+          llamadas desde los flows de WhatsApp).
         </p>
         <div className="mt-3 flex flex-col gap-3">
           {WEBHOOKS.map((w) => (

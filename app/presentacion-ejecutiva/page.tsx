@@ -14,12 +14,17 @@ const TOC = [
   { id: "plataforma", label: "La plataforma" },
   { id: "jornada", label: "Recorrido" },
   { id: "tarificadores", label: "Tarificadores" },
-  { id: "utm", label: "Atribución UTM" },
-  { id: "llamada", label: "Solicitud de llamada" },
+  { id: "precios", label: "Precios reales" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "utm", label: "Atribución" },
+  { id: "llamada", label: "Llamada + voz IA" },
+  { id: "area-cliente", label: "Área de cliente" },
+  { id: "referidos", label: "Referidos" },
   { id: "gracias", label: "Página de gracias" },
-  { id: "admin", label: "Panel admin" },
+  { id: "admin", label: "Panel / CRM" },
+  { id: "seguridad", label: "Seguridad" },
   { id: "cumplimiento", label: "Cumplimiento" },
-  { id: "comparativa", label: "Antes / después" },
+  { id: "antes-despues", label: "Antes / después" },
   { id: "roadmap", label: "Pendientes" },
 ];
 
@@ -63,8 +68,9 @@ export default function PresentacionEjecutiva() {
             </h1>
             <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-white/80">
               Presentación del proyecto web de {BRAND_NAME}: qué construimos, qué problema resuelve
-              frente al funnel actual y cómo funcionan por dentro el tarificador, la captación de
-              llamadas, la atribución UTM y el panel de gestión de leads.
+              frente al funnel actual y cómo funcionan por dentro los tarificadores, la comparativa con
+              precios reales, el tarificador por WhatsApp, la captación y llamada automática, el área de
+              cliente, los referidos y el panel de gestión de leads.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-white/70">
               <span>{today}</span>
@@ -85,6 +91,14 @@ export default function PresentacionEjecutiva() {
             no ha sido parchear esos puntos, sino construir un espacio propio para Asegurados Ventajon, con su
             propio customer journey, su propio tarificador y un CRM interno que hace visible todo lo que antes
             se perdía.
+          </p>
+          <p className="mt-4 max-w-3xl text-[16px] leading-relaxed text-slate2">
+            Desde entonces la plataforma ha crecido bastante más allá del arreglo del funnel: hoy son <b className="text-ink">4
+            tarificadores</b> (salud, vida, auto y decesos) sobre un mismo motor, una <b className="text-ink">comparativa con
+            precios reales de las aseguradoras en vivo</b> (integración de Codeoscopic ya cableada), un <b className="text-ink">tarificador
+            conversacional por WhatsApp</b> (ManyChat), <b className="text-ink">llamada automática de voz con IA</b> (Retell/Bland),
+            un <b className="text-ink">área de cliente sin registro</b>, un <b className="text-ink">programa de referidos</b> con pago
+            automático de incentivos, y un panel de administración tipo SaaS con equipo, permisos y doble factor.
           </p>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard tone="red" k="3 hallazgos" v="de severidad alta o crítica" d="detectados en el funnel actual y evitados por diseño en la nueva plataforma." />
@@ -119,8 +133,12 @@ export default function PresentacionEjecutiva() {
             <TechPill label="Tailwind CSS" note="sistema visual propio" />
             <TechPill label="Zod" note="validación de formularios" />
             <TechPill label="Vercel KV / Redis" note="almacén de leads durable" />
+            <TechPill label="Codeoscopic" note="precios reales de aseguradoras" />
+            <TechPill label="ManyChat" note="tarificador por WhatsApp" />
+            <TechPill label="Retell / Bland" note="llamada de voz con IA" />
+            <TechPill label="Meta CAPI + GA4" note="medición server-side + Consent Mode" />
+            <TechPill label="Tremendous" note="pago de referidos (vale Amazon)" />
             <TechPill label="Mobile-first" note="pensado para el móvil primero" />
-            <TechPill label="Webhooks" note="integrable con CRM/Manychat" />
             <TechPill label="CSV / API admin" note="exportación e integración" />
           </div>
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -141,13 +159,13 @@ export default function PresentacionEjecutiva() {
         </Section>
 
         {/* TARIFICADORES */}
-        <Section id="tarificadores" eyebrow="05" title="Tarificadores guiados" subtitle="Un mismo motor de pasos (StepForm) alimenta hoy el tarificador de salud y el de vida — y está preparado para sumar más productos.">
+        <Section id="tarificadores" eyebrow="05" title="Tarificadores guiados (4 ramos, un solo motor)" subtitle="Un mismo motor declarativo de pasos (StepForm + lib/forms.ts) alimenta los 4 tarificadores. Solo cambian los pasos y el endpoint; se organizan en 3 fases con nombre: Tu seguro → Tus datos → Tu precio.">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
-              <p className="text-[13px] font-bold uppercase tracking-wide text-brand-red">/tarificador</p>
-              <h3 className="mt-1 text-[20px] font-extrabold text-navy">Seguro de salud · 7 pasos</h3>
+              <p className="text-[13px] font-bold uppercase tracking-wide text-brand-red">/tarificador · salud</p>
+              <h3 className="mt-1 text-[20px] font-extrabold text-navy">Seguro de salud · 3 fases</h3>
               <ol className="mt-4 flex flex-col gap-2.5 text-[14px] text-ink">
-                {["¿Cuándo quieres que empiece el seguro?", "Código postal", "Número de personas a asegurar", "Fecha de nacimiento y sexo del titular", "¿Cobertura dental?", "¿Ya tiene seguro? (compara si dice que sí)", "Contacto + doble consentimiento"].map((s, i) => (
+                {["Inicio deseado y nº de personas a asegurar (la zona se deriva del CP, sin paso “¿dónde vives?”)", "Titular (fecha nac. + sexo), CP real, ¿fuma?, asegurados adicionales, ¿dental?, ¿ya tiene seguro?", "En la comparativa: nombre, dos apellidos, DNI/NIE, teléfono, email y consentimiento → POST /api/lead"].map((s, i) => (
                   <li key={s} className="flex items-start gap-3">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy/10 text-[12px] font-bold tnums text-navy">{i + 1}</span>
                     {s}
@@ -156,31 +174,89 @@ export default function PresentacionEjecutiva() {
               </ol>
             </div>
             <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
-              <p className="text-[13px] font-bold uppercase tracking-wide text-brand-red">/tarificador-vida</p>
-              <h3 className="mt-1 text-[20px] font-extrabold text-navy">Seguro de vida · 6 pasos</h3>
-              <ol className="mt-4 flex flex-col gap-2.5 text-[14px] text-ink">
-                {["Motivo (familia, hipoteca, ahorro…)", "Código postal", "Fecha de nacimiento y sexo", "¿Fumador?", "¿Ya tiene seguro? (compara si dice que sí)", "Contacto + doble consentimiento"].map((s, i) => (
-                  <li key={s} className="flex items-start gap-3">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy/10 text-[12px] font-bold tnums text-navy">{i + 1}</span>
-                    {s}
-                  </li>
-                ))}
+              <p className="text-[13px] font-bold uppercase tracking-wide text-brand-red">vida · auto · decesos</p>
+              <h3 className="mt-1 text-[20px] font-extrabold text-navy">Los otros 3 ramos</h3>
+              <ul className="mt-4 flex flex-col gap-3 text-[14px] text-ink">
+                <li><b className="text-navy">Vida</b> — motivo (familia / hipoteca / ahorro), zona, fecha nac. + sexo, ¿fumador?, seguro actual.</li>
+                <li><b className="text-navy">Auto</b> — el más largo: vehículo y matrícula, uso, conductor, antigüedad de carnet + cobertura, seguro actual.</li>
+                <li><b className="text-navy">Decesos</b> — para quién es (uno mismo / familiar / toda la familia), nº de asegurados, titular.</li>
+                <li className="text-slate2">Hogar aún no tiene tarificador propio: es página informativa + “que te llamen”.</li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-card border border-hair bg-white p-5">
+              <p className="text-[14px] leading-relaxed text-slate2">
+                Cada respuesta se valida con <b className="text-ink">Zod</b> antes de enviarse (móvil español, CP de 5
+                dígitos, DNI/NIE, fecha de nacimiento coherente…). En salud y vida el lead se crea en el <b className="text-ink">gate
+                de la comparativa</b>, no antes; en auto y decesos, en el paso de contacto. Nunca hay tabla de
+                resultados sin CTA ni desvíos a otro producto a mitad de camino — el hallazgo de mayor severidad de la
+                auditoría queda resuelto por diseño.
+              </p>
+            </div>
+            <div className="rounded-card border border-navy/20 bg-navy/[0.03] p-5">
+              <p className="text-[14px] leading-relaxed text-slate2">
+                <b className="text-ink">Minimización de datos (RGPD art. 5.1.c):</b> el DNI/NIE y los apellidos ya no se
+                piden dentro del tarificador — solo se recogen al final, en la comparativa, justo cuando hacen falta para
+                cotizar de verdad. Menos fricción para el usuario y menos dato personal en tránsito del que no se
+                necesita todavía.
+              </p>
+            </div>
+          </div>
+        </Section>
+
+        {/* PRECIOS REALES / CODEOSCOPIC */}
+        <Section id="precios" eyebrow="06" tone="mist" title="La comparativa: precios reales de las aseguradoras en vivo" subtitle="El tramo de resultados que la auditoría señaló sin CTA es ahora una comparativa propia con precios reales consultados en directo a las compañías, vía el motor Codeoscopic (Avant2).">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr]">
+            <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
+              <h3 className="text-[16px] font-bold text-ink">Dos bloques en una sola pantalla</h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+                <b className="text-ink">Opciones negociadas por Asegurados Ventajon</b> (catálogo editable en /admin/productos):
+                salen siempre arriba, con badge “Recomendado”, por norma sin copago — es la oferta comercial preferente.
+              </p>
+              <p className="mt-3 text-[14px] leading-relaxed text-slate2">
+                <b className="text-ink">Precios reales de mercado</b>: las compañías cotizando en directo el perfil del
+                usuario, con logo, modalidad, valoración, precio/mes, coberturas y condicionado en PDF. El usuario ordena
+                (recomendado / precio / valoración) y filtra (copago, dental, reembolso), y cada opción lleva a “Que te
+                llamen gratis”.
+              </p>
+              <p className="mt-3 text-[13px] leading-relaxed text-slate2">
+                Se mantiene la decisión de marca: <b className="text-ink">sin precios de gancho ni % de ahorro sin validar</b>.
+                Todo precio es orientativo; el asesor confirma la propuesta real.
+              </p>
+            </div>
+            <div className="rounded-[24px] border border-hair bg-navy p-6 text-white shadow-card">
+              <p className="text-[13px] font-bold uppercase tracking-wide text-white/60">Cómo fluye la cotización</p>
+              <ol className="mt-4 flex flex-col gap-4 text-[14px]">
+                <FlowStep n={1} text="Al montar la comparativa se crea un proyecto en Codeoscopic (POST /api/quote/create)." />
+                <FlowStep n={2} text="La web hace polling cada 4s mientras las aseguradoras van respondiendo con su tarifa." />
+                <FlowStep n={3} text="Se muestran las opciones reales junto a las negociadas, con acceso protegido al lead." />
+                <FlowStep n={4} text="Si el usuario elige una, se crea el presupuesto con esa compañía y precio." last />
               </ol>
             </div>
           </div>
-          <div className="mt-6 rounded-card border border-hair bg-white p-5">
+          <div className="mt-6 rounded-card border border-navy/20 bg-navy/[0.03] p-5">
             <p className="text-[14px] leading-relaxed text-slate2">
-              Cada respuesta se valida con <b className="text-ink">Zod</b> antes de enviarse (móvil español,
-              código postal de 5 dígitos, fecha de nacimiento coherente…). El último paso siempre son los datos
-              de contacto y los consentimientos: no hay tabla de resultados sin CTA ni desvíos hacia otro
-              producto a mitad de camino — el hallazgo de mayor severidad de la auditoría queda resuelto por
-              diseño.
+              <b className="text-ink">Estado:</b> la integración está construida y cableada de punta a punta (cliente OAuth2,
+              mapeo del lead, resolución de código postal a municipio). Lo único pendiente para producción son las
+              credenciales reales de Codeoscopic; mientras tanto, todo el flujo degrada en silencio a un catálogo de
+              referencia, sin error para el usuario.
             </p>
           </div>
         </Section>
 
+        {/* WHATSAPP / MANYCHAT */}
+        <Section id="whatsapp" eyebrow="07" title="Tarificador por WhatsApp (ManyChat)" subtitle="El mismo motor de precios reales, ahora dentro de una conversación de WhatsApp — donde ya está el usuario que viene de campañas de Meta.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FeatureRow icon="compare" title="Cotiza en tiempo real en el chat" desc="ManyChat recoge los datos por WhatsApp y llama a la web, que da de alta el lead y pide precios a Codeoscopic dentro de la propia conversación." />
+            <FeatureRow icon="check" title="La más barata, con y sin copago" desc="Espera a que respondan varias compañías y devuelve la tarifa firme más barata; muestra con y sin copago, y añade como gancho las opciones negociadas por Asegurados Ventajon (sin copagos)." />
+            <FeatureRow icon="doc" title="Puente a la web sin reteclear" desc="Manda un enlace firmado a la comparativa con los datos precargados: el usuario ve todas las opciones sin volver a escribir nada ni reaceptar la política." />
+            <FeatureRow icon="pin" title="Reconoce al cliente y prellena" desc="Con el teléfono sabe si ya tarificó en la web y prerrellena sus datos para saltarse preguntas; muestra sus presupuestos y le deja cancelar o reprogramar su llamada, todo desde WhatsApp." />
+          </div>
+        </Section>
+
         {/* UTM */}
-        <Section id="utm" eyebrow="06" tone="mist" title="Sistema interno de atribución UTM" subtitle="Cada lead sabe de dónde vino, aunque Analytics falle.">
+        <Section id="utm" eyebrow="08" tone="mist" title="Atribución propia y medición server-side" subtitle="Cada lead sabe de dónde vino, aunque Analytics falle — y la conversión se mide también desde el servidor.">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr]">
             <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
               <p className="text-[14px] leading-relaxed text-slate2">
@@ -190,17 +266,23 @@ export default function PresentacionEjecutiva() {
                 en el momento del envío, y la persiste en el CRM interno.
               </p>
               <div className="mt-5 flex flex-wrap gap-2" translate="no">
-                {["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "referrer"].map((u) => (
+                {["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "referrer", "gclid", "fbclid"].map((u) => (
                   <span key={u} className="rounded-pill border border-hair bg-mist px-3 py-1.5 text-[12px] font-semibold text-navy">{u}</span>
                 ))}
               </div>
+              <p className="mt-5 text-[14px] leading-relaxed text-slate2">
+                Además, el evento de conversión <b className="text-ink">“Lead” se envía a Meta por la Conversions API
+                (server-to-server)</b>, resistente a bloqueadores y a Safari/ITP, con email y teléfono hasheados. GA4 y GTM
+                cargan con <b className="text-ink">Consent Mode v2</b>, reactivos al banner de cookies, que siempre tiene
+                prioridad sobre los popups de marketing.
+              </p>
             </div>
             <div className="rounded-[24px] border border-hair bg-navy p-6 text-white shadow-card">
               <p className="text-[13px] font-bold uppercase tracking-wide text-white/60">Cómo fluye</p>
               <ol className="mt-4 flex flex-col gap-4 text-[14px]">
                 <FlowStep n={1} text="Un anuncio o email llega con parámetros ?utm_source=…&utm_campaign=…" />
-                <FlowStep n={2} text="La landing o el tarificador leen esos parámetros al cargar la página." />
-                <FlowStep n={3} text="Al enviar el formulario, los UTM viajan junto al lead a /api/lead o /api/call-request." />
+                <FlowStep n={2} text="La landing o el tarificador leen esos parámetros al cargar la página (ventana de 30 días)." />
+                <FlowStep n={3} text="Al enviar, los UTM viajan junto al lead; el evento Lead sale también por CAPI." />
                 <FlowStep n={4} text="El lead queda guardado con su atribución completa, visible y filtrable en el panel admin." last />
               </ol>
             </div>
@@ -208,22 +290,46 @@ export default function PresentacionEjecutiva() {
         </Section>
 
         {/* LLAMADA */}
-        <Section id="llamada" eyebrow="07" title="Solicitud de llamada: un flujo sin fugas" subtitle="La página “Quiero que me llamen” funciona como un paso de conversión aislado, sin las fugas del formulario actual.">
+        <Section id="llamada" eyebrow="09" title="Solicitud de llamada + llamada automática de voz IA" subtitle="La página “Quiero que me llamen” es un paso de conversión aislado; y cuando el lead autoriza contacto, un agente de voz con IA puede llamarle en segundos.">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FeatureRow icon="shield" title="Pantalla completa, sin salidas" desc="Sin menú, sin navegación ni enlaces de fuga: es la página CRO de /quiero-que-me-llamen, dedicada solo a captar el teléfono." />
+            <FeatureRow icon="shield" title="Pantalla completa, sin salidas" desc="Sin menú, sin navegación ni enlaces de fuga: es la página CRO de /quiero-que-me-llamen, dedicada solo a captar el teléfono. Si ya tarificó, no repite datos: confirma la franja en un clic." />
             <FeatureRow icon="check" title="Confirmación inmediata" desc="Al enviar, el propio formulario cambia a un estado de “Solicitud recibida”, con mensaje claro de qué va a pasar. Nunca un envío sin respuesta." />
-            <FeatureRow icon="doc" title="Doble consentimiento con sello de tiempo" desc="Privacidad y autorización de contacto se marcan por separado, cada uno con su timestamp de cliente y servidor, listos para auditoría legal." />
-            <FeatureRow icon="compare" title="Antispam con honeypot" desc="Un campo oculto descarta envíos automatizados sin fricción para la persona real que rellena el formulario." />
+            <FeatureRow icon="doc" title="Consentimiento con sello de tiempo" desc="Un único check esencial agrupa privacidad, contacto y comunicaciones; se graba con doble sello de tiempo (cliente y servidor), listo para auditoría legal." />
+            <FeatureRow icon="compare" title="Antispam y anti-acoso" desc="Honeypot + CAPTCHA invisible (Turnstile) + límite de frecuencia por IP y por teléfono, para no llamar de más a la misma persona." />
           </div>
-          <p className="mt-6 max-w-3xl text-[14px] leading-relaxed text-slate2">
-            Frente al “callejón sin salida” detectado en la auditoría —formulario que no confirma ni entrega
-            nada—, este flujo cierra siempre con una respuesta visible y con la ficha del lead ya creada (o
-            actualizada, si es un contacto recurrente) en el CRM interno.
-          </p>
+          <div className="mt-6 rounded-[24px] border border-hair bg-white p-6 shadow-card">
+            <h3 className="text-[16px] font-bold text-ink">Llamada automática de voz con IA (Retell / Bland)</h3>
+            <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-slate2">
+              Al completar un tarificador o pedir que le llamen, si el lead autoriza el contacto se dispara —de forma
+              opcional y configurable— una llamada saliente de un agente de voz con IA, con su nombre, producto y zona
+              como variables. El resultado de la llamada vuelve por webhook firmado y queda registrado en la ficha del
+              lead. Frente al “callejón sin salida” de la auditoría, este flujo cierra siempre con una respuesta visible
+              y la ficha creada (o actualizada, si es recurrente) en el CRM.
+            </p>
+          </div>
+        </Section>
+
+        {/* AREA DE CLIENTE */}
+        <Section id="area-cliente" eyebrow="10" tone="mist" title="Área de cliente, sin registro" subtitle="El propio lead consulta y gestiona lo suyo sin crear usuario ni contraseña — identificado de forma segura, con la base de datos como única fuente de verdad.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FeatureRow icon="shield" title="Sin usuario ni contraseña" desc="Se identifica por una cookie de sesión firmada que solo guarda el identificador del lead. Tras tarificar por primera vez, entra directo." />
+            <FeatureRow icon="doc" title="Recuperación con enlace de un solo uso" desc="Desde otro dispositivo, introduce su email o teléfono y recibe un enlace de acceso caducable al dato YA guardado (nunca autentica con datos que no son secretos)." />
+            <FeatureRow icon="compare" title="Sus presupuestos y llamadas" desc="Ve sus presupuestos (solo lo que le concierne, sin notas internas del agente) y puede cancelar o reprogramar sus llamadas." />
+            <FeatureRow icon="check" title="Avisos y notificaciones push" desc="Centro de notificaciones (llamada reprogramada/hecha) y notificaciones push del navegador si las activa. Reenvío del acceso por WhatsApp además de email." />
+          </div>
+        </Section>
+
+        {/* REFERIDOS */}
+        <Section id="referidos" eyebrow="11" title="Programa de referidos “Amigos Ventajon”" subtitle="Un canal de captación con coste por adquisición objetivo la mitad del de paid ads, con pago automático de incentivos.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <PrincipleCard title="Doble incentivo simétrico" desc="20 € en vale Amazon para el amigo al cotizar (tras doble opt-in) y 20 € para el cliente que le trajo cuando el amigo contrata y supera 30 días de vigencia." />
+            <PrincipleCard title="Pago automático" desc="Los vales se emiten por Tremendous (Amazon.es eGift) sin gestión manual, con idempotencia para no pagar dos veces y reintentos ante fallo." />
+            <PrincipleCard title="Anti-fraude y RGPD" desc="Solo refieren clientes con póliza vigente (comprobado en vivo), tope anual por persona, y el referidor nunca introduce el email del amigo — es él quien entra por su enlace." />
+          </div>
         </Section>
 
         {/* GRACIAS / SaveCaller */}
-        <Section id="gracias" eyebrow="08" tone="mist" title="Página de gracias: cerrar el círculo de confianza">
+        <Section id="gracias" eyebrow="12" tone="mist" title="Página de gracias: cerrar el círculo de confianza">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="rounded-[24px] border border-hair bg-white p-6 shadow-card">
               <h3 className="text-[18px] font-extrabold text-navy">“Guarda estos números”</h3>
@@ -249,30 +355,44 @@ export default function PresentacionEjecutiva() {
         </Section>
 
         {/* ADMIN */}
-        <Section id="admin" eyebrow="09" title="Panel admin: el CRM interno" subtitle="Todo lo que entra por el tarificador o por “quiero que me llamen” aterriza en la misma ficha de lead.">
+        <Section id="admin" eyebrow="13" title="Panel de administración: un CRM interno tipo SaaS" subtitle="Todo lo que entra —cualquier tarificador, “quiero que me llamen”, exit-intent o WhatsApp— aterriza en la misma ficha de lead. Rediseñado como un SaaS: menú lateral colapsable, modo oscuro y módulos.">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <FeatureRow icon="doc" title="Acceso por token" desc="El panel /admin pide un token de administrador (ADMIN_TOKEN) antes de mostrar ningún dato." />
-            <FeatureRow icon="compare" title="Filtro por fuente" desc="Listado filtrable por tarificador de salud, tarificador de vida o “quiero que me llamen”, con contador por fuente." />
-            <FeatureRow icon="pin" title="Ficha 360º del lead" desc="Contacto, código postal, datos del tarificador, atribución UTM y consentimientos, todo en una sola vista." />
-            <FeatureRow icon="shield" title="Antiduplicado automático" desc="Si el mismo teléfono o email vuelve a escribir, no se crea un lead nuevo: se completa la ficha existente y se registra la nueva solicitud en su actividad." />
-            <FeatureRow icon="doc" title="Estado y próximo paso" desc="Nuevo → Contactado → Presupuestado → Ganado / Perdido, con un campo de “próximo paso” editable por el asesor." />
-            <FeatureRow icon="check" title="Auditoría de consentimientos" desc="Cada consentimiento queda registrado con IP, dispositivo, página de origen y marca de tiempo: prueba legal ante cualquier reclamación." />
-            <FeatureRow icon="compare" title="Timeline de actividad" desc="Alta, formularios recibidos, cambios de estado y notas del asesor, ordenados cronológicamente en cada ficha." />
-            <FeatureRow icon="doc" title="Exportación a CSV" desc="Descarga directa del listado de leads para análisis o carga en otras herramientas." />
+            <FeatureRow icon="pin" title="Ficha 360º del lead" desc="Contacto, zona, datos del tarificador por ramo, identificación, atribución (UTM, referrer, gclid/fbclid), consentimientos y actividad — todo en una sola vista." />
+            <FeatureRow icon="shield" title="Antiduplicado automático" desc="Si el mismo teléfono o email vuelve a escribir, no se crea otro lead: se completa la ficha existente y se registra la nueva solicitud en su actividad." />
+            <FeatureRow icon="doc" title="Pipeline y próximo paso" desc="Nuevo → Contactado → Presupuestado → Ganado / Perdido, con “próximo paso” y notas editables por el asesor." />
+            <FeatureRow icon="compare" title="Presupuestos, llamadas y tareas" desc="El presupuesto se crea solo cuando el usuario elige una opción; las llamadas y las tareas/recordatorios del equipo se gestionan desde el mismo panel." />
+            <FeatureRow icon="doc" title="Resultado de las llamadas de voz" desc="El resultado de cada llamada automática (Retell/Bland) vuelve por webhook firmado y queda registrado en la ficha del lead." />
+            <FeatureRow icon="check" title="Auditoría de consentimientos" desc="Cada consentimiento queda con IP, dispositivo, página de origen y marca de tiempo (cliente y servidor): prueba legal ante cualquier reclamación." />
+            <FeatureRow icon="shield" title="Equipo con doble factor" desc="Agentes con login por email + contraseña y OTP obligatorio por email, con permisos por módulo; gestionar equipo y ver el registro de auditoría exige rol admin no delegable." />
+            <FeatureRow icon="compare" title="Informes y seguimiento UTM" desc="Informes de negocio (Codeoscopic, price-match, referidos) y seguimiento de campañas por UTM, más exportación a CSV." />
+            <FeatureRow icon="doc" title="Integraciones con estado real" desc="Una sección lista cada integración con su estado (derivado de las variables presentes) y una prueba de conexión real, con documentación descargable en PDF." />
+          </div>
+        </Section>
+
+        {/* SEGURIDAD */}
+        <Section id="seguridad" eyebrow="14" tone="mist" title="Seguridad, por diseño" subtitle="La captación abre una superficie que hay que proteger. Esto es lo que ya está integrado — pensado para la conversación con el equipo de ciberseguridad.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <FeatureRow icon="shield" title="Doble factor y permisos" desc="Agentes con login + OTP obligatorio por email y permisos por módulo. Gestionar equipo y ver la auditoría exigen rol admin no delegable." />
+            <FeatureRow icon="shield" title="Anti-acoso y antibot" desc="Límite de frecuencia por IP y por teléfono destino (para no llamar de más), honeypot y CAPTCHA invisible (Turnstile) en los formularios públicos." />
+            <FeatureRow icon="doc" title="Webhooks firmados" desc="Los webhooks entrantes (Retell, Bland) verifican firma HMAC y son fail-closed; ManyChat usa un secreto compartido. Idempotencia para no procesar dos veces un reintento." />
+            <FeatureRow icon="shield" title="Secretos aislados" desc="Cada dominio (sesión admin, sesión cliente, bloqueo de sitio) usa su propio secreto: si uno se ve comprometido, no arrastra a los demás." />
+            <FeatureRow icon="compare" title="CSRF y aislamiento" desc="El middleware exige doble señal de origen en toda mutación de admin/cliente y añade cabeceras COOP/CORP. Acceso al lead protegido contra referencias directas (BOLA)." />
+            <FeatureRow icon="pin" title="Bloqueo global de la web" desc="La web se puede cerrar tras contraseña (para pruebas o pre-lanzamiento), con anti-fuerza-bruta y sin exponerse a buscadores mientras está cerrada." />
           </div>
         </Section>
 
         {/* CUMPLIMIENTO */}
-        <Section id="cumplimiento" eyebrow="10" tone="mist" title="Cumplimiento y protección legal" subtitle="La auditoría marcó la ausencia de checkboxes legales con persistencia como un gap obligatorio. Aquí es la base del formulario.">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <PrincipleCard title="Doble consentimiento" desc="Privacidad y autorización de contacto son campos obligatorios independientes, cada uno con su propio timestamp de cliente y de servidor." />
+        <Section id="cumplimiento" eyebrow="15" title="Cumplimiento y protección legal" subtitle="La auditoría marcó la ausencia de checkboxes legales con persistencia como un gap obligatorio. Aquí es la base del formulario.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <PrincipleCard title="Consentimiento esencial con sello de tiempo" desc="Un único check obligatorio agrupa privacidad, autorización de contacto y comunicaciones comerciales; en salud y vida incluye además el consentimiento explícito de datos de salud (RGPD art. 9). Se graba con doble sello de tiempo (cliente y servidor) para auditoría." />
             <PrincipleCard title="Preparado para octubre 2026" desc="La normativa de llamadas comerciales exigirá numeración identificable y solicitud previa: el flujo de captación y la página de gracias ya están alineados con ese modelo." />
+            <PrincipleCard title="Minimización y retención" desc="Solo se pide el dato cuando hace falta (el DNI, ya en la comparativa); anonimización a los 24 meses de inactividad, y export/borrado del lead a petición (RGPD art. 15/17/20). Los avisos al equipo van sin datos personales." />
             <PrincipleCard title="Sin cifras sin validar" desc="No se publican precios cerrados ni porcentajes de descuento sin aprobación expresa de dirección, evitando el “bait” detectado en el cross-sell auditado." />
           </div>
         </Section>
 
-        {/* COMPARATIVA */}
-        <Section id="comparativa" eyebrow="11" title="Antes / después, hallazgo por hallazgo">
+        {/* ANTES / DESPUÉS */}
+        <Section id="antes-despues" eyebrow="16" tone="mist" title="Antes / después, hallazgo por hallazgo">
           <div className="overflow-x-auto rounded-[24px] border border-hair bg-white shadow-card">
             <table className="w-full min-w-[720px] border-collapse text-[14px]">
               <thead>
@@ -282,26 +402,28 @@ export default function PresentacionEjecutiva() {
                 </tr>
               </thead>
               <tbody>
-                <CompareRow before="Error 503 en GA4 y título de página corrupto." after="Atribución UTM propia guardada en cada lead; no depende solo de GA4." />
+                <CompareRow before="Error 503 en GA4 y título de página corrupto." after="Atribución UTM propia en cada lead + evento Lead por la Conversions API server-side; no depende solo de GA4." />
                 <CompareRow before="Formulario de descuento sin confirmación ni código." after="Confirmación visible en el propio formulario + página de gracias con próximos pasos." />
                 <CompareRow before="Cross-sell de Viajeros con confirmshaming antes del presupuesto." after="Un único objetivo por tarificador: ningún producto ajeno interrumpe el flujo." />
-                <CompareRow before="Tabla de resultados sin CTA por plan individual." after="El tarificador termina siempre en un CTA de contacto con asesor, sin callejones sin salida." />
+                <CompareRow before="Tabla de resultados sin CTA por plan individual." after="Comparativa propia con precios reales en vivo (Codeoscopic) y un CTA de contacto por opción, sin callejones sin salida." />
                 <CompareRow before="Formulario de contacto duplicado en la página de categoría." after="Un solo camino de conversión por página: tarificador o “quiero que me llamen”." />
-                <CompareRow before="Sin checkboxes legales con persistencia." after="Doble consentimiento obligatorio, con timestamp y auditoría en el panel admin." />
+                <CompareRow before="Sin checkboxes legales con persistencia." after="Consentimiento obligatorio con sello de tiempo y auditoría en el panel admin." />
               </tbody>
             </table>
           </div>
         </Section>
 
         {/* ROADMAP */}
-        <Section id="roadmap" eyebrow="12" tone="mist" title="Decisiones pendientes antes de publicar" subtitle="Puntos abiertos que necesitan validación de dirección — transparencia total antes del lanzamiento.">
+        <Section id="roadmap" eyebrow="17" title="Decisiones pendientes antes de publicar" subtitle="Puntos abiertos que necesitan validación de dirección — transparencia total antes del lanzamiento.">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <RoadmapItem title="Textos legales" desc="Identificación registral de la correduría (DGSFP, RC), privacidad RGPD, condiciones y aviso legal. Pendiente de validar con legal." />
+            <RoadmapItem title="Textos legales" desc="La identificación registral y fiscal ya está cableada (razón social, CIF, clave DGSFP, Registro Mercantil, email de atención). Queda la validación final de privacidad RGPD, condiciones y aviso legal con legal." />
             <RoadmapItem title="Nombre de marca" desc="Confirmar la forma definitiva: “Asegurados Ventajon” (por defecto) o “Asegurados Ventajón”." />
             <RoadmapItem title="Números de la centralita" desc="Sustituir los números de ejemplo de la página de gracias por los números reales, antes de la normativa de octubre 2026." />
             <RoadmapItem title="Logos de compañías" desc="Adeslas, Mapfre y el resto de aseguradoras se muestran hoy solo en texto: los logos requieren autorización previa." />
             <RoadmapItem title="Imagen del hero" desc="La imagen actual es un placeholder de marca; sustituir por fotografía aprobada." />
             <RoadmapItem title="Precios y promociones" desc="Por decisión de marca, no se muestran precios ni % de ahorro. Cualquier cifra necesita validación expresa de dirección." />
+            <RoadmapItem title="Credenciales de Codeoscopic" desc="La integración está construida y cableada; para dar precios reales en producción solo faltan las credenciales y la documentación de acceso de Codeoscopic." />
+            <RoadmapItem title="Encaje con IT / desarrollo del grupo" desc="Decidir el modelo de dato (¿CRM propio o unificado con el del grupo?), la titularidad y el gobierno técnico y de ciberseguridad de esta plataforma frente a los sistemas actuales." />
           </div>
         </Section>
 
