@@ -88,7 +88,7 @@ function PortalContent() {
           className="flex items-center gap-2 rounded-card bg-brand-red px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-red-deep disabled:cursor-not-allowed disabled:opacity-60"
         >
           {downloading && <Spinner />}
-          {downloading ? "Generando…" : "Descargar referencia de API (PDF)"}
+          {downloading ? "Generando…" : "Descargar documentación completa (PDF)"}
         </button>
         {downloadError && <p role="alert" className="mt-1.5 text-[12px] font-medium text-brand-red">{downloadError}</p>}
       </div>
