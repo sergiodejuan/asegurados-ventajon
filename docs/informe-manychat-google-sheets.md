@@ -22,7 +22,12 @@ Google Sheet (DASHBOARD) → Apps Script Web App (?token=SECRET)
 
 ## 1. Pega el script en la hoja
 
-En la hoja: **Extensiones → Apps Script**. Borra lo que haya y pega esto:
+En la hoja: **Extensiones → Apps Script**. Si ya tienes otros scripts en el
+proyecto (p. ej. `syncMaestro` en `Código.gs`), **no los borres**: crea un
+archivo nuevo con **+ (Archivos) → Script**, llámalo `Informe`, y pega ahí
+esto. Los dos archivos conviven en el mismo proyecto (las funciones son
+globales entre archivos) y no hay colisión de nombres. Si la hoja no tenía
+ningún script, puedes pegarlo directamente en `Código.gs`.
 
 ```javascript
 // Web App de solo lectura del DASHBOARD para el panel de Asegurados Ventajon.
