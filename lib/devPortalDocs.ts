@@ -387,6 +387,7 @@ export const ENV_GROUPS: EnvGroup[] = [
       { nombre: "NEXT_PUBLIC_TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY", para: "CAPTCHA Cloudflare (sin él, solo rate-limit)", obligatoria: "Opcional (recomendada)", secreta: true },
       { nombre: "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_SUBJECT", para: "Web Push (generar con npx web-push generate-vapid-keys; la pública debe coincidir en las dos vars)", obligatoria: "Opcional", secreta: true },
       { nombre: "TREMENDOUS_API_KEY / _FUNDING_SOURCE_ID / _CAMPAIGN_ID / _BASE_URL", para: "Pago de bonos de referidos (Amazon eGift)", obligatoria: "Sí (referidos)", secreta: true },
+      { nombre: "SHEETS_WEBAPP_URL / SHEETS_WEBAPP_SECRET", para: "Informe \"Leads ManyChat\": lee el DASHBOARD de la hoja de Google Sheets vía Web App de Apps Script (ver docs/informe-manychat-google-sheets.md). Sin ellas el informe muestra \"no configurado\"", obligatoria: "Sí (informe ManyChat)", secreta: true },
       { nombre: "LEAD_WEBHOOK_URL + NEXT_PUBLIC_WHATSAPP_NUMBER / _CALLER_1/2 / _CONTACT_HOURS / _GOOGLE_REVIEW_URL / _WHATSAPP_FUNNEL_SALUD_URL", para: "Webhook saliente opcional de leads + marca/contacto (todas con fallback)", obligatoria: "Opcional", secreta: false },
     ],
   },
@@ -418,6 +419,7 @@ export const EXTERNAL_SERVICES: ExternalService[] = [
   { servicio: "Tremendous", para: "Pago de bonos de referidos (Amazon eGift 20€)", credencial: "API key + funding source id (+ campaña opcional)" },
   { servicio: "Cloudflare Turnstile", para: "CAPTCHA en formularios que disparan llamadas", credencial: "Site key + secret" },
   { servicio: "Google Tag Manager / GA", para: "Analítica cliente", credencial: "Contenedor GTM (ID en admin/analitica)" },
+  { servicio: "Google Sheets (Apps Script Web App)", para: "Informe \"Leads ManyChat\" (lee el DASHBOARD de la hoja maestra en vivo, solo lectura)", credencial: "Web App /exec publicado en la hoja + secreto compartido (SHEETS_WEBAPP_URL / _SECRET)" },
 ];
 
 export type ChecklistPhase = { fase: string; items: string[] };
