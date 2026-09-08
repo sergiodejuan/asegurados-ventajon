@@ -82,6 +82,7 @@ const NAV: NavNode[] = [
       leaf("/admin/informes", "Informes", "informes", "informes"),
       leaf("/admin/utm", "UTM", "utm", "informes"),
       leaf("/admin/informes/referidos", "Referidos", "informes-referidos", "informes"),
+      leaf("/admin/informes/manychat", "Leads ManyChat", "informes-manychat", "informes"),
     ],
   },
   {
@@ -149,7 +150,7 @@ function ancestorsOfActive(nodes: NavNode[], active: string, trail: string[] = [
 }
 
 export type AdminActiveKey =
-  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "productos" | "aseguradoras" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
+  | "leads" | "presupuestos" | "llamadas" | "tareas" | "informes" | "utm" | "informes-referidos" | "informes-manychat" | "productos" | "aseguradoras" | "campana" | "landings" | "landings-comparar" | "lp-price-match" | "lp-referral" | "blog"
   | "exitintents" | "modal-inactividad" | "promociones" | "testimonios"
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
