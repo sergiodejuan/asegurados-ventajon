@@ -168,6 +168,21 @@ export async function ProductLandingPage({ page }: { page: ProductPage }) {
           </div>
         </section>
 
+        {/* Cross-sell "igualación de precio" — enlace para el usuario que
+            ya tiene presupuesto de otra compañía y busca alternativa. */}
+        <section className="mx-auto mt-8 max-w-app px-5 md:max-w-5xl lg:max-w-6xl">
+          <a href="/precio-mejor-garantizado"
+            className="flex items-center justify-between gap-3 rounded-[16px] border border-hair bg-mist/60 p-4 transition-colors hover:border-navy/40 hover:bg-mist md:p-5">
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-navy md:text-[15px]">¿Ya tienes un precio de otra compañía?</p>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-slate2 md:text-[13px]">
+                Envíanoslo y estudiamos la mejor alternativa del mercado. Gratis y sin compromiso.
+              </p>
+            </div>
+            <span className="shrink-0 text-[13px] font-semibold text-navy">Enviar →</span>
+          </a>
+        </section>
+
         {/* SEO */}
         <section aria-labelledby="seo-heading" className="mx-auto mt-14 max-w-app px-5 pb-4 md:mt-24 md:max-w-2xl">
           <h2 id="seo-heading" className="text-[22px] font-extrabold text-navy md:text-[26px]">Todo sobre el {page.badge.toLowerCase()}</h2>

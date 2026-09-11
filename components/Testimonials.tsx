@@ -1,5 +1,4 @@
 import { Star } from "./icons";
-import { TESTIMONIALS_PLACEHOLDER_NOTE } from "@/lib/productPages";
 
 export type Testimonial = { name: string; place: string; quote: string };
 
@@ -9,13 +8,32 @@ export const EXAMPLE_TESTIMONIALS: Testimonial[] = [
   { name: "Ana T.", place: "Santa Cruz de Tenerife", quote: "Todo por teléfono, sin ir a ninguna oficina. Rápido y sin letra pequeña." },
 ];
 
+// Sin reseñas reales todavía: preferimos decirlo en vez de inventar
+// testimonios. En cuanto haya valoraciones verificadas (Google, Trustpilot o
+// encuestas propias), esta sección se sustituye por ellas con nombre y
+// enlace verificable.
 export function Testimonials({
   heading = "Lo que dicen quienes ya han comparado",
-  items = EXAMPLE_TESTIMONIALS,
+  items,
 }: {
   heading?: string;
   items?: Testimonial[];
 }) {
+  if (!items) {
+    return (
+      <section aria-labelledby="testimonios" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
+        <h2 id="testimonios" className="text-[22px] font-extrabold text-navy md:text-[26px]">{heading}</h2>
+        <div className="mt-5 rounded-card border border-hair bg-white p-6 shadow-soft md:max-w-xl">
+          <p className="text-[15px] font-bold text-ink">Todavía no tenemos aquí tus reseñas</p>
+          <p className="mt-2 text-[14px] leading-relaxed text-slate2">
+            Preferimos no inventar testimonios. En cuanto tengamos valoraciones verificadas de clientes reales
+            (Google, Trustpilot o encuestas propias), las publicamos aquí con nombre y enlace verificable.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section aria-labelledby="testimonios" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
       <h2 id="testimonios" className="text-[22px] font-extrabold text-navy md:text-[26px]">{heading}</h2>
@@ -31,7 +49,9 @@ export function Testimonials({
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-[12px] leading-relaxed text-slate2">{TESTIMONIALS_PLACEHOLDER_NOTE}</p>
+      <p className="mt-3 text-[12px] leading-relaxed text-slate2">
+        Reseñas de ejemplo mientras recopilamos las de nuestros clientes reales — dinos si prefieres esperar a tenerlas antes de publicar esta sección.
+      </p>
     </section>
   );
 }

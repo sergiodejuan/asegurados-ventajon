@@ -7,6 +7,7 @@ import { Check, Phone, WhatsApp, ChevronRight } from "./icons";
 import { CALLER_NUMBERS, SITE_URL } from "@/lib/brand";
 import { withPromotionUtm, type Promotion } from "@/lib/promotions";
 import { otherPromotions } from "@/lib/store";
+import { safeHref } from "@/lib/safeHref";
 
 function telHref(n: string) {
   return "tel:" + n.replace(/[^\d+]/g, "");
@@ -21,7 +22,7 @@ export async function PromotionPage({ promo }: { promo: Promotion }) {
   // Los dos CTA que llevan a un tarificador/formulario van con el UTM propio
   // de la promoción, para que el lead que se cree quede atribuido a ella
   // (ver promotionSourceFromUtm en los endpoints de /api).
-  const ctaHref = withPromotionUtm(promo.ctaHref, promo.slug);
+  const ctaHref = withPromotionUtm(safeHref(promo.ctaHref), promo.slug);
   const llamadmeHref = withPromotionUtm(
     `/quiero-que-me-llamen${promo.producto ? `?producto=${promo.producto}` : ""}`,
     promo.slug

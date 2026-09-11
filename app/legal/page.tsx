@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
-import { BRAND_NAME, CONTACT_HOURS, PARTNERS, SITE_URL } from "@/lib/brand";
+import {
+  BRAND_NAME,
+  CONTACT_HOURS,
+  CUSTOMER_SUPPORT_EMAIL,
+  DGSFP_KEY,
+  LEGAL_ADDRESS,
+  LEGAL_ADDRESS_ONELINE,
+  LEGAL_CIF,
+  LEGAL_NAME,
+  PARTNERS,
+  REGISTRO_MERCANTIL_ONELINE,
+  SITE_URL,
+} from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `Información legal — ${BRAND_NAME}`,
@@ -36,12 +48,14 @@ export default function Legal() {
         <h1 className="text-[26px] font-extrabold text-navy">Información legal</h1>
 
         <div className="mt-4 rounded-card border border-brand-red/30 bg-brand-red/5 p-4">
-          <p className="text-[14px] font-semibold text-brand-red-deep">Pendiente de completar</p>
+          <p className="text-[14px] font-semibold text-brand-red-deep">Datos pendientes</p>
           <p className="mt-1 text-[13px] leading-relaxed text-slate2">
-            Este texto ya cubre la estructura y las cláusulas exigidas por el RGPD, la LOPDGDD, la
-            LSSI-CE y la normativa de distribución de seguros (RD-ley 3/2020). Los datos identificativos
-            concretos de la correduría, marcados en rojo, deben completarse con la información real antes
-            de publicar — y conviene una revisión final de un asesor legal.
+            Los datos identificativos y registrales de la correduría ya están cumplimentados, incluida
+            la inscripción en el Registro Mercantil y el email de atención al cliente. Quedan marcados
+            en rojo únicamente los datos operativos que aún faltan por confirmar (teléfono legal, email
+            del DPO/responsable de privacidad, email específico para ejercicio de derechos RGPD y
+            aseguradora del seguro de RC profesional). Antes de publicar conviene una revisión final de
+            un asesor legal.
           </p>
         </div>
 
@@ -62,11 +76,15 @@ export default function Legal() {
         <P>
           En cumplimiento del artículo 10 de la Ley 34/2002, de Servicios de la Sociedad de la
           Información y de Comercio Electrónico, se informa de los siguientes datos: este sitio web
-          (<span translate="no">{SITE_URL}</span>) es titularidad de <strong translate="no">{BRAND_NAME}</strong>,
-          con CIF <Pendiente>CIF de la correduría</Pendiente>, domicilio social en{" "}
-          <Pendiente>domicilio social completo</Pendiente>, inscrita en el Registro Mercantil de{" "}
-          <Pendiente>provincia, tomo, folio, hoja</Pendiente>. Correo electrónico de contacto:{" "}
-          <Pendiente>email de contacto legal</Pendiente>. Teléfono: <Pendiente>teléfono de contacto</Pendiente>.
+          (<span translate="no">{SITE_URL}</span>) es titularidad de{" "}
+          <strong translate="no">{LEGAL_NAME}</strong> (que opera comercialmente bajo la marca{" "}
+          <span translate="no">{BRAND_NAME}</span>), con CIF{" "}
+          <span translate="no">{LEGAL_CIF}</span>, domicilio social en{" "}
+          <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>, inscrita en el{" "}
+          <span translate="no">{REGISTRO_MERCANTIL_ONELINE}</span>. Correo electrónico de contacto:{" "}
+          <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+            {CUSTOMER_SUPPORT_EMAIL}
+          </a>. Teléfono: <Pendiente>teléfono de contacto</Pendiente>.
         </P>
 
         {/* 2. CORREDURÍA */}
@@ -80,8 +98,8 @@ export default function Legal() {
         <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-relaxed text-slate2">
           <li>
             Se encuentra inscrita en el Registro Administrativo Especial de Distribuidores de Seguros y
-            Reaseguros de la Dirección General de Seguros y Fondos de Pensiones (DGSFP) con el número{" "}
-            <Pendiente>nº de registro DGSFP</Pendiente>, registro que puede consultarse en{" "}
+            Reaseguros de la Dirección General de Seguros y Fondos de Pensiones (DGSFP) con clave{" "}
+            <span translate="no">{DGSFP_KEY}</span>, registro que puede consultarse en{" "}
             <a href="https://sedeelectronica.dgsfp.mineco.es/" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">
               sedeelectronica.dgsfp.mineco.es
             </a>.
@@ -103,7 +121,10 @@ export default function Legal() {
           </li>
           <li>
             Para quejas y reclamaciones relacionadas con la actividad de mediación, puede dirigirse al
-            departamento de atención al cliente en <Pendiente>email del servicio de atención al cliente</Pendiente>,
+            departamento de atención al cliente en{" "}
+            <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+              {CUSTOMER_SUPPORT_EMAIL}
+            </a>,
             y, en caso de no obtener respuesta satisfactoria, ante el Servicio de Reclamaciones de la
             DGSFP.
           </li>
@@ -114,17 +135,33 @@ export default function Legal() {
 
         <H3>3.1 Responsable del tratamiento</H3>
         <P>
-          <strong translate="no">{BRAND_NAME}</strong>, CIF <Pendiente>CIF</Pendiente>, domicilio en{" "}
-          <Pendiente>domicilio social</Pendiente>. Contacto para cuestiones de protección de datos:{" "}
+          <strong translate="no">{LEGAL_NAME}</strong>, CIF <span translate="no">{LEGAL_CIF}</span>,
+          domicilio en <span translate="no">{LEGAL_ADDRESS_ONELINE}</span>. Contacto para cuestiones de
+          protección de datos:{" "}
           <Pendiente>email del delegado de protección de datos o responsable de privacidad</Pendiente>.
         </P>
 
         <H3>3.2 Finalidades y base jurídica del tratamiento</H3>
         <P>Tratamos los datos que nos facilitas a través de los formularios de esta web para:</P>
         <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-relaxed text-slate2">
-          <li>Elaborar y enviarte una comparativa o presupuesto de seguros — base jurídica: ejecución de medidas precontractuales a tu solicitud (art. 6.1.b RGPD).</li>
-          <li>Contactarte por teléfono, WhatsApp o correo electrónico para asesorarte sobre tu solicitud, incluida la programación de una llamada — base jurídica: tu consentimiento expreso (art. 6.1.a RGPD), que se solicita de forma separada e independiente de la aceptación de la política de privacidad.</li>
-          <li>Enviarte comunicaciones comerciales sobre productos de seguros — base jurídica: tu consentimiento expreso, opcional y revocable en cualquier momento.</li>
+          <li>
+            Elaborar y enviarte una comparativa o presupuesto de seguros, y contactarte por teléfono,
+            WhatsApp o correo electrónico para atender esa misma solicitud (confirmarte el precio,
+            resolver dudas, programar una llamada) — base jurídica: ejecución de medidas
+            precontractuales a tu solicitud (art. 6.1.b RGPD). Te informamos de ello, junto con esta
+            política de privacidad, en la casilla obligatoria de cada formulario: al no ser una
+            finalidad distinta de la que tú mismo inicias, no exige un consentimiento separado, aunque
+            igualmente requiere una acción afirmativa expresa (marcar la casilla) antes de poder
+            enviar el formulario.
+          </li>
+          <li>
+            Cuando el seguro que solicitas trata datos de salud (salud, vida — el hábito de fumar o el
+            motivo de la contratación cuentan como datos de salud a estos efectos), calcular y comparar
+            tu tarifa a partir de esos datos — base jurídica: tu consentimiento explícito y separado
+            para categorías especiales de datos (art. 9.2.a RGPD), recogido en una casilla propia,
+            distinta de la anterior y nunca premarcada.
+          </li>
+          <li>Enviarte comunicaciones comerciales sobre productos de seguros — base jurídica: tu consentimiento expreso, opcional, desmarcado por defecto y revocable en cualquier momento.</li>
           <li>Gestionar tu área de cliente, tus llamadas programadas y tus notificaciones, si te registras — base jurídica: ejecución de la relación contractual o precontractual.</li>
           <li>Medir el rendimiento y la seguridad de la web (analítica, prevención de abuso) — base jurídica: interés legítimo y, para las cookies no esenciales, tu consentimiento a través del panel de cookies.</li>
         </ul>
@@ -272,16 +309,20 @@ export default function Legal() {
           Estas condiciones se rigen por la legislación española. Para cualquier controversia que no
           pueda resolverse por vía amistosa, y sin perjuicio del derecho del usuario consumidor a acudir
           al fuero de su domicilio, las partes se someten a los Juzgados y Tribunales de{" "}
-          <Pendiente>ciudad del domicilio social</Pendiente>.
+          <span translate="no">{LEGAL_ADDRESS.province}</span>.
         </P>
 
         {/* 6. COMUNICACIONES COMERCIALES */}
         <H2 id="comunicaciones">6. Comunicaciones comerciales y llamadas telefónicas</H2>
         <P>
-          Solo te llamamos o te escribimos por WhatsApp si has autorizado expresamente el contacto en el
-          formulario correspondiente. Puedes revocar esta autorización en cualquier momento indicándolo
+          Solo te llamamos o te escribimos por WhatsApp para atender una solicitud que tú mismo nos has
+          enviado (por ejemplo, confirmarte un presupuesto) o si nos has dado tu consentimiento expreso
+          para comunicaciones comerciales; en ambos casos te lo indicamos con claridad en el propio
+          formulario antes de enviarlo. Puedes revocar tu autorización en cualquier momento indicándolo
           en la propia llamada, respondiendo "BAJA" por WhatsApp, o escribiendo a{" "}
-          <Pendiente>email para darte de baja del contacto comercial</Pendiente>. En cumplimiento de la
+          <a href={`mailto:${CUSTOMER_SUPPORT_EMAIL}`} className="font-semibold text-navy underline" translate="no">
+            {CUSTOMER_SUPPORT_EMAIL}
+          </a>. En cumplimiento de la
           Ley General de Telecomunicaciones, las llamadas comerciales se realizan desde numeración
           identificable como tal; puedes consultar los números concretos desde los que te llamamos en la
           página de agradecimiento tras completar un formulario. Si consideras que hemos vulnerado tu

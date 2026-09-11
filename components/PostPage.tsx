@@ -5,6 +5,7 @@ import { PostCard } from "./PostCard";
 import { Check, IconByName } from "./icons";
 import type { Post, PostBlock } from "@/lib/posts";
 import { otherPosts } from "@/lib/store";
+import { safeHref } from "@/lib/safeHref";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
@@ -38,7 +39,7 @@ function ArticleBlock({ block }: { block: PostBlock }) {
           <p className="max-w-sm text-[18px] font-extrabold leading-tight text-navy-deep">{block.headline}</p>
           <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-navy-deep/80">{block.sub}</p>
           <a
-            href={block.ctaHref}
+            href={safeHref(block.ctaHref)}
             className="mt-4 inline-flex items-center justify-center rounded-card bg-navy px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep"
           >
             {block.ctaLabel}

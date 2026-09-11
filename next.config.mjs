@@ -10,14 +10,19 @@
 // connect.facebook.net + www.facebook.com: píxel de Meta (components/
 // MetaPixel.tsx) — el script se sirve desde el primero, el beacon de
 // noscript y las llamadas de fbq() van al segundo.
+// AvantProductForm de Codeoscopic: se carga como iframe desde
+// product-form.avant.codeoscopic.io y su script vive ahí. También hace
+// llamadas de red al mismo host (aunque nosotros ya proxyamos todo a
+// través de /api/product-form, el widget puede pedir assets estáticos).
+// Solo abrimos codeoscopic.io — nada de terceros amplios.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://challenges.cloudflare.com https://connect.facebook.net",
+  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://challenges.cloudflare.com https://connect.facebook.net https://product-form.avant.codeoscopic.io",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https:",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://challenges.cloudflare.com https://connect.facebook.net https://www.facebook.com",
-  "frame-src https://www.googletagmanager.com https://challenges.cloudflare.com",
+  "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://challenges.cloudflare.com https://connect.facebook.net https://www.facebook.com https://*.codeoscopic.io",
+  "frame-src https://www.googletagmanager.com https://challenges.cloudflare.com https://product-form.avant.codeoscopic.io https://*.codeoscopic.io",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'self'",

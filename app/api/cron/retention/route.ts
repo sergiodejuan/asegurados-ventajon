@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { purgeStaleLeads, createAuditLog } from "@/lib/store";
+import { purgeStaleLeads, expireStalePresupuestos, createAuditLog } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +11,13 @@ export const maxDuration = 60;
 // calendario de vercel.json, con la cabecera Authorization que añade
 // automáticamente a partir de la variable de entorno CRON_SECRET.
 const RETENTION_DAYS = 730;
+
+// Auto-caducidad de presupuestos fríos (higiene de pipeline, NO borrado):
+// los que siguen en "nuevo" y llevan este plazo sin actividad pasan a
+// "caducado" (ver expireStalePresupuestos en lib/store.ts). Se conserva todo
+// el histórico y la analítica; es reversible. 90 días es conservador para no
+// caducar leads templados que aún están decidiendo.
+const PRESUPUESTO_CADUCIDAD_DAYS = 90;
 
 function safeEquals(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -41,5 +48,21 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true, ...result, retentionDays: RETENTION_DAYS });
+  const caducados = await expireStalePresupuestos(PRESUPUESTO_CADUCIDAD_DAYS);
+
+  if (caducados.expired > 0) {
+    await createAuditLog({
+      agenteId: "sistema", agenteNombre: "Sistema (retención automática)", action: "actualizar", modulo: "presupuestos",
+      entidad: "presupuesto", entidadId: "batch",
+      resumen: `Caducó automáticamente ${caducados.expired} presupuesto(s) en estado "nuevo" sin actividad en más de ${PRESUPUESTO_CADUCIDAD_DAYS} días (higiene de pipeline; no se borran datos).`,
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    ...result,
+    retentionDays: RETENTION_DAYS,
+    presupuestosCaducados: caducados.expired,
+    presupuestosCaducidadDays: PRESUPUESTO_CADUCIDAD_DAYS,
+  });
 }

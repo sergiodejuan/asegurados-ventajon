@@ -8,6 +8,8 @@ import { quoteNumber } from "@/lib/quote";
 import { fmt, SUBMISSION_FIELD_LABELS, formatSubmissionValue } from "@/lib/adminFormat";
 import { StatTile, ViewToggle, FilterTab, FilterDropdown, CollapsiblePanel, NoteBox } from "@/components/admin/Widgets";
 import { WhatsAppFollowupModal } from "@/components/admin/WhatsAppFollowupModal";
+import { SendEmailModal } from "@/components/admin/SendEmailModal";
+import { CreatePresupuestoModal } from "@/components/admin/CreatePresupuestoModal";
 
 type Activity = { at: string; type: string; note: string; meta?: { agente?: string; channel?: string } };
 type ConsentRecord = {
@@ -34,12 +36,37 @@ type Lead = {
   fechaNacimiento: string; sexo: string; yaTieneSeguro: boolean | null;
   seguroActualImporte: number | null; seguroActualPeriodo: string; seguroActualServicios: string[];
   diaLlamada: string; turnoLlamada: string; presupuestoId: string;
+  priceMatch: {
+    companiaActual: string;
+    precioActual: number | null;
+    periodicidad: string;
+    capturaUrl: string;
+    comentario: string;
+    solicitadoAt: string;
+  } | null;
   aceptaPrivacidad: boolean; autorizaContacto: boolean; aceptaComercial: boolean;
   consents: ConsentRecord[];
   utm: Record<string, string | undefined>; activity: Activity[];
   submissions: LeadSubmission[];
   emails: EmailLog[];
   anonymizedAt: string;
+  // Programa referidos — ver app/api/admin/leads/[id]/route.ts. Solo lo
+  // rellena la ficha individual (openLead), no el listado; opcionales para
+  // no tener que tocar también GET /api/admin/leads. Ninguno de los dos es
+  // exclusivo del otro: un cliente puede haber llegado como amigo de
+  // alguien Y a la vez tener ya su propio código para referir.
+  referidoDe?: ReferidoDeInfo | null;
+  comoReferidor?: ComoReferidorInfo | null;
+};
+
+type ReferidoDeInfo = {
+  referidorLeadId: string; referidorNombre: string; code: string;
+  status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
+  cotizadoAt: string; optInAt: string; contratadoAt: string;
+  pagadoReferidoAt: string; pagadoReferidorAt: string; ultimoErrorPago: string;
+};
+type ComoReferidorInfo = {
+  code: string; bloqueado: boolean; totalConvertidos: number; contratados: number; pagados: number;
 };
 
 const EMAIL_STATUS_COLORS: Record<EmailLog["status"], string> = {
@@ -57,6 +84,17 @@ const STATUS_COLORS: Record<string, string> = {
   presupuestado: "bg-amber-100 text-amber-700",
   ganado: "bg-emerald-100 text-emerald-700",
   perdido: "bg-slate-200 text-slate-600",
+};
+
+const REFERIDO_STATUS_LABELS: Record<NonNullable<Lead["referidoDe"]>["status"], string> = {
+  cotizado: "Cotizado", "opt-in": "Opt-in confirmado", contratado: "Contratado", pagado: "Pagado", cancelado: "Cancelado",
+};
+const REFERIDO_STATUS_COLORS: Record<NonNullable<Lead["referidoDe"]>["status"], string> = {
+  cotizado: "bg-slate-200 text-slate-600",
+  "opt-in": "bg-navy/10 text-navy",
+  contratado: "bg-amber-100 text-amber-700",
+  pagado: "bg-emerald-100 text-emerald-700",
+  cancelado: "bg-brand-red/10 text-brand-red-deep",
 };
 
 const USO_LABELS: Record<string, string> = {
@@ -103,6 +141,7 @@ function LeadsCrm() {
   const [selected, setSelected] = useState<Lead | null>(null);
   const [agents, setAgents] = useState<{ id: string; nombre: string }[]>([]);
   const [filterCartera, setFilterCartera] = useState<"all" | "mia">("all");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const load = useCallback(async (tk: string) => {
     setError(null); setLoading(true);
@@ -128,14 +167,16 @@ function LeadsCrm() {
   }, [loadedOnce]);
 
   async function openLead(id: string) {
+    setEmailModalOpen(false);
     // Se pide la ficha fresca (no la del listado, que puede estar desactualizada
     // si el propio cliente ha cambiado sus datos desde /area-cliente).
     try {
       const res = await fetch(`/api/admin/leads/${id}`, { headers: { "x-admin-token": token } });
       const body = await res.json();
       if (res.ok && body.ok) {
-        setSelected(body.lead);
-        setLeads((prev) => prev.map((l) => (l.id === body.lead.id ? body.lead : l)));
+        const full: Lead = { ...body.lead, referidoDe: body.referidoDe, comoReferidor: body.comoReferidor };
+        setSelected(full);
+        setLeads((prev) => prev.map((l) => (l.id === full.id ? full : l)));
         return;
       }
     } catch { /* si falla, se cae al fallback de abajo */ }
@@ -146,7 +187,7 @@ function LeadsCrm() {
     const res = await fetch(`/api/admin/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ ...payload, agente: agent }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (res.ok && body.ok) {
@@ -239,6 +280,13 @@ function LeadsCrm() {
               </div>
               <p className="mt-1 text-[14px] tnums text-slate2">{l.telefono || "sin teléfono"}</p>
               <p className="text-[14px] text-slate2">{l.email || "sin email"}</p>
+              <button
+                type="button" onClick={() => setEmailModalOpen(true)} disabled={!l.email}
+                title={l.email ? undefined : "Este lead no tiene un email guardado."}
+                className="mt-3 rounded-pill border border-navy px-3.5 py-1.5 text-[12px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:border-hair disabled:text-slate2 disabled:hover:bg-transparent"
+              >
+                Enviar email
+              </button>
 
               <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">Fuente(s)</dt><dd className="text-right font-medium text-ink">{l.sources.map((s) => sources[s] ?? s).join(", ")}</dd></div>
@@ -288,6 +336,54 @@ function LeadsCrm() {
                     {l.utm?.term && <div className="flex items-baseline justify-between gap-3"><dt className="text-slate2">utm_term</dt><dd className="text-right font-medium text-ink">{l.utm.term}</dd></div>}
                     {l.utm?.referrer && <div className="flex items-baseline justify-between gap-3"><dt className="shrink-0 text-slate2">Referrer</dt><dd className="truncate text-right font-medium text-ink" title={l.utm.referrer}>{l.utm.referrer}</dd></div>}
                   </dl>
+                </div>
+              )}
+
+              {(l.referidoDe || l.comoReferidor) && (
+                <div className="mt-5 border-t border-hair pt-4">
+                  <p className="text-[12px] font-semibold text-ink">Programa referidos</p>
+                  {l.referidoDe && (
+                    <div className="mt-1.5 text-[12px] leading-relaxed text-slate2">
+                      <p>
+                        Referido por{" "}
+                        <button type="button" onClick={() => openLead(l.referidoDe!.referidorLeadId)} className="font-semibold text-navy underline">
+                          {l.referidoDe.referidorNombre || "otro cliente"}
+                        </button>
+                        {" "}
+                        <span className={`ml-1 rounded-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${REFERIDO_STATUS_COLORS[l.referidoDe.status]}`}>
+                          {REFERIDO_STATUS_LABELS[l.referidoDe.status]}
+                        </span>
+                      </p>
+                      <p className="mt-1">
+                        Su bono (amigo): {l.referidoDe.pagadoReferidoAt
+                          ? <b className="text-emerald-700">pagado {fmt(l.referidoDe.pagadoReferidoAt)}</b>
+                          : l.referidoDe.ultimoErrorPago
+                          ? <b className="text-brand-red-deep" title={l.referidoDe.ultimoErrorPago}>error de pago</b>
+                          : <b className="text-amber-700">pendiente</b>}
+                      </p>
+                      <p>
+                        Bono del referidor: {l.referidoDe.pagadoReferidorAt
+                          ? <b className="text-emerald-700">pagado {fmt(l.referidoDe.pagadoReferidorAt)}</b>
+                          : l.referidoDe.contratadoAt
+                          ? <b className="text-amber-700">en periodo de gracia (contratado {fmt(l.referidoDe.contratadoAt)})</b>
+                          : <b className="text-slate2">aún no aplica (falta contratar)</b>}
+                      </p>
+                    </div>
+                  )}
+                  {l.comoReferidor && (
+                    <div className={l.referidoDe ? "mt-3 border-t border-hair pt-3" : "mt-1.5"}>
+                      <p className="text-[12px] leading-relaxed text-slate2">
+                        Tiene su propio código <b className="tnums text-ink">{l.comoReferidor.code}</b>
+                        {l.comoReferidor.bloqueado && <span className="ml-1.5 rounded-pill bg-brand-red/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand-red-deep">Bloqueado</span>}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-slate2">
+                        {l.comoReferidor.totalConvertidos} amigo{l.comoReferidor.totalConvertidos === 1 ? "" : "s"} · {l.comoReferidor.contratados} contratado{l.comoReferidor.contratados === 1 ? "" : "s"} · {l.comoReferidor.pagados} pagado{l.comoReferidor.pagados === 1 ? "" : "s"}
+                      </p>
+                      <a href="/admin/informes/referidos" className="mt-1 inline-block text-[12px] font-semibold text-navy underline">
+                        Ver en el dashboard de referidos →
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -358,6 +454,36 @@ function LeadsCrm() {
 
           {/* DERECHA (70%): paneles colapsables */}
           <div className="flex flex-col gap-4">
+            {l.priceMatch && (
+              <CollapsiblePanel title="Solicitud de igualación de precio">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                  <dt className="text-slate2">Compañía actual</dt>
+                  <dd className="text-right font-semibold text-ink">{l.priceMatch.companiaActual || "—"}</dd>
+                  <dt className="text-slate2">Precio actual</dt>
+                  <dd className="text-right font-semibold tnums text-ink">
+                    {l.priceMatch.precioActual != null ? `${l.priceMatch.precioActual.toFixed(2)} €/${l.priceMatch.periodicidad || "?"}` : "—"}
+                  </dd>
+                  <dt className="text-slate2">Solicitado</dt>
+                  <dd className="text-right text-slate2">{fmt(l.priceMatch.solicitadoAt)}</dd>
+                </dl>
+                {l.priceMatch.comentario && (
+                  <p className="mt-3 rounded-card border border-hair bg-mist/60 p-3 text-[13px] leading-relaxed text-ink">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate2">Comentario del cliente</span>
+                    {l.priceMatch.comentario}
+                  </p>
+                )}
+                {l.priceMatch.capturaUrl && (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate2">Captura del presupuesto</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <a href={l.priceMatch.capturaUrl} target="_blank" rel="noreferrer">
+                      <img src={l.priceMatch.capturaUrl} alt="Captura del presupuesto del cliente" className="max-h-64 w-auto rounded-card border border-hair" />
+                    </a>
+                  </div>
+                )}
+              </CollapsiblePanel>
+            )}
+
             <CollapsiblePanel title="Actividad">
               <ActivityPanel activity={l.activity} />
             </CollapsiblePanel>
@@ -375,7 +501,7 @@ function LeadsCrm() {
             </CollapsiblePanel>
 
             <CollapsiblePanel title="Presupuestos">
-              <PresupuestosPanel leadId={l.id} />
+              <PresupuestosPanel lead={{ id: l.id, nombre: l.nombre, telefono: l.telefono, email: l.email }} />
             </CollapsiblePanel>
 
             <CollapsiblePanel title="Llamadas">
@@ -387,6 +513,13 @@ function LeadsCrm() {
             </CollapsiblePanel>
           </div>
         </div>
+
+        {emailModalOpen && (
+          <SendEmailModal
+            lead={{ id: l.id, nombre: l.nombre, email: l.email, producto: l.producto }}
+            onClose={() => setEmailModalOpen(false)}
+          />
+        )}
       </main>
     );
   }
@@ -492,7 +625,17 @@ function LeadsCrm() {
             <li key={l.id}>
               <button onClick={() => openLead(l.id)} className="flex w-full items-center justify-between gap-3 rounded-card border border-hair bg-white px-4 py-3.5 text-left transition-colors hover:bg-mist">
                 <div className="min-w-0">
-                  <p className="truncate text-[15px] font-semibold text-ink">{l.nombre || "Sin nombre"}</p>
+                  <p className="truncate text-[15px] font-semibold text-ink">
+                    {l.nombre || "Sin nombre"}
+                    {l.priceMatch && (
+                      <span
+                        title={`Iguala precio: ${l.priceMatch.precioActual ?? "?"} €/${l.priceMatch.periodicidad} en ${l.priceMatch.companiaActual}`}
+                        className="ml-1.5 inline-flex items-center rounded-pill bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-800"
+                      >
+                        Iguala precio
+                      </span>
+                    )}
+                  </p>
                   <p className="truncate text-[13px] text-slate2 tnums">
                     {[l.telefono || l.email, sources[l.source] ?? l.source, l.producto || null, l.agenteAsignadoNombre || null, fmt(l.updatedAt)].filter(Boolean).join(" · ")}
                   </p>
@@ -620,24 +763,57 @@ type PresupuestoFull = {
   precioAprox: number | null; eleccion: PresupuestoEleccion; nombre: string; telefono: string; updatedAt: string;
 };
 
-function PresupuestosPanel({ leadId }: { leadId: string }) {
+function PresupuestosPanel({ lead }: { lead: { id: string; nombre: string; telefono: string; email: string } }) {
   const { token } = useAdminToken();
   const [items, setItems] = useState<PresupuestoFull[]>([]);
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [waTarget, setWaTarget] = useState<PresupuestoFull | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/admin/presupuestos?leadId=${leadId}`, { headers: { "x-admin-token": token } })
+  const load = useCallback(() => {
+    fetch(`/api/admin/presupuestos?leadId=${lead.id}`, { headers: { "x-admin-token": token } })
       .then((r) => r.json())
       .then((body) => { if (body.ok) { setItems(body.presupuestos); setStatusLabels(body.statusLabels); } })
       .finally(() => setLoaded(true));
-  }, [leadId, token]);
+  }, [lead.id, token]);
 
-  if (!loaded) return <p className="text-[13px] text-slate2">Cargando…</p>;
-  if (items.length === 0) return <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>;
+  useEffect(() => { load(); }, [load]);
 
+  return (
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button type="button" onClick={() => setCreating(true)}
+          className="rounded-pill border border-navy px-3 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white">
+          + Crear presupuesto
+        </button>
+      </div>
+      {!loaded ? (
+        <p className="text-[13px] text-slate2">Cargando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-[13px] text-slate2">Sin presupuestos generados.</p>
+      ) : (
+        <PresupuestosList items={items} statusLabels={statusLabels} expandedId={expandedId} setExpandedId={setExpandedId} waTarget={waTarget} setWaTarget={setWaTarget} />
+      )}
+      {creating && (
+        <CreatePresupuestoModal
+          lockedLead={lead}
+          onClose={() => setCreating(false)}
+          onCreated={() => { setCreating(false); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PresupuestosList({
+  items, statusLabels, expandedId, setExpandedId, waTarget, setWaTarget,
+}: {
+  items: PresupuestoFull[]; statusLabels: Record<string, string>;
+  expandedId: string | null; setExpandedId: (id: string | null) => void;
+  waTarget: PresupuestoFull | null; setWaTarget: (p: PresupuestoFull | null) => void;
+}) {
   return (
     <ol className="flex flex-col gap-2">
       {items.map((s) => {
@@ -650,6 +826,14 @@ function PresupuestosPanel({ leadId }: { leadId: string }) {
                 <p className="truncate text-[13px] font-semibold tnums text-ink">
                   #{quoteNumber(s.id)} <span className="font-normal capitalize text-slate2">· {s.producto}</span>
                   {s.eleccion && <span className="font-normal text-slate2"> · {s.eleccion.compania}</span>}
+                  {typeof (s.data as { codeoscopicInsuranceId?: unknown })?.codeoscopicInsuranceId === "string" && (
+                    <span
+                      title={`Cotizado en Codeoscopic: ${(s.data as { codeoscopicInsuranceId: string }).codeoscopicInsuranceId}`}
+                      className="ml-1.5 inline-flex items-center gap-0.5 rounded-pill bg-emerald-50 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-emerald-700"
+                    >
+                      Codeoscopic ✓
+                    </span>
+                  )}
                 </p>
                 <p className="text-[12px] text-slate2">{statusLabels[s.status] ?? s.status} · {fmt(s.updatedAt)}</p>
               </button>

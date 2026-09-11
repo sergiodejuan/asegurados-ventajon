@@ -4,12 +4,11 @@ import { toE164Spain } from "./phone";
 // Integración con Retell AI: cuando un lead completa el tarificador (y ya ha
 // dado autorización de contacto), se dispara una llamada saliente automática
 // del agente de voz configurado en Retell.
-//
 // Variables de entorno necesarias (Vercel → Environment Variables):
-//   RETELL_API_KEY     — clave de API de Retell (Account Settings → API Keys).
-//   RETELL_AGENT_ID     — ID del agente (botón "ID" en el detalle del agente).
-//   RETELL_FROM_NUMBER  — número saliente en formato E.164 (+34...), comprado
-//                          o importado en Retell para este agente.
+// RETELL_API_KEY — clave de API de Retell (Account Settings → API Keys).
+// RETELL_AGENT_ID — ID del agente (botón "ID" en el detalle del agente).
+// RETELL_FROM_NUMBER — número saliente en formato E.164 (+34...), comprado
+// o importado en Retell para este agente.
 // Sin estas tres variables, la llamada automática queda desactivada sin más
 // (el tarificador sigue funcionando con normalidad).
 

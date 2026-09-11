@@ -1,8 +1,7 @@
 // Disponibilidad real de asesores, derivada de un horario configurado (no
 // texto libre): evita parsear CONTACT_HOURS y da un mensaje honesto tipo
 // "disponible ahora" / "te llamamos mañana a las 9:00".
-//
-// ⚠️ Debe reflejar el horario real. Si CONTACT_HOURS (lib/brand.ts) cambia,
+// Debe reflejar el horario real. Si CONTACT_HOURS (lib/brand.ts) cambia,
 // actualiza también BUSINESS_HOURS aquí.
 
 export const BUSINESS_HOURS = {

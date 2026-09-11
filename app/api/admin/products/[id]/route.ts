@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteProduct, getProduct, saveProduct, createAuditLog } from "@/lib/store";
 import { requireModule } from "@/lib/agentAuth";
 import type { ProductDraft } from "@/lib/catalog";
+import { isValidImageDataUri } from "@/lib/media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,8 +25,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
 
-  if (typeof body.logoUrl === "string" && body.logoUrl.length > MAX_LOGO_LENGTH) {
-    return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+  if (typeof body.logoUrl === "string") {
+    if (body.logoUrl.length > MAX_LOGO_LENGTH) {
+      return NextResponse.json({ ok: false, error: "El logo es demasiado grande. Prueba con uno más ligero." }, { status: 413 });
+    }
+    // Validar MIME real: solo data:image/(png|jpeg|webp|gif). Sin esto, un
+    // admin con permiso "productos" podría guardar data:text/html o
+    // data:image/svg+xml con <script> y provocar XSS same-origin al servir
+    // el logo (ver auditoría, hallazgo X-02). Vacío también es válido (quitar el logo).
+    if (!isValidImageDataUri(body.logoUrl)) {
+      return NextResponse.json({ ok: false, error: "El logo no es una imagen válida (PNG/JPEG/WebP/GIF)." }, { status: 400 });
+    }
   }
 
   const product = await saveProduct(params.id, body);

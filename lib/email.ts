@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { BRAND_NAME } from "./brand";
+import { BRAND_NAME, SITE_URL } from "./brand";
 
 // Mismo patrón "no-op hasta que se configure" que Retell/Bland/Turnstile:
 // sin RESEND_API_KEY el resto de la app sigue funcionando, simplemente no se
@@ -27,4 +27,18 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     console.error("[email] send error", err);
     return false;
   }
+}
+
+// Genéricas, reutilizadas por cualquier email transaccional/manual con HTML
+// (ver lib/comparativaEmail.ts y lib/leadEmailTemplates.ts): escapeHtml evita
+// inyectar HTML desde datos de usuario (nombre, compañía...); tracked()
+// envuelve cualquier URL del correo vía /api/email/click, que registra el
+// clic en el EmailLog del lead antes de redirigir de verdad.
+export function escapeHtml(s: string): string {
+  const map: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  return s.replace(/[&<>"']/g, (c) => map[c]);
+}
+
+export function tracked(leadId: string, logId: string, path: string): string {
+  return `${SITE_URL}/api/email/click?lead=${encodeURIComponent(leadId)}&log=${encodeURIComponent(logId)}&url=${encodeURIComponent(path)}`;
 }

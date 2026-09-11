@@ -26,6 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
   negociando: "bg-amber-100 text-amber-700",
   ganado: "bg-emerald-100 text-emerald-700",
   perdido: "bg-slate-200 text-slate-600",
+  caducado: "bg-slate-100 text-slate-400",
 };
 
 function eur(n: number) {

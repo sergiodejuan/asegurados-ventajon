@@ -6,7 +6,7 @@ import { IconByName } from "./icons";
 import { Modal } from "./Modal";
 
 // Banner de reclamo tipo referencia (recuadro mint + claim + "ver condiciones").
-// ⚠️ Sin % ni precios: el texto se edita en lib/brand.ts (PROMO) tras validación de Gabriel.
+// Sin % ni precios: el texto se edita en lib/brand.ts (PROMO) tras validación de Gabriel.
 // headline/sub opcionales: para contextos multiproducto (p.ej. "quiero que me
 // llamen" genérico) donde el claim de salud de PROMO no encaja.
 export function PromoBanner({ headline, sub }: { headline?: string; sub?: string } = {}) {

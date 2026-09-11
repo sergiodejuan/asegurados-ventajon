@@ -6,7 +6,6 @@ import { getTheme } from "./store";
 // podido cargar (bloqueadores de anuncios, Safari/ITP, "no cookies hasta
 // aceptar"...). Es el complemento server-side del píxel de components/
 // MetaPixel.tsx, que solo se encarga de PageView/remarketing.
-//
 // El access token es un dato sensible de verdad (permite escribir eventos
 // de conversión en la cuenta de anuncios): vive en variable de entorno
 // (META_CAPI_ACCESS_TOKEN), nunca en el tema editable desde el admin — mismo

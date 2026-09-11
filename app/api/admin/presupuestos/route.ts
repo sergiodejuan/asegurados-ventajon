@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   let body: {
     leadId?: string; producto?: string; compania?: string; precio?: number;
-    condiciones?: string; servicios?: string[];
+    condiciones?: string; servicios?: string[]; codeoscopicInsuranceId?: string;
   };
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     leadId: body.leadId, producto: body.producto, compania: body.compania.trim(),
     precio: typeof body.precio === "number" && !Number.isNaN(body.precio) ? body.precio : null,
     condiciones: body.condiciones, servicios: body.servicios,
+    codeoscopicInsuranceId: typeof body.codeoscopicInsuranceId === "string" ? body.codeoscopicInsuranceId : undefined,
   });
   if (!presupuesto) return NextResponse.json({ ok: false, error: "Lead no encontrado." }, { status: 404 });
 

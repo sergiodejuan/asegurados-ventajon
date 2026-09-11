@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 // almacén que lib/store.ts (Redis en producción, memoria del proceso en
 // dev/sin credenciales) pero deliberadamente independiente de store.ts: no
 // es un dato del CRM, es control de abuso.
-//
 // Se usa sobre todo en los endpoints que disparan una llamada automática
 // real por Retell/Bland AI (/api/lead, /api/vida, /api/auto,
 // /api/call-request, /api/exit-intent, /api/calculadora-ahorro): sin esto,

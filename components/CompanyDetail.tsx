@@ -7,7 +7,7 @@ import { CallRequestForm } from "./CallRequestForm";
 import { WhatsAppHelpWidget } from "./WhatsAppHelpWidget";
 import { CompanyLogo } from "./Comparativa";
 import { Check } from "./icons";
-import type { Product } from "@/lib/catalog";
+import { copagoModoDe, copagoChip, type Product } from "@/lib/catalog";
 import {
   loadQuote, saludPrice, vidaPrice, autoPrice, decesosPrice, quoteNumber, buildWhatsAppText, whatsAppUrl, slugify, type QuoteProfile,
 } from "@/lib/quote";
@@ -42,7 +42,11 @@ export function CompanyDetail() {
       .finally(() => setLoaded(true));
   }, [producto]);
 
-  const entry = products.find((c) => slugify(c.compania) === params.compania);
+  // Se resuelve por id (?pid=) si viene — permite distinguir varios productos
+  // de la misma compañía (p.ej. dos "Mapfre", con y sin copago); si no, por el
+  // slug de la compañía (enlaces antiguos).
+  const pid = searchParams.get("pid");
+  const entry = (pid && products.find((c) => c.id === pid)) || products.find((c) => slugify(c.compania) === params.compania);
 
   if (loaded && !entry) {
     return (
@@ -61,6 +65,7 @@ export function CompanyDetail() {
   const widgetWaText = buildWhatsAppText({ producto, compania: entry.compania, quote, origen: `ficha ${entry.compania}` });
   const firstName = quote?.nombre?.trim().split(/\s+/)[0];
   const precioSalud = saludPrice({ conCopago: entry.precioConCopago ?? 0, sinCopago: entry.precioSinCopago ?? 0 }, { numAsegurados: quote?.numAsegurados, coberturaDental: quote?.coberturaDental });
+  const saludModo = copagoModoDe(entry);
   const precioVida = vidaPrice({ precio: entry.precio ?? 0 }, { fumador: quote?.fumador });
   const precioAuto = autoPrice({ precio: entry.precio ?? 0 }, { antiguedadCarnet: quote?.antiguedadCarnet, coberturaDeseada: quote?.coberturaDeseada });
   const precioDecesos = decesosPrice({ precio: entry.precio ?? 0 }, { numAsegurados: quote?.numAsegurados });
@@ -74,6 +79,7 @@ export function CompanyDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           producto, compania: entry!.compania, quote,
+          presupuestoId: quote?.id ?? "",
           precio: producto === "salud" ? { conCopago: precioSalud.conCopago, sinCopago: precioSalud.sinCopago } : { precio: precioUnico },
           servicios: entry!.servicios, condiciones: entry!.condiciones,
         }),
@@ -106,14 +112,17 @@ export function CompanyDetail() {
           <CompanyLogo logoUrl={entry.logoUrl} compania={entry.compania} />
           {entry.compania}
         </h1>
-        {quote && <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Presupuesto nº {quoteNumber(quote.id)}</p>}
+        {entry.titulo && <p className="mt-0.5 text-[15px] font-semibold text-slate2">{entry.titulo}</p>}
+        {/* Es una COTIZACIÓN mientras el usuario no elige/solicita; el nº que
+            se muestra es el de la comparativa (leadId), no "Presupuesto nº". */}
+        {quote && <p className="mt-1 text-[13px] font-semibold tnums text-slate2">Cotización nº {quoteNumber(quote.leadId || quote.id)}</p>}
 
         {producto !== "salud" ? (
           <p className="mt-5 text-[32px] font-extrabold tnums text-navy">
             Desde {euros(precioUnico)} €
             <span className="text-[16px] font-medium text-slate2">/mes</span>
           </p>
-        ) : (
+        ) : saludModo === "ambas" ? (
           <div className="mt-5 flex gap-8">
             <div>
               <p className="text-[13px] text-slate2">Con copago</p>
@@ -123,6 +132,14 @@ export function CompanyDetail() {
               <p className="text-[13px] text-slate2">Sin copago</p>
               <p className="text-[24px] font-extrabold tnums text-navy">{euros(precioSalud.sinCopago)} €/mes</p>
             </div>
+          </div>
+        ) : (
+          <div className="mt-5">
+            <span className="inline-block rounded-pill bg-emerald-600/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">{copagoChip(saludModo)}</span>
+            <p className="mt-2 text-[32px] font-extrabold tnums text-navy">
+              {euros(saludModo === "con" ? precioSalud.conCopago : precioSalud.sinCopago)} €
+              <span className="text-[16px] font-medium text-slate2">/mes</span>
+            </p>
           </div>
         )}
         <p className="mt-2 text-[12px] leading-relaxed text-slate2">

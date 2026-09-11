@@ -1,0 +1,59 @@
+name: Security audit
+
+# Auditoría de dependencias: se ejecuta en cada PR (para no meter CVEs
+# nuevas) y semanalmente los lunes (para pillar CVEs publicadas después de
+# hacer merge).
+#
+# Política: FALLA solo ante vulnerabilidades CRITICAL. Las HIGH se reportan
+# como aviso (no bloquean el pipeline) porque las HIGH abiertas hoy
+# (advisories de Next 14 / postcss) solo se resuelven subiendo a Next 15/16,
+# un cambio mayor que se aborda en una tarea de actualización aparte y con
+# pruebas — no debe bloquear cada commit mientras tanto.
+#
+# P0.15: acciones pineadas por SHA (no por tag) para evitar que una acción
+# comprometida en su release publique código nuevo bajo la misma etiqueta
+# y lo ejecutemos con permisos del repo. Los SHAs corresponden a las
+# versiones marcadas en el comentario y se actualizan con Dependabot.
+#
+# Permisos por defecto restringidos al mínimo (read-all) — cada job pide
+# más si lo necesita. Nunca permitir write por defecto.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # cada lunes a las 06:00 UTC
+  workflow_dispatch: # también manual desde la UI de Actions
+
+permissions: read-all
+
+jobs:
+  npm-audit:
+    name: npm audit (falla en CRITICAL; HIGH informativo)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Informe de vulnerabilidades HIGH: se imprime pero NO hace fallar el
+      # job (las HIGH abiertas hoy solo se resuelven con la subida mayor de
+      # Next, que va en su propia tarea).
+      - name: Informe de vulnerabilidades HIGH (no bloqueante)
+        run: npm audit --audit-level=high || true
+
+      # Puerta real: solo las CRITICAL bloquean el pipeline.
+      - name: Fallar ante vulnerabilidades CRITICAL
+        run: npm audit --audit-level=critical

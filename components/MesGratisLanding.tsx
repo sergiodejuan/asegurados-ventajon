@@ -257,8 +257,8 @@ function TermsContent() {
   return (
     <div className="flex flex-col gap-4">
       <p className="rounded-lg bg-amber-50 px-3 py-2.5 text-[12px] font-medium text-amber-800">
-        ⚠️ Texto DEMO: fechas de vigencia, compañías participantes y mecánica exacta de aplicación del
-        descuento pendientes de validación con dirección/legal antes de publicar esta campaña.
+        Texto de demo. Fechas de vigencia, compañías participantes y mecánica exacta de aplicación del
+        descuento pendientes de validación con dirección y legal antes de publicar esta campaña.
       </p>
 
       <div>

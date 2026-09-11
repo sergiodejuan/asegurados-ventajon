@@ -3,8 +3,7 @@
 // por historia, con foto destacada + galería repartida entre los capítulos
 // del relato). Mismo patrón que promociones/blog: un documento JSON en el
 // store, editable como un CMS desde /admin/testimonios.
-//
-// ⚠️ A diferencia de /promociones, aquí NO hay historias publicadas de
+// A diferencia de /promociones, aquí NO hay historias publicadas de
 // ejemplo: publicar una "historia de cliente" inventada como si fuera real
 // sería una reseña falsa presentada como genuina (riesgo legal de
 // competencia desleal, además de una falta de confianza hacia quien lee).

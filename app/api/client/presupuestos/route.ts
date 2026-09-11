@@ -9,14 +9,12 @@ export const dynamic = "force-dynamic";
 // Endpoint público (sin token admin) para que un cliente recupere el acceso
 // a su área de cliente desde otro dispositivo, identificándose con su
 // correo, su móvil o su número de presupuesto.
-//
 // Importante: un teléfono, un email o un número de presupuesto NO son un
 // secreto — cualquiera que los conozca podría escribirlos aquí. Por eso este
 // endpoint YA NO concede sesión ni devuelve los presupuestos al momento
 // (como hacía antes): solo manda un enlace de un solo uso al email que YA
 // estaba guardado en la ficha (nunca a uno nuevo que llegue en la propia
 // petición). Sin ese clic, no hay acceso — ver lib/clientVerification.ts.
-//
 // channel: "email" (por defecto) o "whatsapp" — este segundo se ofrece en
 // el área de cliente como alternativa manual si el email falla o el
 // cliente lo prefiere, nunca como reintento automático.

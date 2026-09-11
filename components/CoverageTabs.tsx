@@ -59,7 +59,7 @@ export function CoverageTabs() {
           href="/tarificador"
           className="mt-4 flex w-full items-center justify-center rounded-card bg-brand-red px-5 py-3.5 text-[16px] font-semibold text-white transition-colors hover:bg-brand-red-deep"
         >
-          Calcula tu precio
+          Calcula tu precio del seguro de salud {active === "sin" ? "sin" : "con"} copago
         </a>
       </div>
     </div>

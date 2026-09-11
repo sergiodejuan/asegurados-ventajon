@@ -6,7 +6,7 @@ import { pushDataLayerEvent } from "@/lib/dataLayer";
 
 const SHOW_DELAY_MS = 3000;
 
-export function WhatsAppHelpWidget({ message, waHref }: { message: string; waHref: string }) {
+export function WhatsAppHelpWidget({ message, waHref, raised = false }: { message: string; waHref: string; raised?: boolean }) {
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -21,7 +21,7 @@ export function WhatsAppHelpWidget({ message, waHref }: { message: string; waHre
     <div
       role="dialog"
       aria-label="Ayuda por WhatsApp"
-      className="fixed bottom-6 right-4 z-40 w-[260px] rounded-card border border-hair bg-white p-4 pr-8 shadow-card motion-safe:animate-fade-up lg:right-6"
+      className={`fixed right-4 z-40 w-[260px] rounded-card border border-hair bg-white p-4 pr-8 shadow-card motion-safe:animate-fade-up lg:right-6 ${raised ? "bottom-28 sm:bottom-24" : "bottom-6"}`}
     >
       <button
         type="button"

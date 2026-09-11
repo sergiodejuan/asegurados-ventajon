@@ -9,7 +9,20 @@ export const AGENT_SESSION_COOKIE = "ventajon_agent_session";
 const AGENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 días
 
 function secret(): string {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_TOKEN || "ventajon-dev-secret-change-me";
+  // Aislamiento estricto respecto de ADMIN_TOKEN (credencial de acceso
+  // "master" en resolveIdentity): esta función firma las cookies de sesión
+  // de agente y no debe compartir secreto con nada más, así el compromiso o
+  // rotación de una no afecta a la otra.
+  const configured = process.env.ADMIN_SESSION_SECRET;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[agentAuth] Falta ADMIN_SESSION_SECRET en producción. " +
+      "Configura una cadena larga aleatoria (32+ bytes base64) en Vercel → Environment Variables. " +
+      "No se acepta reusar ADMIN_TOKEN como fallback (aislamiento de dominios)."
+    );
+  }
+  return "ventajon-dev-agent-secret-change-me";
 }
 function sign(value: string): string {
   return crypto.createHmac("sha256", secret()).update(value).digest("base64url");
@@ -46,11 +59,11 @@ export function clearAgentSessionCookie(): void {
 
 /* ------------------------ Resolución de identidad ------------------------ */
 // Dos formas de entrar, coexistiendo:
-//  1. ADMIN_TOKEN (acceso maestro heredado): igual que siempre, nunca se
-//     puede quedar el equipo sin poder entrar al panel aunque no haya
-//     todavía ningún agente dado de alta.
-//  2. Sesión de agente (email + contraseña, propia de cada persona): además
-//     de identificar quién hace cada acción, aplica sus permisos modulares.
+// 1. ADMIN_TOKEN (acceso maestro heredado): igual que siempre, nunca se
+// puede quedar el equipo sin poder entrar al panel aunque no haya
+// todavía ningún agente dado de alta.
+// 2. Sesión de agente (email + contraseña, propia de cada persona): además
+// de identificar quién hace cada acción, aplica sus permisos modulares.
 
 export type ResolvedIdentity =
   | { kind: "master"; agentId: string; agentNombre: string }

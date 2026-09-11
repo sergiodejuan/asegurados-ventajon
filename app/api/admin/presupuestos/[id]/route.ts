@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getPresupuesto, updatePresupuesto, getLead, getNpsResponse, createAuditLog } from "@/lib/store";
 import { PRESUPUESTO_STATUSES, type PresupuestoStatus } from "@/lib/crm";
 import { requireModule } from "@/lib/agentAuth";
 import { sendPushToLead } from "@/lib/webPush";
 import { BRAND_NAME } from "@/lib/brand";
+
+// Schema estricto: solo status + note. Cualquier otro campo (leadId,
+// data.codeoscopicInsuranceId, tarifas...) se rechaza — esos se cambian por
+// flujos internos, no por PATCH del admin.
+const presupuestoPatchSchema = z
+  .object({
+    status: z.string().max(60).optional(),
+    note: z.string().max(4000).optional(),
+  })
+  .strict();
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,12 +43,17 @@ export async function PATCH(
   const auth = await requireModule(request, "presupuestos");
   if (!auth.ok) return auth.response;
 
-  let body: { status?: string; note?: string };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 });
   }
+  const parsed = presupuestoPatchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Campos no válidos." }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const status =
     body.status && (PRESUPUESTO_STATUSES as readonly string[]).includes(body.status)

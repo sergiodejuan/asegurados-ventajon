@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SeoLandingPage } from "@/components/SeoLandingPage";
 import { getSeoLandingPage, resolvePrice, getCombinedFaq, buildJsonLd } from "@/lib/seoLandingPages";
 import { SITE_URL } from "@/lib/brand";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 const page = getSeoLandingPage("mallorca")!;
 
@@ -25,7 +26,7 @@ export default async function SeguroDeSaludMallorcaPage() {
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <SeoLandingPage page={page} precio={precio} />
     </>
   );

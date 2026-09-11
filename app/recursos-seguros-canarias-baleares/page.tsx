@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MinimalTopBar } from "@/components/MinimalTopBar";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
 import { BRAND_NAME, CONTACT_HOURS, ECOSYSTEM_MEMBERS, PARTNERS } from "@/lib/brand";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 const TITLE = `Guías gratis de seguros para Canarias y Baleares — ${BRAND_NAME}`;
 const DESCRIPTION =
@@ -65,7 +66,7 @@ export default function RecursosCanariasBalearesPage() {
   return (
     <main className="safe-top min-h-screen bg-mist">
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
 
       <div className="mx-auto max-w-app px-5 py-8 md:max-w-5xl md:py-14 lg:max-w-6xl">
         <MinimalTopBar />

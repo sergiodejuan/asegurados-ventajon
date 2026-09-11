@@ -38,6 +38,9 @@ export async function POST(request: Request) {
     email: leadId && typeof patch.email === "string" ? patch.email.slice(0, 160) : undefined,
     diaLlamada: typeof patch.diaLlamada === "string" ? patch.diaLlamada.slice(0, 20) : undefined,
     turnoLlamada: typeof patch.turnoLlamada === "string" ? patch.turnoLlamada.slice(0, 20) : undefined,
+    // No es identificativo (a diferencia de teléfono/email) así que no hace
+    // falta sesión: igual que nombre, se acepta también por lookup directo.
+    aceptaComercial: typeof patch.aceptaComercial === "boolean" ? patch.aceptaComercial : undefined,
   };
 
   const lead = await updateLeadContactByLookup(

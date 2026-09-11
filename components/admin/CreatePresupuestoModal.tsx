@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAdminToken } from "@/components/admin/AdminShell";
 import { Close } from "@/components/icons";
+import type { CodeoscopicQuoteSummary } from "@/lib/store";
 
 type LeadOption = { id: string; nombre: string; telefono: string; email: string };
 type ProductOption = {
@@ -10,11 +11,24 @@ type ProductOption = {
   condiciones: string; servicios: string[];
 };
 
-export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+const CODESCOPIC_POLL_MS = 3000;
+const CODESCOPIC_MAX_POLLS = 10; // ~30s de margen, igual criterio que la comparativa pública
+
+export function CreatePresupuestoModal({
+  onClose, onCreated, lockedLead,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+  // Cuando se abre desde la ficha de un lead concreto (ver PresupuestosPanel
+  // en app/admin/page.tsx): se omite el buscador/selector y el presupuesto
+  // queda vinculado a este lead directamente. Sin esta prop (uso desde el
+  // listado genérico /admin/presupuestos) se mantiene el buscador de siempre.
+  lockedLead?: LeadOption;
+}) {
   const { token } = useAdminToken();
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [leadQuery, setLeadQuery] = useState("");
-  const [leadId, setLeadId] = useState("");
+  const [leadId, setLeadId] = useState(lockedLead?.id ?? "");
   const [producto, setProducto] = useState<"salud" | "vida" | "auto" | "decesos">("salud");
   const [mode, setMode] = useState<"catalog" | "custom">("catalog");
   const [catalog, setCatalog] = useState<ProductOption[]>([]);
@@ -26,12 +40,31 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cotización real Codeoscopic (solo salud) — ver
+  // app/api/admin/leads/[id]/codeoscopic-quote.
+  const [cqStatus, setCqStatus] = useState<"idle" | "loading" | "polling" | "done" | "error">("idle");
+  const [cqError, setCqError] = useState<string | null>(null);
+  const [cqQuotes, setCqQuotes] = useState<CodeoscopicQuoteSummary[]>([]);
+  const [cqInsuranceId, setCqInsuranceId] = useState("");
+  // Documento del titular: Codeoscopic lo exige para tarificar y el
+  // tarificador público no lo recoge, así que el agente puede aportarlo aquí.
+  const [cqDocumentoTipo, setCqDocumentoTipo] = useState<"Dni" | "Nie">("Dni");
+  const [cqDocumento, setCqDocumento] = useState("");
+  // Segundo apellido: Codeoscopic exige los dos. Si el lead no lo tiene, el
+  // agente lo aporta aquí para poder tarificar.
+  const [cqApellido2, setCqApellido2] = useState("");
+  // Acciones por cotización: afinar a precio firme (re-rate) y generar el PDF.
+  const [cqBusyId, setCqBusyId] = useState<string | null>(null);
+  const [cqActionError, setCqActionError] = useState<string | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    if (lockedLead) return; // sin buscador, no hace falta el listado completo
     fetch("/api/admin/leads", { headers: { "x-admin-token": token } })
       .then((r) => r.json())
       .then((body) => { if (body.ok) setLeads(body.leads); })
       .catch(() => {});
-  }, [token]);
+  }, [token, lockedLead]);
 
   useEffect(() => {
     fetch(`/api/admin/products?producto=${producto}`, { headers: { "x-admin-token": token } })
@@ -39,6 +72,8 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
       .then((body) => { if (body.ok) { setCatalog(body.products); setProductId(""); } })
       .catch(() => {});
   }, [producto, token]);
+
+  useEffect(() => () => { if (pollTimer.current) clearTimeout(pollTimer.current); }, []);
 
   const filteredLeads = useMemo(() => {
     const q = leadQuery.trim().toLowerCase();
@@ -57,6 +92,103 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, mode]);
 
+  function pollQuote(insuranceId: string, attempt: number) {
+    fetch(`/api/quote/${encodeURIComponent(insuranceId)}`, { headers: { "x-admin-token": token } })
+      .then((r) => r.json())
+      .then((body) => {
+        if (!body.ok) { setCqStatus("error"); setCqError("No se pudo consultar la cotización."); return; }
+        setCqQuotes(body.summary.quotes ?? []);
+        if (body.summary.done || attempt >= CODESCOPIC_MAX_POLLS) {
+          setCqStatus("done");
+          return;
+        }
+        setCqStatus("polling");
+        pollTimer.current = setTimeout(() => pollQuote(insuranceId, attempt + 1), CODESCOPIC_POLL_MS);
+      })
+      .catch(() => { setCqStatus("error"); setCqError("Error de conexión al consultar la cotización."); });
+  }
+
+  async function consultarCodeoscopic() {
+    if (!leadId) return;
+    setCqStatus("loading");
+    setCqError(null);
+    setCqQuotes([]);
+    setCqInsuranceId("");
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({
+          ...(cqDocumento.trim() ? { documento: cqDocumento.trim(), documentoTipo: cqDocumentoTipo } : {}),
+          ...(cqApellido2.trim() ? { apellido2: cqApellido2.trim() } : {}),
+        }),
+      });
+      const body = await res.json();
+      if (!body.ok) {
+        setCqStatus("error");
+        setCqError(
+          body.reason === "not_configured" ? "Codeoscopic no está configurado."
+          : body.reason === "codeoscopic_error" ? "Codeoscopic no ha podido responder ahora mismo."
+          : body.reason || body.error || "No se pudo consultar Codeoscopic."
+        );
+        return;
+      }
+      setCqInsuranceId(body.insuranceId);
+      setCqQuotes(body.summary.quotes ?? []);
+      if (body.summary.done) setCqStatus("done");
+      else { setCqStatus("polling"); pollTimer.current = setTimeout(() => pollQuote(body.insuranceId, 1), CODESCOPIC_POLL_MS); }
+    } catch {
+      setCqStatus("error");
+      setCqError("Error de conexión al consultar Codeoscopic.");
+    }
+  }
+
+  function pickCodeoscopicQuote(q: CodeoscopicQuoteSummary) {
+    setMode("custom");
+    setCompania(q.compania);
+    if (q.premium != null) setPrecio(String(q.premium));
+  }
+
+  // Afina el precio estimado a firme (POST /offers vía backend) y refleja el
+  // nuevo importe en la propia tarjeta de la cotización.
+  async function afinarPrecio(q: CodeoscopicQuoteSummary) {
+    if (!leadId || !cqInsuranceId) return;
+    setCqBusyId(q.id);
+    setCqActionError(null);
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-rerate`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ insuranceId: cqInsuranceId, quoteId: q.id }),
+      });
+      const body = await res.json();
+      if (!body.ok) { setCqActionError("No se pudo afinar el precio ahora mismo."); return; }
+      setCqQuotes((prev) => prev.map((x) => x.id === q.id
+        ? { ...x, premium: typeof body.premium === "number" ? body.premium : x.premium, downPayment: typeof body.downPayment === "number" ? body.downPayment : x.downPayment, estimate: !!body.estimate }
+        : x));
+    } catch { setCqActionError("Error de conexión al afinar el precio."); }
+    finally { setCqBusyId(null); }
+  }
+
+  // Genera el informe PDF y lo abre en una pestaña nueva (el backend hace de
+  // proxy autenticado del fichero de Codeoscopic).
+  async function generarInforme(q: CodeoscopicQuoteSummary) {
+    if (!leadId || !cqInsuranceId) return;
+    setCqBusyId(q.id);
+    setCqActionError(null);
+    try {
+      const res = await fetch(`/api/admin/leads/${leadId}/codeoscopic-report`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ insuranceId: cqInsuranceId, quoteId: q.id }),
+      });
+      if (!res.ok) { setCqActionError("No se pudo generar el informe."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch { setCqActionError("Error de conexión al generar el informe."); }
+    finally { setCqBusyId(null); }
+  }
+
   async function submit() {
     setError(null);
     if (!leadId) { setError("Elige un lead."); return; }
@@ -71,6 +203,7 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
           precio: precio.trim() ? Number(precio) : undefined,
           condiciones: condiciones.trim(),
           servicios: servicios.split("\n").map((s) => s.trim()).filter(Boolean),
+          codeoscopicInsuranceId: cqInsuranceId || undefined,
         }),
       });
       const body = await res.json();
@@ -90,22 +223,29 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
           </button>
         </div>
 
-        <label className="mt-4 block">
-          <span className="mb-1.5 block text-[12px] font-semibold text-ink">Lead</span>
-          <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Buscar por nombre, teléfono o email…"
-            className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]" />
-          <select value={leadId} onChange={(e) => setLeadId(e.target.value)}
-            className="mt-2 w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]">
-            <option value="">— Selecciona un lead —</option>
-            {filteredLeads.map((l) => (
-              <option key={l.id} value={l.id}>{l.nombre || "Sin nombre"} · {l.telefono}</option>
-            ))}
-          </select>
-        </label>
+        {lockedLead ? (
+          <p className="mt-4 text-[13px] text-slate2">
+            Para <span className="font-semibold text-ink">{lockedLead.nombre || "este lead"}</span>
+            {lockedLead.telefono ? ` · ${lockedLead.telefono}` : ""}
+          </p>
+        ) : (
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-[12px] font-semibold text-ink">Lead</span>
+            <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Buscar por nombre, teléfono o email…"
+              className="w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]" />
+            <select value={leadId} onChange={(e) => setLeadId(e.target.value)}
+              className="mt-2 w-full rounded-card border border-hair bg-white px-4 py-2.5 text-[14px]">
+              <option value="">— Selecciona un lead —</option>
+              {filteredLeads.map((l) => (
+                <option key={l.id} value={l.id}>{l.nombre || "Sin nombre"} · {l.telefono}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="mt-4 flex gap-2">
           {(["salud", "vida", "auto", "decesos"] as const).map((p) => (
-            <button key={p} type="button" onClick={() => setProducto(p)}
+            <button key={p} type="button" onClick={() => { setProducto(p); setCqStatus("idle"); }}
               className={`rounded-pill px-3.5 py-1.5 text-[13px] font-semibold capitalize transition-colors ${producto === p ? "bg-navy text-white" : "border border-hair bg-white text-navy hover:bg-mist"}`}>
               Seguro de {p}
             </button>
@@ -134,6 +274,89 @@ export function CreatePresupuestoModal({ onClose, onCreated }: { onClose: () => 
               ))}
             </select>
           </label>
+        )}
+
+        {producto === "salud" && leadId && (
+          <div className="mt-3 rounded-card border border-hair bg-mist/50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[12px] font-semibold text-ink">Precio real (Codeoscopic)</span>
+              <button
+                type="button" onClick={consultarCodeoscopic}
+                disabled={cqStatus === "loading" || cqStatus === "polling"}
+                className="rounded-pill border border-navy px-3 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cqStatus === "loading" ? "Consultando…" : cqStatus === "polling" ? "Esperando aseguradoras…" : "Consultar precio real"}
+              </button>
+            </div>
+            {/* DNI/NIE del titular: Codeoscopic lo exige para tarificar. Si el
+                lead ya lo tiene guardado, se puede dejar vacío y se usará el
+                suyo; si no, hay que teclearlo aquí para obtener precios. */}
+            <div className="mt-2 flex items-end gap-2">
+              <label className="shrink-0">
+                <span className="mb-1 block text-[11px] font-semibold text-slate2">Tipo</span>
+                <select value={cqDocumentoTipo} onChange={(e) => setCqDocumentoTipo(e.target.value as "Dni" | "Nie")}
+                  className="rounded-card border border-hair bg-white px-2 py-1.5 text-[13px]">
+                  <option value="Dni">DNI</option>
+                  <option value="Nie">NIE</option>
+                </select>
+              </label>
+              <label className="min-w-0 flex-1">
+                <span className="mb-1 block text-[11px] font-semibold text-slate2">Documento del titular</span>
+                <input value={cqDocumento} onChange={(e) => setCqDocumento(e.target.value.toUpperCase())}
+                  placeholder="12345678Z" maxLength={9}
+                  className="w-full rounded-card border border-hair bg-white px-3 py-1.5 text-[13px] uppercase tnums" />
+              </label>
+            </div>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-[11px] font-semibold text-slate2">Segundo apellido del titular</span>
+              <input value={cqApellido2} onChange={(e) => setCqApellido2(e.target.value)}
+                placeholder="Solo si el lead no lo tiene ya"
+                className="w-full rounded-card border border-hair bg-white px-3 py-1.5 text-[13px]" />
+            </label>
+            <p className="mt-1 text-[11px] leading-snug text-slate2">
+              Obligatorio para tarificar (DNI/NIE + los dos apellidos). Déjalo vacío solo si el lead ya los tiene guardados.
+            </p>
+            {cqError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqError}</p>}
+            {cqActionError && <p className="mt-2 text-[12px] text-brand-red-deep">{cqActionError}</p>}
+            {cqQuotes.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {cqQuotes.map((q) => (
+                  <li key={q.id} className="rounded-lg border border-hair bg-white">
+                    <button type="button" onClick={() => pickCodeoscopicQuote(q)}
+                      className="flex w-full items-center justify-between gap-2 rounded-t-lg px-3 py-2 text-left text-[13px] transition-colors hover:bg-mist">
+                      <span className="flex min-w-0 items-center gap-2">
+                        {q.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={q.imageUrl} alt={q.compania} className="h-6 max-w-[64px] w-auto shrink-0 object-contain" />
+                        )}
+                        <span className="min-w-0 truncate text-ink">
+                          {q.compania}{q.modalidad ? ` · ${q.modalidad}` : ""}
+                          {q.estimate
+                            ? <span className="ml-1 text-[11px] text-slate2">(estimado)</span>
+                            : <span className="ml-1 text-[11px] font-semibold text-emerald-700">(firme)</span>}
+                        </span>
+                      </span>
+                      <span className="shrink-0 tnums font-semibold text-navy">
+                        {q.premium != null ? `${q.premium.toFixed(2)} €/mes` : "…"}
+                      </span>
+                    </button>
+                    <div className="flex items-center gap-3 border-t border-hair px-3 py-1.5">
+                      {q.estimate && (
+                        <button type="button" onClick={() => afinarPrecio(q)} disabled={cqBusyId === q.id}
+                          className="text-[11px] font-semibold text-navy underline underline-offset-2 hover:text-brand-red disabled:opacity-50">
+                          {cqBusyId === q.id ? "Afinando…" : "Afinar a precio firme"}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => generarInforme(q)} disabled={cqBusyId === q.id}
+                        className="text-[11px] font-semibold text-slate2 underline underline-offset-2 hover:text-navy disabled:opacity-50">
+                        {cqBusyId === q.id ? "Generando…" : "Informe PDF"}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         <div className="mt-3 flex flex-col gap-3">
