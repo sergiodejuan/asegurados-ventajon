@@ -150,7 +150,7 @@ async function releaseLock(key: string, token: string): Promise<void> {
 // como duplicado). No hay que liberar — la clave caduca sola con el TTL.
 // Se usa para deduplicar webhooks Retell/Bland/Manychat en la ventana de
 // firma (~5 min); una réplica accidental o intencional del mismo payload
-// no doblará el efecto lateral (auditoría consultora, P0.9).
+// no doblará el efecto lateral .
 export async function claimOnce(key: string, ttlMs = 15 * 60 * 1000): Promise<boolean> {
   if (hasKV) {
     const r = await redisClient();
@@ -248,7 +248,7 @@ export async function upsertLead(
   // Lock por identidad (teléfono como primary, email como secundario): impide
   // race condition entre envíos concurrentes del mismo usuario que crearía
   // dos leads huérfanos y dejaría los índices phone/email inconsistentes
-  // (auditoría consultora, API6:2023 Unrestricted business logic).
+  // .
   const lockKey = `lock:upsertLead:${phone || email || "anon"}`;
   return withLock(lockKey, () => upsertLeadCritical(draft, source, phone, email, consent));
 }
@@ -1464,12 +1464,10 @@ export async function savePriceMatchLandingConfig(next: PriceMatchLandingConfig)
 // Editable desde /admin/campanas/referidos. Mismo criterio de merge que las
 // demás landings: mantiene defaults por sub-sección para no romper si se
 // guarda una config parcial.
-//
 // Además de la config, aquí viven los documentos de referral en sí:
-//   · referral:code:{CODE} — { referidorLeadId, creadoAt, convertidos: [], bloqueado }
-//   · idx:refcode:{CODE} → leadId del referidor (búsqueda rápida por código)
-//   · referral:byLead:{leadId} → CODE (para no re-generar código si ya tiene)
-//
+// · referral:code:{CODE} — { referidorLeadId, creadoAt, convertidos: [], bloqueado }
+// · idx:refcode:{CODE} → leadId del referidor (búsqueda rápida por código)
+// · referral:byLead:{leadId} → CODE (para no re-generar código si ya tiene)
 // Un lead que llega con ?ref=CODE guarda el código en utm; al contratar,
 // disparamos appendReferralConvertido y — si supera 30 días de vigencia —
 // se paga el bono al referidor. El bono al referido se paga tras opt-in.
@@ -1530,11 +1528,11 @@ export type ReferralConvertido = {
   producto: string;
   presupuestoId: string;
   // Máquina de estados del convertido:
-  //   cotizado   → llegó y completó comparativa (bono referido pendiente)
-  //   opt-in     → confirmó email (bono referido pagable/pagado)
-  //   contratado → el asesor cerró póliza (arranca el reloj T+30d)
-  //   pagado     → referidor cobró su bono
-  //   cancelado  → póliza cancelada en periodo de gracia; no se paga a nadie
+  // cotizado → llegó y completó comparativa (bono referido pendiente)
+  // opt-in → confirmó email (bono referido pagable/pagado)
+  // contratado → el asesor cerró póliza (arranca el reloj T+30d)
+  // pagado → referidor cobró su bono
+  // cancelado → póliza cancelada en periodo de gracia; no se paga a nadie
   status: "cotizado" | "opt-in" | "contratado" | "pagado" | "cancelado";
   cotizadoAt: string;
   optInAt?: string;
@@ -1653,7 +1651,7 @@ export async function getReferralByLeadId(leadId: string): Promise<ReferralDoc |
 // Lado contrario a getReferralByLeadId: dado un lead que pudo haber
 // entrado como AMIGO (referido) desde /r/{code} — el código viaja en
 // lead.utm.ref (ver lib/store.ts updatePresupuesto y app/api/lead/route.ts)
-// —, resuelve el ReferralDoc de quien lo trajo y su propia entrada de
+// , resuelve el ReferralDoc de quien lo trajo y su propia entrada de
 // convertido (estado, fechas, bonos). null si el lead no vino por
 // referido o el código ya no existe. Usado en la ficha de /admin para
 // mostrar "Referido por…" — ver app/api/admin/leads/[id]/route.ts.
@@ -1992,7 +1990,7 @@ export async function createManualPresupuesto(input: {
   // Presente cuando el agente consultó un precio real vía Codeoscopic antes
   // de crear el presupuesto (ver app/api/admin/leads/[id]/codeoscopic-quote
   // y components/admin/CreatePresupuestoModal.tsx) — se guarda igual que
-  // setPresupuestoCodeoscopicInsurance, para que el badge "Codeoscopic ✓"
+  // setPresupuestoCodeoscopicInsurance, para que el badge "Codeoscopic "
   // (app/admin/page.tsx PresupuestosPanel) se muestre también aquí.
   codeoscopicInsuranceId?: string;
 }): Promise<Presupuesto | null> {
@@ -2305,7 +2303,7 @@ async function findLeadIdByIdentifier(raw: string): Promise<string | null> {
 // tarificadores los vea todos entrando con cualquiera de sus datos. Un lead
 // sin ningún presupuesto (p.ej. solo pidió que le llamaran, o su única
 // consulta fue un ticket del asistente) también se identifica correctamente
-// — sigue teniendo llamadas que ver en su área de cliente — devuelve la
+// sigue teniendo llamadas que ver en su área de cliente — devuelve la
 // lista vacía en vez de null. Solo es null si no se encuentra el lead.
 export async function findClientPresupuestos(identifier: string): Promise<{ leadId: string; presupuestos: Presupuesto[] } | null> {
   const leadId = await findLeadIdByIdentifier(identifier);
@@ -2822,7 +2820,7 @@ export async function touchAgentLogin(id: string): Promise<void> {
 }
 
 /* --------------------------- OTP 2FA para agentes --------------------------- */
-// Plus3: tras validar email+contraseña, generamos un OTP de 6 dígitos, lo
+// tras validar email+contraseña, generamos un OTP de 6 dígitos, lo
 // guardamos aquí con TTL 10min y single-use (se borra al verificar) y lo
 // enviamos por email. Solo cuando el agente pega el código creamos la
 // cookie de sesión. Blindar el 2FA es la defensa más importante contra

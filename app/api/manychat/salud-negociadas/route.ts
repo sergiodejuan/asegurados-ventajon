@@ -16,17 +16,14 @@ export const maxDuration = 15;
 export const dynamic = "force-dynamic";
 
 // POST /api/manychat/salud-negociadas
-//
 // Devuelve el mensaje de las opciones NEGOCIADAS por Asegurados Ventajón
 // (Mapfre/Adeslas, SIN copagos), personalizado por edad, dental y nº de
 // asegurados. Se envía justo DESPUÉS de la tarifa de Codeoscopic (que suele
 // venir con copago) como gancho: mismas compañías, sin copagos.
-//
 // Body (todo opcional; lo ideal es pasar leadId):
-//   { "leadId": "..." }                        → lee edad/dental/nº del lead
-//   { "fechaNacimiento": "12/03/1985",         → o pásalos directos como
-//     "coberturaDental": "sí", "numAsegurados": 2 }   merge tags
-//
+// { "leadId": "..." } → lee edad/dental/nº del lead
+// { "fechaNacimiento": "12/03/1985", → o pásalos directos como
+// "coberturaDental": "sí", "numAsegurados": 2 } merge tags
 // Autenticación: header `x-manychat-secret` (MANYCHAT_WEBHOOK_SECRET).
 
 type Body = {

@@ -116,10 +116,9 @@ export function LeadMagnetForm() {
         />
       </div>
 
-      {/* Consentimiento único (decisión producto 2026-09): un solo check
-          agrupa política de privacidad + consejos por email. Al marcarlo
-          se activan los dos flags — comportamiento coherente con el resto
-          de tarificadores. Ver AVISO LEGAL en EssentialConsent.tsx. */}
+      {/* Un solo check agrupa la política de privacidad y los consejos por
+          email; al marcarlo se activan los dos flags, coherente con el resto
+          de tarificadores. Nota legal en EssentialConsent.tsx. */}
       <div className="mt-5">
         <label htmlFor="lm-privacidad" className="flex cursor-pointer items-start gap-3">
           <input

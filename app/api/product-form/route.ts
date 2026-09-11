@@ -7,7 +7,6 @@ import { rateLimitFail } from "@/lib/rateLimit";
 // nuestro (con nuestras cabeceras/credenciales) y nosotros reenviamos a
 // Codeoscopic. NUNCA damos al widget acceso directo a Codeoscopic —el
 // client_secret jamás debe viajar al navegador ni aparecer en el iframe.
-//
 // Codeoscopic expone POST /product-form-requests como endpoint único que
 // enruta internamente cada tipo de petición del widget. Aceptamos su body
 // tal cual (JSON opaco definido por el widget) y devolvemos su respuesta.

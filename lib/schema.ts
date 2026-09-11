@@ -15,7 +15,6 @@ const phoneField = z
 // campo/variable que antes llevaba un código postal de 5 dígitos, ahora con
 // la zona de residencia — así no hace falta tocar la automatización de
 // ManyChat, que ya lee esta variable.
-//
 // Desde 2026-09 el tarificador ya no pide la zona a mano: pide sólo el
 // CP real de 5 dígitos y el backend deriva la zona con `zonaFromCP()`.
 // Por eso `zonaField` acepta también la cadena vacía y sin valor — el
@@ -59,7 +58,7 @@ const consentPrivacidad = z.literal(true, {
 const consentContacto = z.literal(true, {
   errorMap: () => ({ message: "Necesitamos tu autorización para poder llamarte." }),
 });
-// Plus5 · Art. 9 RGPD (categorías especiales — datos de salud). Se pide
+// Art. 9 RGPD (categorías especiales — datos de salud). Se pide
 // como consentimiento explícito, separado del consentimiento genérico de
 // privacidad, en TODO formulario que trate datos de salud (salud, vida —
 // tabaquismo/motivo son datos de salud a efectos legales). AEPD exige
@@ -385,7 +384,6 @@ export type LeadMagnetInput = z.input<typeof leadMagnetSchema>;
 // pide que le busquemos una alternativa igual o mejor. Se convierte en un
 // lead con source="price-match" y un bloque `priceMatch` con los datos
 // aportados — el equipo comercial trabaja el caso desde /admin.
-//
 // La captura (foto/PDF del presupuesto) es opcional pero muy útil para el
 // asesor: viene comprimida desde el cliente como data URI hasta 900KB
 // (mismo tope que resto del panel: ver components/admin/ImageField.tsx).

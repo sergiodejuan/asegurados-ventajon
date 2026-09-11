@@ -3,13 +3,10 @@ import crypto from "node:crypto";
 // Tokens firmados HMAC para "abrir" la comparativa desde canales externos
 // (WhatsApp via ManyChat, email, SMS) sin exponer leadIds sueltos en la
 // URL. El token va en el link que envía el flow al usuario:
-//
-//   https://.../comparativa?token=<leadId>.<expires>.<sig>
-//
+// https://.../comparativa?token=<leadId>.<expires>.<sig>
 // El endpoint /api/client/hydrate-quote lee el token, verifica firma y
 // caducidad, y devuelve el `quote` que la comparativa espera cargar
 // localmente — así el usuario no tiene que reintroducir sus datos.
-//
 // Aislado del secreto de sesión (SESSION_SECRETS) y del referral secret
 // para no arrastrar compromisos entre subsistemas — misma política que
 // PDF_WATERMARK_SECRET / REFERRAL_TOKEN_SECRET. Sin secreto configurado

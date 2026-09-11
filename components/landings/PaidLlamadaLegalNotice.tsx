@@ -14,7 +14,6 @@ const HORARIO_LP_SALUD = "L-V de 8:00 a 18:00";
 // checkbox, ya lo autoriza el propio envío); el consentimiento explícito
 // solo hace falta para las comunicaciones comerciales, opcional y
 // desmarcado por defecto.
-//
 // `simple` deja solo el aviso informativo, centrado y sin checkbox ni
 // horario — para la barra de captura de la sección "Contrata por teléfono",
 // donde el bloque completo generaba demasiada carga visual bajo la barra.

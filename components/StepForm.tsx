@@ -167,7 +167,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
   }
 
   // Un único check cubre privacidad + autorización de contacto + comunicaciones
-  // comerciales (+ datos de salud en salud/vida). Ver AVISO LEGAL en
+  // comerciales (+ datos de salud en salud/vida). Ver Nota en
   // components/EssentialConsent.tsx — decisión producto 2026-09.
   // Al marcarlo firmamos DOBLE timestamp (contactoAt + comercialAt) y
   // también marcamos aceptaComercial=true en el estado del form.
@@ -201,7 +201,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
 
   function validateIdentificacion(): boolean {
     const e: FieldErrors = {};
-    // Plus5: DNI/NIE ya no se pide en el tarificador — se recoge en el flujo
+    // DNI/NIE ya no se pide en el tarificador — se recoge en el flujo
     // post-elección. Solo validamos el código postal, que sí influye en tarifa.
     if (!/^\d{5}$/.test(String(data.codigoPostalReal ?? ""))) e.codigoPostalReal = "El código postal debe tener 5 dígitos.";
     setErrors(e);
@@ -272,7 +272,7 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
     if (variant === "salud" && (!String(data.apellido1 ?? "").trim() || String(data.apellido1).trim().length < 2)) e.apellido1 = "Dinos tu primer apellido.";
     if (!/^[6-9]\d{8}$/.test(normalizePhone(String(data.telefono ?? "")))) e.telefono = "Introduce un móvil español válido (9 dígitos).";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email ?? "").trim())) e.email = "Revisa tu correo electrónico.";
-    // Plus5: art. 9 RGPD — obligatorio consentimiento explícito de datos de
+    // art. 9 RGPD — obligatorio consentimiento explícito de datos de
     // salud solo cuando el producto los trata (salud, vida). Para el resto,
     // el check esencial cubre privacidad + autorización de contacto.
     if (!data.aceptaEsencial) {
@@ -474,8 +474,8 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
         return (
           <Shell title={step.title} helper={step.helper}>
             <form onSubmit={(ev) => { ev.preventDefault(); if (validateIdentificacion()) next(); }}>
-              {/* Plus5: DNI/NIE se pide en el flujo post-elección (contratación),
-                  no en el tarificador — minimización RGPD. */}
+              {/* El DNI/NIE se pide en el flujo post-elección (contratación),
+                  no en el tarificador — principio de minimización RGPD. */}
               <div>
                 <Field id="f-codigoPostalReal" label="Código postal" type="text" inputMode="numeric" value={String(data.codigoPostalReal ?? "")}
                   onChange={(v) => set({ codigoPostalReal: v.replace(/\D/g, "").slice(0, 5) })}
@@ -623,9 +623,8 @@ export function StepForm({ variant, onStepChange, origen }: { variant: "salud" |
               <Field id="f-telefono" label="Teléfono móvil" type="tel" inputMode="tel" value={String(data.telefono ?? "")} onChange={(v) => set({ telefono: v })} autoComplete="tel" error={errors.telefono} placeholder="600 000 000…" />
               <Field id="f-email" label="Correo electrónico" type="email" inputMode="email" value={String(data.email ?? "")} onChange={(v) => set({ email: v })} autoComplete="email" spellCheck={false} autoCapitalize="none" error={errors.email} placeholder="maria@correo.com…" />
               <div className="mt-5">
-                {/* Consentimiento único (decisión producto 2026-09): el
-                    check esencial abarca también las comunicaciones
-                    comerciales. Ver AVISO LEGAL en EssentialConsent.tsx. */}
+                {/* Un único check cubre privacidad y contacto. La nota legal
+                    completa vive en EssentialConsent.tsx. */}
                 <EssentialConsentCheckbox
                   idPrefix="f" datosSalud={variant === "salud" || variant === "vida"}
                   checked={!!data.aceptaEsencial} onChange={toggleEsencial}

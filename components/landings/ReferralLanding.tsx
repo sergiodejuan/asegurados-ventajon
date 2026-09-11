@@ -13,7 +13,6 @@ import { ReferralInviteModal } from "@/components/landings/ReferralInviteModal";
 // top bar + hero 2 cols + cómo funciona + banner intermedio + testimonios
 // + FAQ + sticky bottom bar. Adaptada al propósito referidos: los CTAs
 // abren el modal "Invita a un amigo" en vez del wizard price-match.
-//
 // El modal decide por sí solo si mostrar el paso de lookup (usuario
 // anónimo) o el panel de compartir (usuario que llega con un código ya
 // precargado — caso del área cliente autenticada, no de esta landing

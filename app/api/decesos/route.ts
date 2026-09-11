@@ -133,7 +133,6 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[decesos] manychat sync error", sync.error);
   }
 
-  // Ver comentario equivalente en app/api/lead/route.ts.
   await sendComparativaSummaryEmail({
     leadId: id, quoteId: submissionId, producto: "decesos",
     nombre: d.nombre, email: d.email, numAsegurados: d.numAsegurados,
@@ -144,7 +143,6 @@ export async function POST(request: Request) {
     await sendMetaLeadEvent({ email: d.email, telefono: d.telefono, ...capiContextFromRequest(request) });
   }
 
-  // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
 

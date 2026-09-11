@@ -2,13 +2,11 @@
 // del código postal español. Se usa para eliminar el paso "¿dónde vives?"
 // de los tarificadores: ahora el usuario solo teclea el CP real y el
 // sistema resuelve la zona por los dos primeros dígitos (provincia INE).
-//
 // La zona sigue guardándose en el campo `codigoPostal` del lead por
 // retrocompatibilidad — el catálogo de precios (`lib/catalog.ts`) y la
 // automatización de ManyChat leen ese nombre. Cambia solo lo que
 // contiene: antes era una etiqueta seleccionada a mano; ahora es el
 // resultado del mapeo automático.
-//
 // Codeoscopic NO usa este valor: sigue leyendo `codigoPostalReal`
 // (5 dígitos) y resolviendo el `townId` con `resolveTownIdByPostalCode`.
 

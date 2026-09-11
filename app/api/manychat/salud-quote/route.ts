@@ -22,17 +22,14 @@ export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 // POST /api/manychat/salud-quote
-//
 // El paso "External Request" de un flow de ManyChat llama aquí con los
 // datos que el usuario ha ido dejando por WhatsApp. La respuesta trae:
-//   - `mensaje`: texto ya listo para pintar en el siguiente Send Message.
-//   - `precio`, `compania`, `producto`: campos personalizados para
-//     usarlos como merge tags.
-//   - `leadId`, `insuranceId`: para trazabilidad y follow-up del asesor.
-//
+// `mensaje`: texto ya listo para pintar en el siguiente Send Message.
+// `precio`, `compania`, `producto`: campos personalizados para
+// usarlos como merge tags.
+// `leadId`, `insuranceId`: para trazabilidad y follow-up del asesor.
 // El endpoint TAMBIÉN da de alta el lead con `source="manychat"` para que
 // aparezca en el CRM aunque el usuario abandone la conversación.
-//
 // Autenticación: header `x-manychat-secret` (MANYCHAT_WEBHOOK_SECRET).
 
 // ManyChat interpola los merge tags como texto crudo dentro del JSON —

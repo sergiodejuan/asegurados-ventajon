@@ -7,17 +7,15 @@ import { summarizeInsurance, filterInsuranceByHiddenBrands } from "@/lib/codeosc
 
 // Endpoint que la comparativa llama al montarse para pedir cotizaciones
 // reales a Codeoscopic. Flujo:
-//   1) Recibe presupuestoId (pid) que viene en la URL de /comparativa.
-//   2) Lee el presupuesto y su lead del almacén server-side.
-//   3) Construye el payload de POST /insurances con los datos ya validados.
-//   4) Persiste el insuranceId devuelto en el propio presupuesto para el
-//      polling posterior desde el frontend.
-//
+// 1) Recibe presupuestoId (pid) que viene en la URL de /comparativa.
+// 2) Lee el presupuesto y su lead del almacén server-side.
+// 3) Construye el payload de POST /insurances con los datos ya validados.
+// 4) Persiste el insuranceId devuelto en el propio presupuesto para el
+// polling posterior desde el frontend.
 // Fail-open documentado: si Codeoscopic no está configurado (falta alguna
 // env) o el mapper no puede construir el payload (por ejemplo si es un lead
 // antiguo sin documento), respondemos con { ok: false, reason } y la
 // comparativa muestra el catálogo mock sin romperse.
-//
 // Vercel Hobby permite hoy hasta 60s por función serverless. El POST
 // /insurances puede tardar más, pero en la mayoría de casos responde dentro
 // de ese margen con lo que ya tienen listas las aseguradoras y las demás

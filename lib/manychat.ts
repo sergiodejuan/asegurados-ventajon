@@ -7,22 +7,20 @@ import { quoteNumber } from "./quote";
 // y una etiqueta por origen — así conviven en la misma base que los leads que
 // ya te llegan por Meta Ads, y puedes lanzarles la misma secuencia de
 // WhatsApp o incluirlos en audiencias de Meta sin duplicar trabajo.
-//
 // Variables de entorno (Vercel → Environment Variables):
-//   MANYCHAT_API_TOKEN — token de API del bot (ManyChat → Configuración → API).
-//     Sin ella, la sincronización queda desactivada sin más (el resto del alta
-//     del lead sigue funcionando con normalidad).
-//   MANYCHAT_THANKYOU_FLOW_NS — (opcional) el "flow_ns" de un Flow de ManyChat
-//     que envía la plantilla de WhatsApp de agradecimiento/resumen. Sin esta
-//     variable, simplemente no se dispara ningún mensaje de WhatsApp (el resto
-//     de la sincronización sigue funcionando igual).
-//   MANYCHAT_VERIFICATION_FLOW_NS — (opcional) el "flow_ns" de un Flow que
-//     manda el enlace de un solo uso para entrar al área de cliente (ver
-//     sendManychatVerificationLink más abajo y lib/clientVerification.ts).
-//     Sin esta variable, el botón "reenviar por WhatsApp" del área de
-//     cliente no puede completarse (sigue funcionando por email igual).
-//
-// ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
+// MANYCHAT_API_TOKEN — token de API del bot (ManyChat → Configuración → API).
+// Sin ella, la sincronización queda desactivada sin más (el resto del alta
+// del lead sigue funcionando con normalidad).
+// MANYCHAT_THANKYOU_FLOW_NS — (opcional) el "flow_ns" de un Flow de ManyChat
+// que envía la plantilla de WhatsApp de agradecimiento/resumen. Sin esta
+// variable, simplemente no se dispara ningún mensaje de WhatsApp (el resto
+// de la sincronización sigue funcionando igual).
+// MANYCHAT_VERIFICATION_FLOW_NS — (opcional) el "flow_ns" de un Flow que
+// manda el enlace de un solo uso para entrar al área de cliente (ver
+// sendManychatVerificationLink más abajo y lib/clientVerification.ts).
+// Sin esta variable, el botón "reenviar por WhatsApp" del área de
+// cliente no puede completarse (sigue funcionando por email igual).
+// Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
 // los campos de texto: nombre, telefono, producto, email, codigo_postal,
 // precio_aprox, id_presupuesto, servicio_adicional, utm_source, utm_campaign,
 // utm_medium, fuente_web, link_verificacion — la API de ManyChat no crea campos
@@ -33,16 +31,14 @@ import { quoteNumber } from "./quote";
 // número ya existía como suscriptor (típico si venía de Meta Ads), ManyChat
 // no lo actualiza, así que el nombre del tarificador se guarda siempre como
 // este campo personalizado en vez de depender de eso.
-//
-// ⚠️ Para el mensaje de agradecimiento con el resumen: WhatsApp exige que un
+// Para el mensaje de agradecimiento con el resumen: WhatsApp exige que un
 // mensaje que abre conversación (el lead no te ha escrito antes) use una
 // plantilla aprobada por Meta, no texto libre. Los pasos son: 1) crear en
 // ManyChat una plantilla de WhatsApp con placeholders (p.ej. usando los campos
 // producto/precio_aprox/codigo_postal ya sincronizados) y esperar su
 // aprobación por Meta; 2) crear un Flow en ManyChat que envíe esa plantilla;
 // 3) copiar el flow_ns de ese Flow y ponerlo en MANYCHAT_THANKYOU_FLOW_NS.
-//
-// ⚠️ Limitación conocida y confirmada de la API de ManyChat: si el número de
+// Limitación conocida y confirmada de la API de ManyChat: si el número de
 // WhatsApp ya existía como suscriptor antes de pasar por la web (típico si
 // venía de una campaña de Meta Ads), createSubscriber devuelve un error de
 // "ya existe" y no hay ningún endpoint público fiable para recuperar su id a
@@ -150,7 +146,7 @@ async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok:
 // ManyChat responde que ya existe pero no lo habíamos encontrado por
 // "phone" (típico de contactos que llegaron por Meta Ads con solo
 // "whatsapp_phone" relleno), no hay forma fiable de recuperar su id por API
-// — limitación documentada de ManyChat, no un fallo de este código — así
+// limitación documentada de ManyChat, no un fallo de este código — así
 // que se registra el motivo en el log y esa sincronización concreta se
 // salta, sin bloquear el alta del lead en el resto del sistema.
 async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string }> {
@@ -201,7 +197,7 @@ async function triggerFlow(subscriberId: string, flowNs: string): Promise<{ ok: 
 // Envía un mensaje de texto libre por WhatsApp a un suscriptor ya existente
 // (o lo crea si hace falta) usando el endpoint sendContent de ManyChat —
 // para el botón "Enviar por ManyChat" del seguimiento de presupuestos en
-// admin. ⚠️ Igual que cualquier envío directo de WhatsApp Business, solo
+// admin. Igual que cualquier envío directo de WhatsApp Business, solo
 // funciona dentro de la ventana de 24h desde el último mensaje del cliente:
 // fuera de esa ventana, WhatsApp exige una plantilla aprobada por Meta (ver
 // triggerFlow más arriba) y esta llamada devolverá el error que ManyChat
@@ -229,9 +225,9 @@ export async function sendManychatWhatsAppText(toNumber: string, nombre: string,
 // su último mensaje, no vale texto libre — hace falta una plantilla
 // aprobada por Meta, disparada como Flow. Configuración necesaria en
 // ManyChat antes de que esto funcione:
-//   1. Campo personalizado de texto "link_verificacion".
-//   2. Plantilla de WhatsApp con el placeholder de ese campo, aprobada por Meta.
-//   3. Un Flow que envíe esa plantilla; copia su flow_ns en MANYCHAT_VERIFICATION_FLOW_NS.
+// 1. Campo personalizado de texto "link_verificacion".
+// 2. Plantilla de WhatsApp con el placeholder de ese campo, aprobada por Meta.
+// 3. Un Flow que envíe esa plantilla; copia su flow_ns en MANYCHAT_VERIFICATION_FLOW_NS.
 // Sin MANYCHAT_VERIFICATION_FLOW_NS (o sin MANYCHAT_API_TOKEN), no-op: el
 // botón de "reenviar por WhatsApp" del área de cliente mostrará que no se
 // pudo enviar, sin afectar al resto de la sincronización con ManyChat.

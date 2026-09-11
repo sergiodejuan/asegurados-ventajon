@@ -7,13 +7,12 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 // un layout persistente por página (cada página monta su propio
 // <AdminShell>), este provider vive en app/admin/layout.tsx —por encima de
 // todas las páginas— y así el estado no se reinicia al navegar.
-//
-// - Modo oscuro: se guarda en una COOKIE (no solo localStorage) para que el
-//   server component del layout pueda pintar data-admin-theme en el primer
-//   render y no haya parpadeo claro→oscuro. El toggle actualiza el atributo
-//   del nodo #admin-root al vuelo + reescribe la cookie.
-// - Sidebar colapsado: solo afecta a escritorio y no necesita evitar
-//   parpadeo, así que basta localStorage.
+// Modo oscuro: se guarda en una COOKIE (no solo localStorage) para que el
+// server component del layout pueda pintar data-admin-theme en el primer
+// render y no haya parpadeo claro→oscuro. El toggle actualiza el atributo
+// del nodo #admin-root al vuelo + reescribe la cookie.
+// Sidebar colapsado: solo afecta a escritorio y no necesita evitar
+// parpadeo, así que basta localStorage.
 
 const THEME_COOKIE = "ventajon_admin_theme";
 const SIDEBAR_KEY = "ventajon:admin:sidebar";

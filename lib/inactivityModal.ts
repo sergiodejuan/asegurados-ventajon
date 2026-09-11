@@ -23,9 +23,9 @@ export type InactivityModalConfig = {
   ctaTexto: string;     // texto del botón (en ambos modos)
   ctaHref: string;      // modo enlace: destino del botón; "" = solo cierra
   // Modo del CTA:
-  //  · capturaTelefono = true  → campo de teléfono + "te llamamos gratis"
-  //    (registra la llamada en el mismo backend que el resto de la web).
-  //  · capturaTelefono = false → botón-enlace a ctaHref.
+  // · capturaTelefono = true → campo de teléfono + "te llamamos gratis"
+  // (registra la llamada en el mismo backend que el resto de la web).
+  // · capturaTelefono = false → botón-enlace a ctaHref.
   capturaTelefono: boolean;
   // Páginas donde se muestra. Cada patrón es una ruta que puede acabar en "*"
   // como comodín de prefijo (p.ej. "/lp/*" cubre todas las landings). Lista

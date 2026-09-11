@@ -445,9 +445,9 @@ export function PriceMatchStepsModal({ open, onClose, defaultProducto = "salud",
                     Confirma que aceptas nuestros términos y enviamos tu solicitud. Un asesor te contacta en menos de 24 horas laborables.
                   </p>
                   <div className="mt-6">
-                    {/* Consentimiento único (decisión producto 2026-09) —
-                        ver AVISO LEGAL en EssentialConsent.tsx. Al marcarlo
-                        también se firma el comercial en el submit. */}
+                    {/* Un único check cubre privacidad y contacto; al marcarlo
+                        también se firma el comercial en el submit. Nota legal
+                        completa en EssentialConsent.tsx. */}
                     <EssentialConsentCheckbox
                       idPrefix="pm-modal" checked={form.aceptaEsencial}
                       onChange={(v) => { set("aceptaEsencial", v); set("aceptaComercial", v); }}

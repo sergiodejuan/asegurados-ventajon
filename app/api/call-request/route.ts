@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);
   }
 
-  // Ver comentario equivalente en app/api/lead/route.ts. Este formulario no
+  // Este formulario no
   // pide email (solo teléfono): si la ficha existente no tiene uno guardado
   // de un envío anterior, sendAreaClienteVerificationEmail no hace nada — no
   // se concede sesión, lo cual es el comportamiento seguro por defecto.

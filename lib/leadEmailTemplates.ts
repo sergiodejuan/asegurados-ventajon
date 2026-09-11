@@ -4,13 +4,11 @@
 // que testimonios/promociones: un documento JSON en el store
 // (lib/store.ts), con semilla aditiva de 6 plantillas de partida,
 // gestionable desde /admin/configuracion/plantillas-email.
-//
 // El cuerpo (cuerpoHtml) es HTML simple — el que produce el editor WYSIWYG
 // (párrafos, negrita, enlaces, listas) —, sin las tablas con estilos en
 // línea que usa lib/comparativaEmail.ts para el correo automático: aquí el
 // tono es el de un correo personal de un agente, no una comparativa de
 // precios con maquetación de marketing.
-//
 // El enlace seguro de acceso al presupuesto NO se escribe como variable
 // dentro del cuerpo editable: el endpoint de envío lo añade siempre al
 // final del correo cuando hay presupuestos asociados (ver §5 del plan), así

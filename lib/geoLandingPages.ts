@@ -4,8 +4,7 @@
 // cada isla para SEO local. Sigue el mismo patrón: datos aquí, JSX en
 // components/GeoLandingPage.tsx, para que añadir una isla nueva sea solo
 // añadir una entrada a este array.
-//
-// ⚠️ El precio "desde 35 €/mes asegurado, con todas las coberturas" es el
+// El precio "desde 35 €/mes asegurado, con todas las coberturas" es el
 // dato de referencia dado por Sergio para el mercado de Canarias — revísalo
 // aquí si cambia, no hace falta tocar el componente.
 

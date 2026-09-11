@@ -56,7 +56,6 @@ export async function POST(request: Request) {
     nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal,
   }).catch((err) => console.error("[exit-intent] llamada error", err));
 
-  // Ver comentario equivalente en app/api/lead/route.ts.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
 

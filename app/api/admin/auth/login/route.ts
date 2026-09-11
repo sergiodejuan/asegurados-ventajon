@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 // Login propio de cada agente (email + contraseña). Coexiste con el
 // ADMIN_TOKEN maestro, que sigue funcionando igual que siempre en la
 // pantalla de acceso de /admin.
-//
-// Plus3 (auditoría consultora): NO creamos sesión aquí. Devolvemos un
+// NO creamos sesión aquí. Devolvemos un
 // nonce y enviamos un OTP de 6 dígitos por email al agente; solo cuando
 // verifica el código en /api/admin/auth/otp-verify se emite la cookie de
 // sesión. Así, aunque un atacante conozca la contraseña (reuse, phishing,

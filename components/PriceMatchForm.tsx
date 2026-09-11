@@ -88,7 +88,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
   }
 
   // Consentimiento único (decisión producto 2026-09): al marcar el
-  // check esencial también se firma el comercial. Ver AVISO LEGAL en
+  // check esencial también se firma el comercial. Ver Nota en
   // components/EssentialConsent.tsx.
   function toggleEsencial(checked: boolean) {
     setEsencial(checked);
@@ -248,7 +248,7 @@ export function PriceMatchForm({ origen = "landing", defaultProducto = "salud", 
         </label>
       </div>
 
-      {/* Consentimiento único (ver AVISO LEGAL en EssentialConsent.tsx). */}
+      {/* Un único check cubre privacidad y contacto (ver EssentialConsent.tsx). */}
       <div className="rounded-card border border-hair bg-mist/40 p-3">
         <EssentialConsentCheckbox
           idPrefix="pm" size="sm" checked={esencial} onChange={toggleEsencial}

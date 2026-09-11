@@ -2,16 +2,13 @@
 // config KV, el middleware exige una cookie firmada `site_access` antes
 // de servir cualquier página o API pública. La cookie la planta el
 // endpoint `/api/acceso/login` tras verificar la contraseña scrypt.
-//
 // La contraseña se administra desde `/admin/seguridad/acceso`. El secreto
 // que firma la cookie (`SITE_ACCESS_SECRET`) es distinto del secreto de
 // la sesión admin — así rotar uno no invalida el otro.
-//
 // Este módulo se importa desde:
-//   - `middleware.ts` (Edge runtime) — sólo `verifyAccessCookie` y helpers
-//     que usan Web Crypto (no Node crypto).
-//   - Endpoints Node — `hashPassword`/`verifyPassword`/`signAccessCookie`.
-//
+// `middleware.ts` (Edge runtime) — sólo `verifyAccessCookie` y helpers
+// que usan Web Crypto (no Node crypto).
+// Endpoints Node — `hashPassword`/`verifyPassword`/`signAccessCookie`.
 // Para que ambos runtimes compartan la lógica del cookie, todo lo que va
 // dentro de esta cookie (base64url + HMAC-SHA256) usa SÓLO Web Crypto,
 // disponible en Edge y Node 18+.

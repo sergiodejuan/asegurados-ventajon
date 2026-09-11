@@ -8,13 +8,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Cron de pagos del programa referidos.
-//
 // Ejecuciones diarias (Vercel Cron — ver vercel.json) que:
-//   1. Reintenta bonos de REFERIDO en status "opt-in" que fallaron (por
-//      Tremendous caído u otro error transitorio).
-//   2. Paga bonos de REFERIDOR cuando el amigo pasa T+N días desde la
-//      contratación (N configurable desde /admin/campanas/referidos).
-//
+// 1. Reintenta bonos de REFERIDO en status "opt-in" que fallaron (por
+// Tremendous caído u otro error transitorio).
+// 2. Paga bonos de REFERIDOR cuando el amigo pasa T+N días desde la
+// contratación (N configurable desde /admin/campanas/referidos).
 // Protegido con CRON_SECRET (Bearer). Vercel Cron incluye
 // `Authorization: Bearer $CRON_SECRET` automáticamente si la variable
 // está configurada en el proyecto. Cualquier otra llamada externa debe

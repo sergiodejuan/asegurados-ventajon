@@ -3,7 +3,6 @@
 // cada uno con su propio slug, ramo, SEO y contenido — pensado para poder
 // duplicar la landing de salud y lanzar variantes por ramo o por público
 // objetivo sin desplegar código, y compararlas entre sí.
-//
 // El shape del contenido (hero/porQueElegir/beneficios/bannerIntermedio/
 // productos/contrataTelefono/comparativa/rating/resenas/footer/utm) es
 // idéntico, campo a campo, al de la antigua PaidLandingSaludConfig — solo se

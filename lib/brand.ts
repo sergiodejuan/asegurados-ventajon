@@ -1,10 +1,7 @@
-/**
- * Configuración central de marca y contenido.
- *
- * ⚠️ DECISIÓN PENDIENTE (Sergio): el nombre.
- * Memoria de marca: «Asegurados Ventajon» (sin tilde). Estrategia: «Asegurados Ventajón».
- * Por defecto SIN tilde. Cambia solo esta línea si Gabriel confirma la forma acentuada.
- */
+// Configuración central de marca y contenido.
+// Pendiente el nombre: memoria de marca «Asegurados Ventajon» (sin tilde),
+// estrategia «Asegurados Ventajón». Por defecto sin tilde; cambia solo esta
+// línea si se confirma la forma acentuada.
 export const BRAND_NAME = "Asegurados Ventajon";
 
 /* ------------------------- Identidad fiscal y registral ------------------
@@ -55,15 +52,15 @@ export const REGISTRO_MERCANTIL_ONELINE =
 // Dominio absoluto para JSON-LD (url, breadcrumbs), links firmados que
 // se envían por email/WhatsApp, y cualquier URL absoluta que salga del
 // servidor. Prioridad:
-//   1) NEXT_PUBLIC_SITE_URL — el dominio limpio configurado a mano.
-//   2) VERCEL_PROJECT_PRODUCTION_URL — el alias estable del proyecto en
-//      Vercel ("asegurados-ventajon.vercel.app"). Sirve tanto en el
-//      deployment de production como en previews.
-//   3) VERCEL_URL — hostname del deployment específico (con hash,
-//      dhnk0v9fk...). Es lo que uses en local con `vercel dev`, pero en
-//      producción NO queremos que aparezca en enlaces que se envían al
-//      usuario — se parece a un phishing y caduca al siguiente push.
-//   4) Fallback duro al alias de este proyecto.
+// 1) NEXT_PUBLIC_SITE_URL — el dominio limpio configurado a mano.
+// 2) VERCEL_PROJECT_PRODUCTION_URL — el alias estable del proyecto en
+// Vercel ("asegurados-ventajon.vercel.app"). Sirve tanto en el
+// deployment de production como en previews.
+// 3) VERCEL_URL — hostname del deployment específico (con hash,
+// dhnk0v9fk...). Es lo que uses en local con `vercel dev`, pero en
+// producción NO queremos que aparezca en enlaces que se envían al
+// usuario — se parece a un phishing y caduca al siguiente push.
+// 4) Fallback duro al alias de este proyecto.
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -105,21 +102,19 @@ export const WHATSAPP_URL_GENERIC =
 export const CONTACT_HOURS =
   process.env.NEXT_PUBLIC_CONTACT_HOURS ?? "L–V · 9:00–20:00 (hora canaria)";
 
-/* ------------------------- Números desde los que llamamos -----------------
- * Se muestran en la página de gracias para que el usuario los reconozca, los
- * guarde y no tome la llamada por spam.
- * ⚠️ PENDIENTE (Sergio): sustituir por los números REALES de la centralita.
- * Recordatorio: desde octubre 2026 las llamadas comerciales requieren
- * numeración 400 + solicitud previa. Configúralos con las env
- * NEXT_PUBLIC_CALLER_1 / NEXT_PUBLIC_CALLER_2 antes de publicar.
- */
+// Números desde los que llamamos. Se muestran en la página de gracias para
+// que el usuario los reconozca y no confunda la llamada con spam. Pendiente
+// de sustituir por los reales de la centralita — desde octubre de 2026 las
+// llamadas comerciales requieren numeración 400 con solicitud previa.
+// Configúralos con NEXT_PUBLIC_CALLER_1 / NEXT_PUBLIC_CALLER_2 antes de
+// publicar.
 export const CALLER_NUMBERS = [
   { label: "Asesoría Asegurados", number: process.env.NEXT_PUBLIC_CALLER_1 ?? "+34 928 000 000" },
   { label: "Línea alternativa", number: process.env.NEXT_PUBLIC_CALLER_2 ?? "+34 971 000 000" },
 ];
 
 // Enlace directo a "escribir una reseña" del perfil de Google Business.
-// ⚠️ PENDIENTE (Sergio): sin el perfil real todavía. Mientras esta env no
+// Pendiente: sin el perfil real todavía. Mientras esta env no
 // esté configurada, la encuesta de satisfacción (/valoracion) simplemente no
 // muestra el paso de pedir reseña — nunca se inventa una URL.
 export const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ?? "";
@@ -145,18 +140,16 @@ export const TRUST_STATS = [
 // El catálogo de compañías/precios de la comparativa vive en lib/catalog.ts
 // (editable desde /admin/productos), no aquí.
 
-/* -------------------------- Banner de promoción ---------------------------
- * Estilo del reclamo de la referencia (recuadro mint + claim + "ver bases").
- * ⚠️ SIN precios ni % de descuento sin validación de Gabriel. Cuando haya una
- * promo aprobada, cámbiala aquí (headline/sub/badge) y punto.
- */
+// Banner de promoción. Recuadro mint + claim + "ver bases".
+// Sin precios ni porcentajes sin validación legal previa. Cuando haya una
+// promo aprobada, se cambia aquí (headline/sub/badge).
 export const PROMO = {
   badge: "Comparativa gratis",
   headline: "Tu seguro de salud, elegido con cabeza",
   sub: "Comparamos entre las mejores compañías para que pagues lo justo.",
   legalNote: "Sujeto a condiciones.",
   // Contenido del modal "Ver condiciones" (no navega, se abre en la misma página).
-  // ⚠️ Texto provisional: pendiente de redacción/validación legal definitiva.
+  // Texto provisional: pendiente de redacción/validación legal definitiva.
   conditions: [
     "La comparativa y el asesoramiento son gratuitos y sin ningún compromiso de contratación.",
     "El precio final depende del perfil de cada persona a asegurar (edad, coberturas, código postal…) y de la compañía elegida.",

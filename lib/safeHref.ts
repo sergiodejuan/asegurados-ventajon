@@ -3,13 +3,11 @@
 // vbscript:, file:. Cualquier admin comprometido (phishing/session hijack) o
 // cualquier fallo humano al pegar una URL peligrosa se contiene aquí, en la
 // última milla antes de renderizar.
-//
 // Se acepta explícitamente:
-//   - Rutas relativas al sitio (/foo, /foo/bar) — mayoría de casos.
-//   - Anchors dentro de la página (#seccion) — para menús internos.
-//   - URLs http/https absolutas — enlaces salientes normales.
-//   - mailto:, tel:, whatsapp: — canales de contacto habituales.
-//
+// Rutas relativas al sitio (/foo, /foo/bar) — mayoría de casos.
+// Anchors dentro de la página (#seccion) — para menús internos.
+// URLs http/https absolutas — enlaces salientes normales.
+// mailto:, tel:, whatsapp: — canales de contacto habituales.
 // Cualquier otra cadena cae al fallback (por defecto "/") sin lanzar error:
 // una URL rota no debe romper la página, solo neutralizarse.
 

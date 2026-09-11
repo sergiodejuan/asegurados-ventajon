@@ -16,7 +16,6 @@ import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 // legal debajo. Envío al mismo endpoint que el resto, marcado como origen
 // "lp" + el slug de la landing concreta — el CRM lo trata con la etiqueta
 // propia "Quiero que me llamen (landing paid)".
-//
 // Si se pasa onSuccess, el llamador decide qué hacer con el resultado (p.ej.
 // mostrar un "gracias" propio dentro de la misma landing, con la preferencia
 // de día/hora incluida). Sin onSuccess, mantiene el comportamiento por

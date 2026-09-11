@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 function pdfWatermark(body: PdfRequest, at: string): string {
   // Estricto: solo PDF_WATERMARK_SECRET. Nunca ADMIN_TOKEN — si algún día
   // rotamos el master, no queremos invalidar la trazabilidad de PDFs pasados
-  // ni tampoco compartir superficie de compromiso (auditoría consultora Meta-A).
+  // ni tampoco compartir superficie de compromiso .
   const secret = process.env.PDF_WATERMARK_SECRET || "";
   if (!secret) return "";
   const payload = `${body.producto}|${body.compania}|${body.quote?.id ?? ""}|${JSON.stringify(body.precio)}|${at}`;

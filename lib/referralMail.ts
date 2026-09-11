@@ -3,15 +3,14 @@ import { sendEmail } from "./email";
 import { createReferralOptInToken } from "./referralTokens";
 
 // Emails del programa referidos:
-//   · Referido (el amigo): "Confirma tu email y te enviamos 20€ Amazon"
-//     — se envía tras completar la cotización, con token de opt-in firmado.
-//     Doble opt-in obligatorio antes de disparar el vale (previene fraude
-//     de teléfono válido con email falso).
-//   · Referidor (el cliente): "Tu amigo María acaba de pedir presupuesto"
-//     — solo informativo, mantiene la sensación de progreso hacia el bono.
-//   · Referidor: "Enhorabuena, tu bono de 20€ está en tu email" — cuando
-//     el amigo contrata y supera los 30 días.
-//
+// · Referido (el amigo): "Confirma tu email y te enviamos 20€ Amazon"
+// se envía tras completar la cotización, con token de opt-in firmado.
+// Doble opt-in obligatorio antes de disparar el vale (previene fraude
+// de teléfono válido con email falso).
+// · Referidor (el cliente): "Tu amigo María acaba de pedir presupuesto"
+// solo informativo, mantiene la sensación de progreso hacia el bono.
+// · Referidor: "Enhorabuena, tu bono de 20€ está en tu email" — cuando
+// el amigo contrata y supera los 30 días.
 // Fail-open: si el correo no se envía, seguimos guardando la conversión en
 // KV; el equipo lo puede reenviar a mano desde admin.
 

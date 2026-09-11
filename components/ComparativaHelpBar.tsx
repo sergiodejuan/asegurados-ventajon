@@ -30,9 +30,9 @@ function phoneLooksValid(v: string) {
 // Barra sticky de ayuda de la comparativa: aparece al 40% de scroll (desktop y
 // móvil). Ofrece dos vías de conversión de baja fricción sin volver a pedir
 // los datos que el usuario ya dio en el tarificador:
-//   1) Campo rápido "Llamadme gratis" (teléfono en blanco sobre el rojo).
-//   2) Botón "Solicitar llamada" → modal para elegir día/turno, con modal de
-//      gracias al confirmar.
+// 1) Campo rápido "Llamadme gratis" (teléfono en blanco sobre el rojo).
+// 2) Botón "Solicitar llamada" → modal para elegir día/turno, con modal de
+// gracias al confirmar.
 export function ComparativaHelpBar({ quote, producto }: { quote: QuoteProfile | null; producto: string }) {
   const [visible, setVisible] = useState(false);
 

@@ -5,14 +5,13 @@
 // de entorno, la integración queda desactivada sin romper el resto (la
 // comparativa cae al catálogo mock — fallback silencioso documentado en
 // components/Comparativa.tsx).
-//
 // Variables de entorno (Vercel → Environment Variables):
-//   CODESCOPIC_BASE_URL       — URL base de la API (p.ej. https://api.codeoscopic.io o la de sandbox si Codeoscopic te dio una distinta).
-//   CODESCOPIC_OAUTH_URL      — URL completa del endpoint OAuth2 (grant_type=client_credentials). No viene en la doc pública: se consigue entrando en portal.api.codeoscopic.io con el botón GET TOKEN e inspeccionando la petición, o pidiéndola a soporteapi@codeoscopic.com.
-//   CODESCOPIC_CLIENT_ID      — client_id emitido por Codeoscopic para la correduría.
-//   CODESCOPIC_CLIENT_SECRET  — client_secret. Nunca en el bundle del navegador.
-//   CODESCOPIC_APP_HEADER     — valor de la cabecera X-Client-App que Codeoscopic asigna a cada aplicación (identifica esta web ante las aseguradoras).
-//   CODESCOPIC_USER_EMAIL     — (opcional) X-User-Email, para operar en nombre de un usuario/organización concreta de la jerarquía Avant2.
+// CODESCOPIC_BASE_URL — URL base de la API (p.ej. https://api.codeoscopic.io o la de sandbox si Codeoscopic te dio una distinta).
+// CODESCOPIC_OAUTH_URL — URL completa del endpoint OAuth2 (grant_type=client_credentials). No viene en la doc pública: se consigue entrando en portal.api.codeoscopic.io con el botón GET TOKEN e inspeccionando la petición, o pidiéndola a soporteapi@codeoscopic.com.
+// CODESCOPIC_CLIENT_ID — client_id emitido por Codeoscopic para la correduría.
+// CODESCOPIC_CLIENT_SECRET — client_secret. Nunca en el bundle del navegador.
+// CODESCOPIC_APP_HEADER — valor de la cabecera X-Client-App que Codeoscopic asigna a cada aplicación (identifica esta web ante las aseguradoras).
+// CODESCOPIC_USER_EMAIL — (opcional) X-User-Email, para operar en nombre de un usuario/organización concreta de la jerarquía Avant2.
 
 // La v1 del content-type es la única publicada hoy — si Codeoscopic saca
 // una v2 con cambios de shape, aquí se cambia una sola vez (todo el resto

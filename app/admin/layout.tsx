@@ -10,7 +10,7 @@ const ADMIN_THEME_COOKIE = "ventajon_admin_theme";
 
 // Layout que envuelve TODO /admin. Su única razón de ser es alojar el estado
 // de "chrome" (modo oscuro, sidebar colapsado) por encima de las páginas
-// —cada una monta su propio <AdminShell>, así que sin este layout el estado
+// cada una monta su propio <AdminShell>, así que sin este layout el estado
 // se reiniciaría en cada navegación—, y pintar `data-admin-theme` desde el
 // servidor leyendo la cookie, de modo que el modo oscuro no parpadee en el
 // primer render. El scope en #admin-root (no en <html>) mantiene el modo

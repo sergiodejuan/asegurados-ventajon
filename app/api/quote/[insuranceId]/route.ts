@@ -12,7 +12,6 @@ import { verifyQuoteAccessToken } from "@/lib/quoteTokens";
 // cotizaciones dejen de estar en estimate/procesándose. Además refresca el
 // snapshot en el presupuesto (si el frontend nos pasa el ?pid=...), para que
 // el back office lo lea sin depender de que Codeoscopic responda otra vez.
-//
 // Auditoría consultora — hallazgo API1:2023 BOLA: antes cualquiera con un
 // insuranceId podía leer el snapshot (nombre + DOB + tarifas del lead
 // ajeno). Ahora requerimos: admin (token/sesión) O sesión de cliente cuyo
@@ -35,14 +34,13 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
   // se carga el lead de la sesión de cliente y se comprueba que su
   // codeoscopicInsuranceId coincide con el que se pide. Así un id de otro
   // cliente nunca expone su cotización (API1:2023 BOLA).
-  //
   // Tres formas válidas de autorización, en orden de preferencia:
-  //   1) admin (token o sesión de agente).
-  //   2) cookie de sesión de cliente (flujo web habitual).
-  //   3) ?token=<quoteAccessToken>: token HMAC firmado que el flow de
-  //      ManyChat envía al usuario por WhatsApp. Sirve exactamente lo
-  //      mismo — dueño del lead ligado al insurance — sin necesidad de
-  //      que el visitante entre por el flow web y coja la cookie.
+  // 1) admin (token o sesión de agente).
+  // 2) cookie de sesión de cliente (flujo web habitual).
+  // 3) ?token=<quoteAccessToken>: token HMAC firmado que el flow de
+  // ManyChat envía al usuario por WhatsApp. Sirve exactamente lo
+  // mismo — dueño del lead ligado al insurance — sin necesidad de
+  // que el visitante entre por el flow web y coja la cookie.
   const identity = await resolveIdentity(req).catch(() => null);
   const isAdmin = !!identity;
   if (!isAdmin) {

@@ -1,7 +1,6 @@
 // Verificación server-side de Cloudflare Turnstile — defensa en profundidad
 // para los formularios públicos, por detrás del rate limiting (que es la
 // protección principal, ver lib/rateLimit.ts y ya no depende de esto).
-//
 // Sin TURNSTILE_SECRET_KEY configurada, la verificación se salta sin más
 // (igual que Retell/Bland/ManyChat): el formulario sigue funcionando, solo
 // que sin la capa extra. En cuanto Sergio cree un site en

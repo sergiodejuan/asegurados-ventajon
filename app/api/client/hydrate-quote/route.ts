@@ -6,13 +6,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET /api/client/hydrate-quote?token=<lead>.<exp>.<sig>
-//
 // Recibe un token firmado (generado por /api/manychat/salud-quote y
 // enviado al usuario por WhatsApp), verifica firma + caducidad, y
 // devuelve el `quote` mínimo que la comparativa espera cargar en
 // localStorage — así el usuario que abre el link desde WhatsApp NO
 // tiene que reintroducir sus datos.
-//
 // No exponemos el DNI ni los consentimientos internos aquí — sólo lo
 // que necesita la comparativa para pintar el recap y no volver a
 // pedir al usuario. El leadId sí va incluido, es el ancla para pedir

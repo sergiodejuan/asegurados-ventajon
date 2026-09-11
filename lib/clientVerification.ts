@@ -84,7 +84,6 @@ function verificationEmailHtml(nombre: string, link: string): string {
 // la generación de enlaces en sí, no un canal concreto — si no fuera así,
 // alguien podría esquivar el límite de un canal simplemente pidiendo el
 // otro.
-//
 // Apunta a una página (/area-cliente/verificar), NO directamente al endpoint
 // que consume el token: varios proveedores de correo (Gmail, Outlook...)
 // escanean automáticamente los enlaces de un mensaje nada más llegar, antes

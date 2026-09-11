@@ -3,7 +3,6 @@
 // comparativa y el back office. Vive en su propio módulo para no duplicar
 // el parseo en app/api/quote/create y app/api/quote/[insuranceId], y para
 // que la UI cliente pueda leer el mismo tipo desde el store.
-//
 // La forma completa que devuelve Codeoscopic es amplia y con opcionales;
 // aquí colapsamos a lo que la web realmente pinta: compañía, producto,
 // modalidad, premium, downPayment, frecuencia y flag estimate.

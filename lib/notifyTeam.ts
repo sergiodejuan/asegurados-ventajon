@@ -35,9 +35,9 @@ function labelProducto(p: string): string {
   return PRODUCTO_LABELS[p] ?? (p ? p[0].toUpperCase() + p.slice(1) : "—");
 }
 
-// Iniciales para el asunto — nombre completo NO va al inbox (P0.11 auditoría
-// consultora). Si el buzón se compromete o se reenvía, no filtramos la
-// identidad; el agente ve el nombre completo en la ficha (autenticada).
+// Iniciales para el asunto: el nombre completo no se envía al inbox. Si el
+// buzón se compromete o se reenvía, no filtramos la identidad; el agente ve
+// el nombre completo en la ficha (autenticada).
 function initials(nombre: string): string {
   const parts = nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   if (!parts.length) return "S/N";
@@ -188,7 +188,7 @@ function renderHtml({ lead, source, presupuestoId, precioAprox, logoUrl, extraNo
   const presupUrl = base && presupuestoId ? `${base}/admin/presupuestos?id=${encodeURIComponent(presupuestoId)}` : "";
   const sourceLabel = SOURCE_LABELS[source] ?? source;
 
-  // P0.11: el correo NO transporta PII completa (nombre, teléfono, email,
+  // el correo NO transporta PII completa (nombre, teléfono, email,
   // DNI, DOB, tarificación detallada, UTM). Si el buzón se compromete o el
   // correo se reenvía, no filtramos datos personales — solo mostramos
   // suficiente contexto para decidir si abrir la ficha, y un enlace directo

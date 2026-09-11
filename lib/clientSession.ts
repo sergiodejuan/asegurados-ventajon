@@ -7,7 +7,6 @@ import { cookies } from "next/headers";
 // tener que volver a escribir su nº de presupuesto + correo + teléfono cada
 // vez — la base de datos sigue siendo la única fuente de verdad, esto solo
 // identifica de forma segura qué lead está consultando.
-//
 // Variable de entorno recomendada: CLIENT_SESSION_SECRET (cualquier cadena
 // larga aleatoria). Si no está configurada, se usa ADMIN_TOKEN como clave de
 // firma (ya existe en todos los entornos) para no bloquear nada por defecto.
@@ -20,7 +19,7 @@ function secret(): string {
   // cookies de CLIENTE no puede compartirse con el token master del admin
   // ni con el de agentes. Compromiso de uno = compromiso aislado; rotar
   // uno no invalida los demás. En prod, CLIENT_SESSION_SECRET es OBLIGATORIO
-  // (ADMIN_TOKEN NO es un fallback aceptable — auditoría consultora Meta-A).
+  // (ADMIN_TOKEN NO es un fallback aceptable — ).
   const configured = process.env.CLIENT_SESSION_SECRET;
   if (configured) return configured;
   if (process.env.NODE_ENV === "production") {
@@ -61,7 +60,7 @@ export function verifySessionToken(token: string | undefined | null): string | n
 
 // Deja al lead con sesión iniciada en el área de cliente en este mismo
 // dispositivo, justo tras completar un tarificador o "quiero que me llamen"
-// — así entra directo la próxima vez que visite /area-cliente, sin tener
+// así entra directo la próxima vez que visite /area-cliente, sin tener
 // que teclear su número de presupuesto.
 export function setClientSessionCookie(leadId: string): void {
   cookies().set(CLIENT_SESSION_COOKIE, createSessionToken(leadId), {

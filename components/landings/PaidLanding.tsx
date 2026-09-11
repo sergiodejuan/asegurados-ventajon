@@ -16,18 +16,16 @@ import { PaidQuickCallBar } from "@/components/landings/PaidQuickCallBar";
 // cualquier landing de la colección (no solo salud) — toda la copia,
 // imágenes, precios, partners, beneficios y filas de la comparativa vienen
 // de `landing` — se editan sin desplegar desde /admin/campanas/landings.
-//
 // Diseñada mobile-first: la única capa base cubre pantallas de 320px+, los
 // breakpoints md/lg SÓLO añaden mejoras. En mobile, el orden de lectura
 // empieza por el H1 y el precio (más importante para conversión) y la
 // imagen aparece al final del hero — así el LCP es el titular, que es texto
 // y renderiza al instante. En desktop la imagen pasa a la izquierda con
 // order-first.
-//
 // Rutas propias asociadas (ver app/lp/[slug]/*):
-//   /lp/[slug]/tarificador — wizard embebido (solo producto "salud"); para
-//     el resto de ramas, redirige al tarificador de página completa del site
-//   /lp/[slug]/llamada — formulario "que me llamen" minimalista
+// /lp/[slug]/tarificador — wizard embebido (solo producto "salud"); para
+// el resto de ramas, redirige al tarificador de página completa del site
+// /lp/[slug]/llamada — formulario "que me llamen" minimalista
 
 function highlightH1(h1: string, highlight: string) {
   if (!highlight) return <span>{h1}</span>;

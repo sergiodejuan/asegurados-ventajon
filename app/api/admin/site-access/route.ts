@@ -30,12 +30,11 @@ export async function GET(request: Request) {
 
 // PUT /api/admin/site-access
 // Body: { enabled?: boolean, password?: string }
-//
 // Reglas:
-//   - Si `password` viene, se valida y sustituye al hash actual.
-//   - Si `enabled=true` y NO hay hash (ni existente ni en este mismo
-//     body), rechazamos: no tiene sentido activar el bloqueo sin
-//     contraseña — nadie podría entrar.
+// Si `password` viene, se valida y sustituye al hash actual.
+// Si `enabled=true` y NO hay hash (ni existente ni en este mismo
+// body), rechazamos: no tiene sentido activar el bloqueo sin
+// contraseña — nadie podría entrar.
 export async function PUT(request: Request) {
   const auth = await requireModule(request, "configuracion");
   if (!auth.ok) return auth.response;

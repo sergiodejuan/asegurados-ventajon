@@ -6,7 +6,6 @@ import { rateLimitFail } from "@/lib/rateLimit";
 // resuelve el offerId correspondiente y devuelve el detalle normalizado
 // de coberturas. La comparativa lo consume desde el modal "Ver coberturas"
 // de cada tarjeta real.
-//
 // Codeoscopic requiere dos llamadas: primero recuperar el proyecto con
 // GET /insurances/{id} y leer su array `offers` para encontrar el offer que
 // agrupa la cotización pedida (los offers son combinaciones "cotización
@@ -86,7 +85,7 @@ export async function GET(req: NextRequest, ctx: { params: { insuranceId: string
 
   try {
     // 1) offers del insurance — vienen embebidos en el proyecto (GET /insurances/{id});
-    //    el path /insurances/{id}/offers no admite GET (solo POST para re-tarificar).
+    // el path /insurances/{id}/offers no admite GET (solo POST para re-tarificar).
     const insurance = await getInsurance(insuranceId);
     const offer = (insurance.offers ?? []).find(
       (o) =>

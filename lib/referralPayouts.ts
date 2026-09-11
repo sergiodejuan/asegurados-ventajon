@@ -7,10 +7,9 @@ import { sendAmazonReward, tremendousConfigured } from "./tremendous";
 import type { SendRewardResult } from "./tremendous";
 
 // Lógica de pago del programa "Amigos Ventajon". Se llama desde:
-//   · /api/referral/opt-in     → payReferidoBonus (bono al amigo)
-//   · /api/referral/process-payouts (cron)    → payReferidorBonus (bono al cliente)
-//   · /api/admin/referral/retry (manual)       → cualquiera de los dos
-//
+// · /api/referral/opt-in → payReferidoBonus (bono al amigo)
+// · /api/referral/process-payouts (cron) → payReferidorBonus (bono al cliente)
+// · /api/admin/referral/retry (manual) → cualquiera de los dos
 // Todo con external_id determinista para idempotencia y claimOnce local
 // para evitar carreras (dos crons a la vez, doble clic en admin, etc.).
 

@@ -16,13 +16,11 @@ import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 // registra la llamada en el mismo backend que el resto de la web
 // (/api/call-request → /admin/llamadas) y muestra un "¡Gracias!" propio de
 // esta landing en vez de navegar a /gracias.
-//
 // `variant="navbar"` es la barra compacta (input + botón) para la cabecera
 // en escritorio — en móvil no hay hueco junto al logo, así que ahí se deja
 // el icono de llamada directa que ya existía y esta barra solo se usa en
 // variant="section" (bajo "Tipos de Seguros"), que sí es mobile-first: se
 // apila en columna en pantallas estrechas.
-//
 // El aviso de tratamiento de datos + consentimiento comercial (ver
 // PaidLlamadaLegalNotice) no cabe permanentemente en la barra compacta del
 // navbar (cabecera de altura fija) — ahí se muestra en un desplegable al

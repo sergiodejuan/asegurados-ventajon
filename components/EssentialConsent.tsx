@@ -2,26 +2,14 @@
 
 import { BRAND_NAME } from "@/lib/brand";
 
-// Bloque de consentimiento reutilizado por todos los formularios y
-// tarificadores que crean un lead completo (ComparativaGate, CallRequestForm,
-// PriceMatchForm, PriceMatchStepsModal, StepForm, AssistantWidget).
-//
-// ⚠️ AVISO LEGAL (decisión producto 2026-09):
-// El único check que se muestra al usuario en los tarificadores agrupa
-// la información de privacidad + autorización de contacto + comunicaciones
-// comerciales. Cuando el usuario lo marca, el frontend graba DOBLE
-// timestamp (contactoAt + comercialAt) y envía aceptaComercial=true al
-// backend.
-//
-// Esta agrupación es DELIBERADA a nivel producto pese al riesgo RGPD
-// documentado (AEPD sanciona el consentimiento no libre / no granular
-// cuando publicidad va atada al servicio). Se conserva la clase
-// `ComercialConsentCheckbox` por si se decidiera separarlos en el
-// futuro, pero los tarificadores no la pintan actualmente.
-//
-// Producto de datos de salud (salud/vida — fumador/motivo cuentan como
-// datos de salud): añadimos también el consentimiento explícito art. 9
-// RGPD dentro del mismo check.
+// Bloque de consentimiento reutilizado por todos los tarificadores y
+// formularios que crean lead. El check único agrupa privacidad, contacto y
+// comunicaciones comerciales; al marcarlo se firma doble timestamp
+// (contactoAt + comercialAt) y aceptaComercial=true. Se conserva
+// ComercialConsentCheckbox por si en algún momento vuelve a separarse.
+// Para productos con datos de salud (salud, vida — fumador y motivo entran
+// como tales) se añade el consentimiento explícito del art. 9 RGPD dentro
+// del mismo check.
 export type EssentialConsentProps = {
   idPrefix: string;
   datosSalud?: boolean;
@@ -66,7 +54,7 @@ export function EssentialConsentCheckbox({
 
 // Se mantiene por compatibilidad — hoy no lo pinta ningún tarificador
 // (el consentimiento comercial va embebido en el check esencial, ver
-// AVISO LEGAL arriba). Si el equipo legal exige separarlos otra vez,
+// Nota arriba). Si el equipo legal exige separarlos otra vez,
 // vuelve a añadirlo al lado del EssentialConsentCheckbox en cada form.
 export function ComercialConsentCheckbox({
   idPrefix, checked, onChange, size = "md",

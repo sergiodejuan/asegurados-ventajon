@@ -4,7 +4,6 @@
 // en un correo (ver app/api/products/[id]/logo y app/api/theme/logo): Gmail y
 // otros clientes de email bloquean las imágenes data: URI incrustadas en el
 // propio HTML.
-//
 // Whitelist estricta de MIME de salida: solo se devuelven imágenes reales.
 // Un data:text/html o data:image/svg+xml (que puede contener <script>) no
 // se sirven — el navegador los interpretaría en el propio origen y abriría

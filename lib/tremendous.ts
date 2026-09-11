@@ -2,28 +2,25 @@
 // vales-regalo (Amazon, Zalando, decathlon, tarjetas Visa/Mastercard, etc.).
 // La usamos como motor de pago del programa "Amigos Ventajon": crear un
 // reward = enviar un vale Amazon.es al email del destinatario.
-//
 // Documentación oficial: https://developers.tremendous.com/reference
-//
 // Configuración por variables de entorno (Vercel → Environment Variables):
-//   · TREMENDOUS_API_KEY          Bearer token de la cuenta.
-//   · TREMENDOUS_FUNDING_SOURCE_ID  ID de la fuente de fondos (Balance,
-//                                   ACH, tarjeta). Ver /funding_sources.
-//   · TREMENDOUS_CAMPAIGN_ID      ID de una campaña que restrinja los
-//                                   productos entregables. Recomendado:
-//                                   crear una campaña "Amazon.es" en el
-//                                   panel de Tremendous para que el
-//                                   usuario final NO pueda elegir otro
-//                                   producto (control de branding).
-//   · TREMENDOUS_BASE_URL         Opcional. Por defecto producción
-//                                   (https://api.tremendous.com/api/v2).
-//                                   En dev/QA, cambiar a
-//                                   https://testflight.tremendous.com/api/v2
-//                                   (entorno sandbox con dinero ficticio).
-//   · CRON_SECRET                 Bearer que protege el endpoint de cron
-//                                   de pagos por T+30d. Se pasa como
-//                                   Authorization: Bearer <token>.
-//
+// · TREMENDOUS_API_KEY Bearer token de la cuenta.
+// · TREMENDOUS_FUNDING_SOURCE_ID ID de la fuente de fondos (Balance,
+// ACH, tarjeta). Ver /funding_sources.
+// · TREMENDOUS_CAMPAIGN_ID ID de una campaña que restrinja los
+// productos entregables. Recomendado:
+// crear una campaña "Amazon.es" en el
+// panel de Tremendous para que el
+// usuario final NO pueda elegir otro
+// producto (control de branding).
+// · TREMENDOUS_BASE_URL Opcional. Por defecto producción
+// (https://api.tremendous.com/api/v2).
+// En dev/QA, cambiar a
+// https://testflight.tremendous.com/api/v2
+// (entorno sandbox con dinero ficticio).
+// · CRON_SECRET Bearer que protege el endpoint de cron
+// de pagos por T+30d. Se pasa como
+// Authorization: Bearer <token>.
 // Fail-closed en prod si falta la API key — evita "pagos silenciosos"
 // que en realidad no se ejecutaron. En dev sin key, hace no-op y avisa
 // por log; el equipo puede procesar manualmente desde el panel.
@@ -89,7 +86,6 @@ export type SendRewardResult =
 // Envía un vale Amazon eGift al email indicado. Usa external_id para
 // idempotencia: si se llama dos veces con el mismo external_id, Tremendous
 // devuelve la misma order (no cobra dos veces). Perfecto para reintentos.
-//
 // externalId recomendado: `ref:{code}:{leadId}:{lado}` donde lado es
 // "referido" o "referidor" — así una misma conversión nunca paga dos veces.
 export async function sendAmazonReward(input: {

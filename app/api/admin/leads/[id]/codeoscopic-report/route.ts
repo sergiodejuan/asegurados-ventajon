@@ -17,12 +17,12 @@ export const maxDuration = 60;
 // Genera el informe PDF de ofertas de Codeoscopic (con coberturas + IPID) y
 // lo devuelve como application/pdf para que el agente lo abra o lo adjunte al
 // presupuesto. Flujo:
-//   1) Resolver el offerId a partir del quoteId (las ofertas empaquetan la
-//      cotización principal). Si no existe todavía, se re-tarifica para crear
-//      una (POST /offers).
-//   2) POST /insurances/{id}/reports → devuelve una url del informe.
-//   3) Descargar esa url con el token (codeoscopicDownload) y hacer de proxy:
-//      el PDF requiere Authorization, así que el navegador nunca lo baja solo.
+// 1) Resolver el offerId a partir del quoteId (las ofertas empaquetan la
+// cotización principal). Si no existe todavía, se re-tarifica para crear
+// una (POST /offers).
+// 2) POST /insurances/{id}/reports → devuelve una url del informe.
+// 3) Descargar esa url con el token (codeoscopicDownload) y hacer de proxy:
+// el PDF requiere Authorization, así que el navegador nunca lo baja solo.
 const bodySchema = z
   .object({
     insuranceId: z.string().trim().min(1),

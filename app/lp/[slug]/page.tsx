@@ -7,7 +7,6 @@ import { getLandingBySlug, getTheme } from "@/lib/store";
 // robots noindex/nofollow para no canibalizar el posicionamiento orgánico de
 // las páginas de producto ni de las landings SEO. La copia y el layout se
 // editan sin desplegar desde /admin/campanas/landings — ver lib/landings.ts.
-//
 // dynamic = "force-dynamic" para que cada visita respete la última config
 // guardada en KV (el editor guarda con timestamp y no queremos que Next
 // devuelva una versión vieja en caché tras un ajuste de última hora del

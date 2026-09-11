@@ -1,8 +1,7 @@
 // Contenido de las páginas de producto (una por seguro). Datos, no JSX, para
 // que una sola plantilla (components/ProductLandingPage.tsx) renderice las
 // cinco páginas de forma consistente.
-//
-// ⚠️ Los testimonios están marcados explícitamente como "de ejemplo" en la
+// Los testimonios están marcados explícitamente como "de ejemplo" en la
 // propia página (no se presentan como reseñas reales). Sustituir por
 // reseñas reales (Google Business Profile, etc.) antes de publicar.
 

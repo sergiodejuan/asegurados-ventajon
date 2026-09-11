@@ -12,7 +12,6 @@ import { BRAND_NAME } from "@/lib/brand";
 // ya existente del site (o a "quiero que me llamen" para hogar, que no
 // tiene tarificador propio), con la UTM y el slug de esta landing para
 // poder atribuir el lead.
-//
 // dynamic = "force-dynamic": incluso en el caso "salud" (sin redirect) se
 // mantiene por el mismo motivo que el resto de /lp/[slug]/* — reflejar la
 // última config guardada en KV sin caché de ruta.

@@ -2,7 +2,6 @@
 // POST /api/manychat/salud-quote: arranca el cálculo en Codeoscopic y
 // devuelve la mejor oferta firme que haya llegado dentro del presupuesto
 // síncrono.
-//
 // ¿Por qué un presupuesto? ManyChat aborta cualquier "External Request" a
 // los ~10 s (timeout de plataforma, NO configurable — el error que ve el
 // usuario es "Operation timed out after 10002 milliseconds with 0 bytes
@@ -40,9 +39,9 @@ export type ResponseShape = {
   precioTexto: string;   // "23,45€/mes" o "" si no hay
   // Modalidad de copago DEDUCIDA del nombre de la modalidad de Codeoscopic
   // (ver clasificaCopagoTexto). Merge tags para el flow:
-  //   - `copago`: "con" | "sin" | "ambas" | "" (vacío = no se pudo deducir).
-  //   - `copagoEtiqueta`: chip listo para pintar ("Con copago"/"Sin copagos"/
-  //     "Con y sin copago") o "" si no consta.
+  // `copago`: "con" | "sin" | "ambas" | "" (vacío = no se pudo deducir).
+  // `copagoEtiqueta`: chip listo para pintar ("Con copago"/"Sin copagos"/
+  // "Con y sin copago") o "" si no consta.
   // Útil para contrastar con el siguiente mensaje (opciones negociadas de
   // Asegurados Ventajón, sin copagos).
   copago?: CopagoModo | "";
@@ -94,12 +93,10 @@ function countFirm(quotes: CodeoscopicQuoteSummary[]): number {
 // (Generali suele responder la primera, ~3-5s; Adeslas/Asisa pueden
 // tardar 15-30s). Devolver la primera firme que aparece sesgaría siempre
 // el resultado a Generali. Estrategia:
-//
-//   1) Poll cada `pollMs` hasta que summary.done === true (todas firmes), o
-//   2) mínimo `minWaitMs` de espera aunque ya haya alguna firme, para
-//      dar tiempo a que lleguen las otras compañías, o
-//   3) ya llegaron `minFirmQuotes` compañías firmes.
-//
+// 1) Poll cada `pollMs` hasta que summary.done === true (todas firmes), o
+// 2) mínimo `minWaitMs` de espera aunque ya haya alguna firme, para
+// dar tiempo a que lleguen las otras compañías, o
+// 3) ya llegaron `minFirmQuotes` compañías firmes.
 // Luego devuelve la MÁS BARATA entre todas las firmes que hayan llegado.
 // Timeout duro en `deadlineMs`: pasado ese punto, devolvemos lo que
 // tengamos (o null si no llegó ninguna). El `deadlineMs` lo fija quien

@@ -9,14 +9,12 @@ export const dynamic = "force-dynamic";
 
 // Endpoint de doble opt-in del referido. El referido recibe email con
 // link `/api/referral/opt-in?token=…`; al hacer clic:
-//   1. Se valida el token (HMAC-signed, TTL 14 días, single-use).
-//   2. Se actualiza el status del ReferralConvertido a "opt-in".
-//   3. Redirect a página de gracias con confirmación visual.
-//
+// 1. Se valida el token (HMAC-signed, TTL 14 días, single-use).
+// 2. Se actualiza el status del ReferralConvertido a "opt-in".
+// 3. Redirect a página de gracias con confirmación visual.
 // El pago del bono al AMIGO se dispara desde admin (o cron) al detectar
 // status="opt-in" — no es automático desde aquí para poder hacer batch
 // diario con menos coste operativo. En Fase 2 se automatiza vía Tremendous.
-//
 // Se acepta GET (link desde email) y POST (por si se quiere confirmar
 // desde el propio panel del cliente).
 async function handle(request: Request, token: string | undefined | null) {

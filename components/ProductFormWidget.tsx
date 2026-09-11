@@ -6,8 +6,7 @@ import { useEffect, useRef, useState } from "react";
 // asíncrono desde product-form.avant.codeoscopic.io una sola vez por
 // pestaña, cachea la Promise para no reintentar en cada montaje y expone
 // el componente <ProductFormWidget> con la API mínima que necesitamos:
-//   <ProductFormWidget insuranceId="…" quoteId="…" onFinished={…} />
-//
+// <ProductFormWidget insuranceId="…" quoteId="…" onFinished={…} />
 // Toda petición de datos del widget se enruta a nuestro proxy
 // /api/product-form (que a su vez habla con Codeoscopic con las
 // credenciales server-side). Nunca damos al widget acceso directo.

@@ -1,7 +1,6 @@
 // Resolver de código postal → town.id del catálogo interno de Codeoscopic
 // (municipios). Sin este id el payload de salud no valida: Codeoscopic pide
 // el id de su catálogo, no el CP en sí.
-//
 // Estrategia: llamamos a GET /towns?postalCode=NNNNN (o similar — se ajusta
 // abajo según el shape real que devuelva la API en el tenant), tomamos el
 // primer municipio devuelto para ese CP y lo cacheamos in-memory. En España

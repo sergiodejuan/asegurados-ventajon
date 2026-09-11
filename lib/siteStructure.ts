@@ -14,7 +14,7 @@ export type SiteNode = {
   children?: SiteNode[];
 };
 
-// -------------------------- Tarificadores (detalle) --------------------------
+// Tarificadores (detalle)
 // Los 4 tipos de tarificador comparten el mismo motor genérico
 // (lib/forms.ts + components/StepForm.tsx: un FormConfig con "steps"
 // tipados, renderizados por un único componente) — solo cambian los pasos y
@@ -58,7 +58,7 @@ const TARIFICADORES: SiteNode[] = [
   },
 ];
 
-// ------------------------------ Árbol completo ------------------------------
+// Árbol completo
 export const SITE_STRUCTURE: SiteNode[] = [
   {
     label: "Sitio público", kind: "grupo",

@@ -18,7 +18,6 @@ export const dynamic = "force-dynamic";
 // usuario ya tiene (compañía + importe + periodicidad, opcionalmente una
 // captura del presupuesto), crea/actualiza el lead con source="price-match"
 // y guarda el bloque `priceMatch` en la ficha para que el asesor lo trabaje.
-//
 // El origen concreto (landing dedicada vs comparativa) se distingue en el
 // campo `origen`: 'landing' → source="price-match"; 'comparativa' →
 // source="price-match-comparativa". Los dos aparecen en /admin/utm y se

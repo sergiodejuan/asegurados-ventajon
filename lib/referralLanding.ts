@@ -2,14 +2,12 @@
 // Editable desde /admin/campanas/referidos sin desplegar. Este flujo capta
 // nuevos leads a través de la recomendación de clientes YA contratados —
 // el CAC objetivo es la mitad del de paid ads.
-//
 // Doble incentivo simétrico:
-//   · El REFERIDO (el amigo) recibe 20€ Amazon eGift al completar una
-//     cotización + doble opt-in por email.
-//   · El REFERIDOR (el cliente contratado que invita) recibe 20€ Amazon
-//     eGift cuando el amigo contrata una póliza y supera 30 días de
-//     vigencia (evita cancelaciones fake).
-//
+// · El REFERIDO (el amigo) recibe 20€ Amazon eGift al completar una
+// cotización + doble opt-in por email.
+// · El REFERIDOR (el cliente contratado que invita) recibe 20€ Amazon
+// eGift cuando el amigo contrata una póliza y supera 30 días de
+// vigencia (evita cancelaciones fake).
 // Los importes son EDITABLES desde admin porque estacionalmente pueden
 // subir (verano familia, back-to-school) — no hardcodear en el frontend.
 

@@ -9,16 +9,13 @@ export const maxDuration = 15;
 export const dynamic = "force-dynamic";
 
 // POST /api/manychat/prefill-salud
-//
 // Primer paso del funnel de Tarifa Salud. Con el teléfono del contacto de
 // WhatsApp (ManyChat ya lo conoce) busca si el usuario YA tarificó en la web
 // y devuelve su perfil para prerellenar los CUFs y saltarse las preguntas.
 // Así reconocemos también a quien vino de la comparativa web (no solo a quien
 // usó el bot antes).
-//
 // El cruce es por teléfono: solo funciona si el lead de la web tiene teléfono
 // que coincida con el de WhatsApp. `existe:false` = empieza el flujo normal.
-//
 // Body: { "telefono": "{{phone}}" }
 // Autenticación: header `x-manychat-secret` (MANYCHAT_WEBHOOK_SECRET).
 

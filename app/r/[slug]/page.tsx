@@ -5,14 +5,12 @@ import { PaidLanding } from "@/components/landings/PaidLanding";
 import { SITE_URL } from "@/lib/brand";
 
 // Landing personalizada del amigo (/r/{code}).
-//
 // El amigo llega desde el link que le compartió el referidor. Aquí:
-//   1. Verificamos que el código existe y no está bloqueado.
-//   2. Rehusamos indexarla (noindex). No queremos que Google indexe
-//      páginas con "María P. te invita" — filtración de nombres.
-//   3. Añadimos ?ref=CODE al href del CTA (lib/attribution.ts lo captura
-//      en localStorage y lo propaga al POST /api/lead).
-//
+// 1. Verificamos que el código existe y no está bloqueado.
+// 2. Rehusamos indexarla (noindex). No queremos que Google indexe
+// páginas con "María P. te invita" — filtración de nombres.
+// 3. Añadimos ?ref=CODE al href del CTA (lib/attribution.ts lo captura
+// en localStorage y lo propaga al POST /api/lead).
 // Visualmente reutilizamos la landing paid "salud" (slug "salud") de
 // /admin/campanas/landings, con un kicker personalizado sobre el hero.
 

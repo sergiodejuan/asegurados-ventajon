@@ -6,7 +6,6 @@ import { NextResponse } from "next/server";
 // datos de un cliente por teléfono. Un secreto compartido simple (como
 // ADMIN_TOKEN) porque ManyChat solo permite cabeceras estáticas, no firma
 // HMAC — se manda como header fijo en la configuración del paso.
-//
 // La comparación entre header recibido y secreto se hace con
 // crypto.timingSafeEqual: aunque el impacto real de un timing side-channel
 // sobre un !== en JS es limitado, la comparación timing-safe es trivial

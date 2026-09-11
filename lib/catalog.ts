@@ -99,8 +99,8 @@ export function copagoTexto(modo: CopagoModo): string {
 // su texto (producto + modalidad + categoría). Codeoscopic NO declara el
 // copago en un campo estructurado, así que se infiere del nombre — mismo
 // criterio que los filtros de la comparativa (classifyText en Comparativa.tsx):
-//   - "sin copago" / "reembolso" / "reintegro" → sin copago
-//   - "copago" (sin el "sin" delante)          → con copago
+// "sin copago" / "reembolso" / "reintegro" → sin copago
+// "copago" (sin el "sin" delante) → con copago
 // Devuelve null cuando el nombre no da ninguna pista: NO inventamos una
 // modalidad que no consta (mejor no etiquetar que etiquetar mal).
 export function clasificaCopagoTexto(text: string): CopagoModo | null {
@@ -130,10 +130,10 @@ const nz = (sinCopago: number): TramoEdad["porZona"] => ({
 // que elige la ficha según el copago (siempre sin), el dental (según lo que
 // el usuario marca en el flow) y el nº de asegurados (1 vs 2+). Editables en
 // /admin/productos como cualquier otro producto. Convención de id:
-//   neg-<compania>-<cd|sd>[-<1|n>]   cd=con dental, sd=sin dental, 1=individual, n=familia
+// neg-<compania>-<cd|sd>[-<1|n>] cd=con dental, sd=sin dental, 1=individual, n=familia
 // Adeslas solo tiene tarifa "un asegurado", así que no lleva sufijo de nº.
 const NEGOCIADAS_SALUD: Product[] = [
-  // ---- MAPFRE (sin copagos) ----
+  // MAPFRE (sin copagos)
   {
     id: "neg-mapfre-cd-1", producto: "salud", compania: "Mapfre", titulo: "MAPFRE · Con dental · 1 asegurado",
     activo: false, destacado: false, orden: 90, modalidadCopago: "sin", dental: true,
@@ -190,7 +190,7 @@ const NEGOCIADAS_SALUD: Product[] = [
     condiciones: "Opción negociada Asegurados Ventajón · sin copagos · sin dental · 2+ asegurados. Precio por asegurado/mes.",
     servicios: ["Sin copagos"], updatedAt: now,
   },
-  // ---- ADESLAS (sin copagos) · solo tarifa "un asegurado" (vale para cualquier nº) ----
+  // ADESLAS (sin copagos) · solo tarifa "un asegurado" (vale para cualquier nº)
   {
     id: "neg-adeslas-cd", producto: "salud", compania: "Adeslas", titulo: "ADESLAS · Con dental",
     activo: false, destacado: false, orden: 94, modalidadCopago: "sin", dental: true,

@@ -1,13 +1,11 @@
 // Lectura del informe "Leads ManyChat" desde la hoja de Google Sheets
 // (BBDD_Asegurados_Ventajon_Leads_Maestro_V3), vía un Web App de Google Apps
 // Script publicado en la propia hoja y protegido por un secreto compartido.
-//
 // El navegador NUNCA habla con Google: este módulo corre en el servidor
 // (lo usa app/api/admin/informes/manychat), guarda el secreto en variables de
 // entorno y sirve el resultado ya normalizado al panel admin. "Tiempo real" =
 // se consulta al abrir el informe, con una caché corta en memoria y un botón
 // de actualizar que la salta.
-//
 // Ver docs/informe-manychat-google-sheets.md para el código del Apps Script y
 // cómo desplegarlo. Sin las variables SHEETS_WEBAPP_URL / SHEETS_WEBAPP_SECRET
 // el informe simplemente muestra el estado "no configurado" (no rompe nada).

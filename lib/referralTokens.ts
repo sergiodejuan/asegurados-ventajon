@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 // Tokens firmados HMAC para el doble opt-in del referido tras cotizar.
 // Contenido: `${code}.${leadId}.${expiresAt}.${sig}` — sig es HMAC-SHA256
 // de los tres primeros con REFERRAL_TOKEN_SECRET (o fallback dev).
-//
 // Aislado del secreto de sesión (session/agentSession) — misma política que
 // PDF watermark / OTP admin: si se compromete uno no arrastra al resto.
 // Sin secreto configurado en prod, falla cerrado.

@@ -3,11 +3,9 @@
 // puede cerrar prematuramente el <script> con "</script><script>alert(1)</script>"
 // y provocar XSS almacenado desde admin al público. Este helper reemplaza "<"
 // por "<", que es JSON válido y browsers/parsers lo interpretan igual.
-//
 // Uso: en cualquier <script type="application/ld+json" dangerouslySetInnerHTML=
 // { __html: safeJsonLd(objeto) } />, siempre — cero excepciones aunque el
 // contenido parezca "controlado" hoy (mañana puede llegar de admin/KV/API).
-//
 // También escapa U+2028 y U+2029 (line separators) que son válidos en JSON
 // pero rompen JavaScript inline: cobertura extra ante evaluaciones legacy
 // que hicieran eval() del script.

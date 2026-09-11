@@ -8,15 +8,12 @@ export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 // POST /api/manychat/salud-coverages
-//
 // Devuelve el detalle de coberturas de la oferta ganadora ya formateado
 // como texto listo para WhatsApp (sin markdown ni HTML, sólo saltos de
 // línea, viñetas ASCII y emojis). ManyChat lo pinta directamente con un
 // merge tag {{coberturas_texto}}.
-//
 // Body:
-//   { "insuranceId": "40307819", "quoteId": "..." }
-//
+// { "insuranceId": "40307819", "quoteId": "..." }
 // Autenticación: header `x-manychat-secret` (MANYCHAT_WEBHOOK_SECRET).
 
 type Body = { insuranceId?: string; quoteId?: string };
@@ -133,7 +130,7 @@ export async function POST(request: Request) {
 
   try {
     // 1) Resolvemos el offerId a partir del insurance + quoteId (mismo
-    //    patrón que /api/quote/[id]/coverages para no divergir).
+    // patrón que /api/quote/[id]/coverages para no divergir).
     const insurance = await getInsurance(insuranceId);
     const offer = (insurance.offers ?? []).find(
       (o) =>

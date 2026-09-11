@@ -10,12 +10,10 @@ import type { Product } from "./catalog";
 // se sincroniza con ManyChat y se dispara la llamada automática, así que se
 // engancha igual: no-op si no hay RESEND_API_KEY o no hay email (mismo
 // patrón que el resto de integraciones opcionales del proyecto).
-//
 // Cada logo (de marca y de cada aseguradora) se sirve como una URL https real
 // vía app/api/theme/logo y app/api/products/[id]/logo en vez del data: URI
 // que se guarda en el admin: Gmail y otros clientes de correo bloquean las
 // imágenes data: URI en HTML de email por seguridad.
-//
 // Cada enlace del correo (las dos acciones de cada aseguradora) pasa por
 // app/api/email/click, que registra el clic en la ficha del lead antes de
 // redirigir de verdad — y el correo lleva al final un píxel de 1x1 (ver

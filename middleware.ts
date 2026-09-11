@@ -4,22 +4,20 @@ import { readSiteAccessConfigEdge } from "@/lib/siteAccessEdge";
 
 // Middleware Edge — se ejecuta antes de cada request. Aquí implementamos
 // dos defensas transversales:
-//
-//  1) CSRF por doble señal: en TODAS las mutaciones (POST/PUT/PATCH/DELETE)
-//     de rutas /api/admin/* y /api/client/*, exigimos que el header Origin
-//     (o Referer como fallback) coincida con el host de la petición, O que
-//     el Sec-Fetch-Site sea 'same-origin' / 'same-site' / 'none'. Los
-//     ataques CSRF cross-origin desde otro dominio no pueden falsificar
-//     Origin ni Sec-Fetch-Site (los pone el navegador). Los tokens API
-//     (x-admin-token, x-manychat-secret, x-retell-signature, x-webhook-
-//     signature) están whitelistados: son integraciones server-to-server
-//     que no traen Origin y ya autentican por su propio mecanismo.
-//
-//  2) Cabeceras de aislamiento COOP/CORP en TODAS las respuestas:
-//     Cross-Origin-Opener-Policy same-origin (defensa contra Spectre-class
-//     y contra window.opener leaks) y Cross-Origin-Resource-Policy
-//     same-origin en /api/* (evita hotlinking de nuestras APIs desde
-//     otros orígenes).
+// 1) CSRF por doble señal: en TODAS las mutaciones (POST/PUT/PATCH/DELETE)
+// de rutas /api/admin/* y /api/client/*, exigimos que el header Origin
+// (o Referer como fallback) coincida con el host de la petición, O que
+// el Sec-Fetch-Site sea 'same-origin' / 'same-site' / 'none'. Los
+// ataques CSRF cross-origin desde otro dominio no pueden falsificar
+// Origin ni Sec-Fetch-Site (los pone el navegador). Los tokens API
+// (x-admin-token, x-manychat-secret, x-retell-signature, x-webhook-
+// signature) están whitelistados: son integraciones server-to-server
+// que no traen Origin y ya autentican por su propio mecanismo.
+// 2) Cabeceras de aislamiento COOP/CORP en TODAS las respuestas:
+// Cross-Origin-Opener-Policy same-origin (defensa contra Spectre-class
+// y contra window.opener leaks) y Cross-Origin-Resource-Policy
+// same-origin en /api/* (evita hotlinking de nuestras APIs desde
+// otros orígenes).
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const PROTECTED_PREFIXES = ["/api/admin/", "/api/client/"];
@@ -75,12 +73,12 @@ function checkSameOrigin(request: NextRequest): boolean {
 }
 
 // Rutas que siguen accesibles cuando el bloqueo global está activo:
-//   - la propia pantalla de acceso y su endpoint
-//   - todo /admin (tiene su propia autenticación fuerte con 2FA)
-//   - webhooks server-to-server (Retell/Bland/Manychat/Tremendous cron)
-//   - endpoint de opt-in de referidos (link que llega por email, no debe
-//     quedar detrás del gate)
-//   - assets estáticos (favicon, robots — el matcher ya excluye _next/*)
+// la propia pantalla de acceso y su endpoint
+// todo /admin (tiene su propia autenticación fuerte con 2FA)
+// webhooks server-to-server (Retell/Bland/Manychat/Tremendous cron)
+// endpoint de opt-in de referidos (link que llega por email, no debe
+// quedar detrás del gate)
+// assets estáticos (favicon, robots — el matcher ya excluye _next/*)
 const SITE_ACCESS_EXEMPT_PREFIXES = [
   "/acceso",
   "/api/acceso",

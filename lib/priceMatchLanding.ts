@@ -2,7 +2,6 @@
 // Editable desde /admin/campanas/precio-mejor sin desplegar. Este flujo busca
 // captar al usuario que YA tiene un presupuesto de otra compañía y ofrecerle
 // que se lo estudiemos para buscarle una alternativa igual o mejor.
-//
 // Importante en el copy: la palabra "garantizado" del título comercial se
 // matiza en el disclaimer legal — legalmente prometemos ESTUDIO y RESPUESTA,
 // no igualación matemática de cualquier precio (evita reclamaciones AEPD /

@@ -3,7 +3,6 @@
 // Lo consume /api/manychat/salud-negociadas — el mensaje que se envía JUSTO
 // DESPUÉS de la tarifa de Codeoscopic (que suele venir con copago) para
 // presentar el gancho: mismas compañías, sin copagos.
-//
 // Las fichas viven en el catálogo (lib/catalog.ts → NEGOCIADAS_SALUD),
 // ocultas de la comparativa pública (`activo: false`) y editables en
 // /admin/productos. Convención de id: neg-<compania>-<cd|sd>[-<1|n>].
@@ -37,10 +36,10 @@ export function edadDesdeFecha(dob?: string): number | null {
 }
 
 // Precio sin copago nacional (mismo en las 3 zonas) para la edad dada.
-//   - edad conocida + tramo → precio de ese tramo.
-//   - edad conocida SIN tramo → null: la compañía no cubre esa edad (Mapfre
-//     tope 65, Adeslas 70) — no la ofertamos con un precio inventado.
-//   - edad desconocida → precio plano de la ficha, que actúa de "desde".
+// edad conocida + tramo → precio de ese tramo.
+// edad conocida SIN tramo → null: la compañía no cubre esa edad (Mapfre
+// tope 65, Adeslas 70) — no la ofertamos con un precio inventado.
+// edad desconocida → precio plano de la ficha, que actúa de "desde".
 function precioSinCopago(product: Product, edad: number | null): number | null {
   const tramo = resolveTramo(product.pricing, edad);
   if (tramo) {

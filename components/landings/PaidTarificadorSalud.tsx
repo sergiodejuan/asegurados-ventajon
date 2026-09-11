@@ -15,12 +15,10 @@ import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { PaidLlamadaLegalNotice } from "./PaidLlamadaLegalNotice";
 
 // Tarificador de salud EXCLUSIVO de /lp/salud/tarificador.
-//
 // Unificación de flujo (2026-08): el tarificador SOLO recoge datos técnicos
 // de tarificación (asegurados, salud, zona/CP). NO pide nombre, teléfono,
 // email ni consentimientos — eso lo hace el modal-gate de /comparativa,
 // donde se crea el lead REAL. Antes se pedían dos veces (aquí y allí).
-//
 // La transición al modal viaja por sessionStorage (saveLeadDraft). En
 // /comparativa el modal es obligatorio y no permite ver precios sin datos.
 

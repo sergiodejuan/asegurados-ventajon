@@ -7,8 +7,7 @@ import { signAccessCookie, SITE_ACCESS_COOKIE, SITE_ACCESS_DEFAULT_TTL_DAYS } fr
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// POST /api/acceso/login  { password: string, next?: "/ruta" }
-//
+// POST /api/acceso/login { password: string, next?: "/ruta" }
 // Verifica la contraseña del bloqueo global contra el hash scrypt guardado
 // en KV y, si es válida, planta la cookie firmada HMAC que el middleware
 // Edge acepta como pase. Retorna { ok, next } — el cliente redirige a esa

@@ -1,5 +1,4 @@
 // Atribución interna de marketing (UTM + página de aterrizaje + referrer).
-//
 // Modelo: la página de aterrizaje y el referrer se capturan una única vez
 // (la primera visita de la ventana de atribución) y ya no se tocan — así
 // siempre sabemos por dónde entró realmente el visitante. Los parámetros
@@ -7,7 +6,6 @@
 // ("último toque de campaña"): esto es necesario para que enlaces internos
 // con utm propio (p.ej. el CTA de /mes-gratis hacia /tarificador) queden
 // bien atribuidos aunque el visitante ya llevara un rato navegando.
-//
 // Se guarda en localStorage (no sessionStorage) con una caducidad de 30
 // días — la ventana de atribución estándar del sector — para que una
 // conversión que llega días después de la primera visita siga sabiendo de

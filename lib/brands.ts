@@ -4,7 +4,6 @@
 // el catálogo manual (Product.compania). La clave de identidad es el nombre
 // normalizado, así "Mapfre", "MAPFRE " y "mapfre" son la misma marca aunque
 // vengan de fuentes distintas.
-//
 // Modelo: lista negra por ramo (brand_hidden:<ramo> → string[] de claves
 // normalizadas). Por defecto no hay nada oculto → se muestran todas. Ocultar
 // una marca la añade a la lista; así nunca se queda la comparativa en blanco

@@ -7,11 +7,10 @@ import { TurnstileWidget } from "@/components/TurnstileWidget";
 import type { ReferralLandingConfig } from "@/lib/referralLanding";
 
 // Modal "Invita a un amigo" — fullscreen wizard con 2 estados:
-//   1. Sin código todavía: el usuario introduce email + teléfono para que
-//      hagamos lookup + verificación de elegibilidad (POST /api/referral/generate).
-//   2. Con código: muestra link + código + botones nativos de compartir
-//      (WhatsApp, email, copy) con el mensaje pre-rellenado editable.
-//
+// 1. Sin código todavía: el usuario introduce email + teléfono para que
+// hagamos lookup + verificación de elegibilidad (POST /api/referral/generate).
+// 2. Con código: muestra link + código + botones nativos de compartir
+// (WhatsApp, email, copy) con el mensaje pre-rellenado editable.
 // El código puede venir precargado desde fuera (área cliente sabe el
 // referidor y ya ha hecho el fetch server-side); en ese caso, saltamos
 // directamente al paso 2.

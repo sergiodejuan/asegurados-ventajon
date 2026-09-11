@@ -11,16 +11,15 @@ import { rateLimitFail } from "@/lib/rateLimit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Plus3: segundo paso del 2FA por email. Recibe el nonce que devolvió el
+// segundo paso del 2FA por email. Recibe el nonce que devolvió el
 // login y el código de 6 dígitos que el agente ha recibido. Solo si
 // coincide (timing-safe compare del hash SHA-256) crea la cookie de
 // sesión y descarta el OTP (single-use).
-//
 // Bloqueos:
-//   - 5 intentos por nonce → invalida el OTP (obligar a repetir login).
-//   - TTL 10 min en el nonce.
-//   - Rate-limit por IP para no permitir enumerar códigos válidos a lo
-//     bruto contra nonces filtrados.
+// 5 intentos por nonce → invalida el OTP (obligar a repetir login).
+// TTL 10 min en el nonce.
+// Rate-limit por IP para no permitir enumerar códigos válidos a lo
+// bruto contra nonces filtrados.
 const MAX_ATTEMPTS = 5;
 const OTP_MAX_AGE_MS = 10 * 60 * 1000;
 
