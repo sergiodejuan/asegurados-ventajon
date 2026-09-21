@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SITE_ACCESS_COOKIE, verifyAccessCookie } from "@/lib/siteAccess";
-import { readSiteAccessConfigEdge } from "@/lib/siteAccessEdge";
 
 // Middleware Edge — se ejecuta antes de cada request. Aquí implementamos
 // dos defensas transversales:
-// 1) CSRF por doble señal: en TODAS las mutaciones (POST/PUT/PATCH/DELETE)
-// de rutas /api/admin/* y /api/client/*, exigimos que el header Origin
-// (o Referer como fallback) coincida con el host de la petición, O que
-// el Sec-Fetch-Site sea 'same-origin' / 'same-site' / 'none'. Los
-// ataques CSRF cross-origin desde otro dominio no pueden falsificar
-// Origin ni Sec-Fetch-Site (los pone el navegador). Los tokens API
-// (x-admin-token, x-manychat-secret, x-retell-signature, x-webhook-
-// signature) están whitelistados: son integraciones server-to-server
-// que no traen Origin y ya autentican por su propio mecanismo.
-// 2) Cabeceras de aislamiento COOP/CORP en TODAS las respuestas:
-// Cross-Origin-Opener-Policy same-origin (defensa contra Spectre-class
-// y contra window.opener leaks) y Cross-Origin-Resource-Policy
-// same-origin en /api/* (evita hotlinking de nuestras APIs desde
-// otros orígenes).
+//
+//  1) CSRF por doble señal: en TODAS las mutaciones (POST/PUT/PATCH/DELETE)
+//     de rutas /api/admin/* y /api/client/*, exigimos que el header Origin
+//     (o Referer como fallback) coincida con el host de la petición, O que
+//     el Sec-Fetch-Site sea 'same-origin' / 'same-site' / 'none'. Los
+//     ataques CSRF cross-origin desde otro dominio no pueden falsificar
+//     Origin ni Sec-Fetch-Site (los pone el navegador). Los tokens API
+//     (x-admin-token, x-manychat-secret, x-retell-signature, x-webhook-
+//     signature) están whitelistados: son integraciones server-to-server
+//     que no traen Origin y ya autentican por su propio mecanismo.
+//
+//  2) Cabeceras de aislamiento COOP/CORP en TODAS las respuestas:
+//     Cross-Origin-Opener-Policy same-origin (defensa contra Spectre-class
+//     y contra window.opener leaks) y Cross-Origin-Resource-Policy
+//     same-origin en /api/* (evita hotlinking de nuestras APIs desde
+//     otros orígenes).
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const PROTECTED_PREFIXES = ["/api/admin/", "/api/client/"];
@@ -72,41 +72,7 @@ function checkSameOrigin(request: NextRequest): boolean {
   }
 }
 
-// Rutas que siguen accesibles cuando el bloqueo global está activo:
-// la propia pantalla de acceso y su endpoint
-// todo /admin (tiene su propia autenticación fuerte con 2FA)
-// webhooks server-to-server (Retell/Bland/Manychat/Tremendous cron)
-// endpoint de opt-in de referidos (link que llega por email, no debe
-// quedar detrás del gate)
-// assets estáticos (favicon, robots — el matcher ya excluye _next/*)
-const SITE_ACCESS_EXEMPT_PREFIXES = [
-  "/acceso",
-  "/api/acceso",
-  "/admin",
-  "/api/admin",
-  "/api/retell",
-  "/api/bland",
-  "/api/manychat",
-  "/api/tremendous",
-  "/api/referral/process-payouts",
-  "/api/referral/opt-in",
-];
-const SITE_ACCESS_EXEMPT_EXACT = new Set([
-  "/favicon.ico",
-  "/robots.txt",
-  "/sitemap.xml",
-  "/sw.js",
-]);
-
-function isSiteAccessExempt(pathname: string): boolean {
-  if (SITE_ACCESS_EXEMPT_EXACT.has(pathname)) return true;
-  for (const p of SITE_ACCESS_EXEMPT_PREFIXES) {
-    if (pathname === p || pathname.startsWith(p + "/")) return true;
-  }
-  return false;
-}
-
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   // Verificación CSRF sólo para mutaciones sensibles.
   if (isProtectedMutation(request)) {
     if (!checkSameOrigin(request)) {
@@ -114,34 +80,6 @@ export async function middleware(request: NextRequest) {
         { ok: false, error: "Origen no válido para esta petición." },
         { status: 403 }
       );
-    }
-  }
-
-  // Bloqueo global de la web con contraseña. Sólo se aplica si en la
-  // config KV `enabled=true`. La cookie está firmada con HMAC-SHA256 y
-  // caduca por su propio `exp` — no hace falta pegarle a KV para
-  // validarla (fast-path). La config se lee cacheada 30s por edge.
-  {
-    const pathname = request.nextUrl.pathname;
-    if (!isSiteAccessExempt(pathname)) {
-      const cfg = await readSiteAccessConfigEdge();
-      if (cfg.enabled && cfg.passwordHash) {
-        const cookie = request.cookies.get(SITE_ACCESS_COOKIE)?.value;
-        const authed = await verifyAccessCookie(cookie);
-        if (!authed) {
-          if (pathname.startsWith("/api/")) {
-            return NextResponse.json(
-              { ok: false, error: "Acceso restringido." },
-              { status: 401 },
-            );
-          }
-          const url = request.nextUrl.clone();
-          url.pathname = "/acceso";
-          url.search = "";
-          url.searchParams.set("next", pathname + request.nextUrl.search);
-          return NextResponse.redirect(url);
-        }
-      }
     }
   }
 

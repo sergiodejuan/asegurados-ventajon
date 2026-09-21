@@ -140,7 +140,7 @@ export const API_CATEGORIES: ApiCategory[] = [
   },
   {
     categoria: "WhatsApp / ManyChat (server-to-server)",
-    descripcion: "Endpoints que consume ManyChat como paso \"External Request\" de sus flows de WhatsApp. Autenticación por cabecera estática x-manychat-secret (MANYCHAT_WEBHOOK_SECRET) — ManyChat no soporta firma HMAC. Exentos del bloqueo global de la web.",
+    descripcion: "Endpoints que consume ManyChat como paso \"External Request\" de sus flows de WhatsApp. Autenticación por cabecera estática x-manychat-secret (MANYCHAT_WEBHOOK_SECRET) — ManyChat no soporta firma HMAC.",
     endpoints: [
       { method: "POST", path: "/api/manychat/prefill-salud", resumen: "Primer paso del funnel: con el teléfono del contacto de WhatsApp, busca si ya tarificó en la web y devuelve su perfil para prerrellenar los campos y saltarse preguntas.", auth: "x-manychat-secret", request: "{ telefono }", response: "{ existe, nombre, apellido1/2, email, documento, fechaNacimiento, ... } (vacío si no existe)" },
       { method: "POST", path: "/api/manychat/salud-quote", resumen: "Tarificador de salud en tiempo real por WhatsApp: da de alta el lead, cotiza en Codeoscopic, espera a que respondan varias compañías (mín. ~5s, dentro del presupuesto de ~10s de ManyChat) y devuelve la más barata firme —con y sin copago— + enlace firmado a /comparativa.", auth: "x-manychat-secret + rate limit (20/h por IP)", request: "{ telefono, nombre, apellido1/2, fechaNacimiento, sexo, documento(+tipo), codigoPostal, numAsegurados, coberturaDental, fumador, aceptaPrivacidad }", response: "Plano: { estado, mensaje, precio, precioTexto, compania, leadId, insuranceId, quoteId, urlComparativa }" },
@@ -203,7 +203,6 @@ export const API_CATEGORIES: ApiCategory[] = [
       { method: "GET", path: "/api/admin/informes/codeoscopic, /informes/price-match, /informes/referidos", resumen: "Informes de negocio: uso y resultados de Codeoscopic, embudo de price-match y estado del programa de referidos.", auth: "Módulo \"informes\"", request: "—", response: "—" },
       { method: "GET", path: "/api/admin/informes/manychat", resumen: "Informe \"Leads ManyChat\": lee en vivo el DASHBOARD de la hoja de Google Sheets vía el Web App de Apps Script (server-side, secreto en env). ?refresh=1 salta la caché de 60s.", auth: "Módulo \"informes\"", request: "?refresh=1 (opcional)", response: "{ ok, configured, report }" },
       { method: "GET/POST", path: "/api/admin/integraciones/status, /integraciones/test, /integraciones/pdf, /integraciones/codescopic/catalog", resumen: "Estado real de cada integración (derivado de env), prueba de conexión (round-trip real), PDF de esta documentación y diagnóstico de catálogos de Codeoscopic.", auth: "Módulo \"desarrollador\"", request: "—", response: "—" },
-      { method: "GET/PATCH", path: "/api/admin/site-access", resumen: "Activa/desactiva el bloqueo global de la web con contraseña y fija la contraseña.", auth: "Módulo \"configuracion\"", request: "{ activo, password? }", response: "{ ok }" },
       { method: "GET/POST", path: "/api/admin/referral/[code], /referral/[code]/retry", resumen: "Ficha de un referido y reintento manual del pago de su bono (Tremendous).", auth: "Módulo \"referidos\"", request: "—", response: "—" },
       { method: "GET/POST", path: "/api/admin/notifications, /notifications/push-subscribe", resumen: "Centro de notificaciones del equipo y suscripción a push del navegador admin (avisos de lead nuevo).", auth: "ADMIN_TOKEN o cookie de agente", request: "—", response: "—" },
     ],
@@ -224,7 +223,6 @@ export const API_CATEGORIES: ApiCategory[] = [
       { method: "GET", path: "/api/theme, /api/theme/logo", resumen: "Lectura pública del tema activo (usada por la propia web para pintarse).", auth: "Pública", request: "—", response: "SiteTheme" },
       { method: "GET", path: "/api/inactivity-modal", resumen: "Configuración pública del modal de inactividad activo.", auth: "Pública", request: "—", response: "{ ok, config }" },
       { method: "POST", path: "/api/landing/track", resumen: "Beacon de analítica propia de las landings de pago (dispositivo + franja horaria, clasificados en servidor).", auth: "Pública", request: "{ slug, evento }", response: "204" },
-      { method: "POST", path: "/api/acceso/login, /api/acceso/logout", resumen: "Login/logout del bloqueo global de la web con contraseña (cuando está activo).", auth: "Contraseña + anti-fuerza-bruta (8/15min por IP)", request: "{ password }", response: "{ ok }" },
       { method: "GET", path: "/api/products", resumen: "Catálogo de productos activos (precio aproximado por producto).", auth: "Pública", request: "—", response: "{ ok, products }" },
       { method: "GET", path: "/api/campaign", resumen: "Slides activos de la campaña de la home.", auth: "Pública", request: "—", response: "{ ok, config }" },
       { method: "GET/POST", path: "/api/exit-intents", resumen: "Campañas de exit-intent activas para la web general.", auth: "Pública (lectura)", request: "—", response: "{ ok, config }" },
@@ -268,7 +266,7 @@ export const WEBHOOKS: WebhookDoc[] = [
     endpoint: "/api/manychat/salud-quote · /salud-coverages · /cliente · /llamadas/[id]",
     resumen: "ManyChat llama a estos endpoints como paso \"External Request\" de sus flows para tarificar salud en tiempo real, pedir coberturas, reconocer a un cliente existente y cancelar/reprogramar llamadas — todo dentro de la conversación de WhatsApp.",
     payload: 'JSON escalar (sin arrays anidados) para pegar cada campo en un custom field de ManyChat.',
-    seguridad: "Cabecera estática x-manychat-secret = MANYCHAT_WEBHOOK_SECRET (timing-safe; ManyChat no soporta firma HMAC). Idempotencia en la acción de llamadas. Exentos del bloqueo global de la web.",
+    seguridad: "Cabecera estática x-manychat-secret = MANYCHAT_WEBHOOK_SECRET (timing-safe; ManyChat no soporta firma HMAC). Idempotencia en la acción de llamadas.",
   },
   {
     direccion: "entrante",

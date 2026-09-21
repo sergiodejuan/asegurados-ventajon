@@ -129,7 +129,7 @@ export const DATA_MODEL: DataGroup[] = [
       { clave: "landings:all · landing:price-match · landing:referral · landing:lp-salud", tipo: "JSON", forma: "Landings de pago /lp/[slug] + singletons de price-match y referidos", ttl: "—", para: "Editor de landings sin desplegar" },
       { clave: "campaign:home · exitintent:general · inactivity_modal:comparativa", tipo: "JSON", forma: "Slides de campaña, campañas de exit-intent y modal de inactividad", ttl: "—", para: "CRO configurable" },
       { clave: "theme:site", tipo: "JSON", forma: "colores, fuentes, logos, favicon, heroImages, partnerLogos, cookies, GA4, Meta Pixel, GTM, loader, homeHero", ttl: "—", para: "Tema/diseño del sitio (/admin/diseno)" },
-      { clave: "config:team-notifications · siteAccess:config · brand_hidden:{ramo}", tipo: "JSON", forma: "avisos al equipo; bloqueo global (enabled, passwordHash); marcas ocultas por ramo", ttl: "—", para: "Configuración de operación y comparativa" },
+      { clave: "config:team-notifications · brand_hidden:{ramo}", tipo: "JSON", forma: "avisos al equipo; marcas ocultas por ramo", ttl: "—", para: "Configuración de operación y comparativa" },
     ],
   },
   {
@@ -165,7 +165,7 @@ export const SECURITY_POLICIES: SecCategory[] = [
   {
     categoria: "Sesiones (cookies firmadas HMAC)",
     medidas: [
-      { titulo: "Tres dominios con secretos aislados", detalle: "ventajon_agent_session (ADMIN_SESSION_SECRET), ventajon_client_session (CLIENT_SESSION_SECRET), site_access (SITE_ACCESS_SECRET). Compromiso de uno NO arrastra a los demás." },
+      { titulo: "Dos dominios con secretos aislados", detalle: "ventajon_agent_session (ADMIN_SESSION_SECRET) y ventajon_client_session (CLIENT_SESSION_SECRET). Compromiso de uno NO arrastra al otro." },
       { titulo: "Flags y formato", detalle: "HttpOnly, Secure (prod), SameSite=Lax, Path=/. Formato payload.HMAC; validación con timingSafeEqual y exp (caducidad sin pegar a KV)." },
       { titulo: "Secretos obligatorios en producción", detalle: "Si falta un *_SESSION_SECRET (≥32 chars) el subsistema lanza; se rechaza explícitamente reutilizar ADMIN_TOKEN como fallback." },
     ],
@@ -206,7 +206,7 @@ export const SECURITY_POLICIES: SecCategory[] = [
     medidas: [
       { titulo: "Tokens HMAC-SHA256", detalle: "Quote (QUOTE_TOKEN_SECRET, TTL 30 días), referral opt-in (REFERRAL_TOKEN_SECRET, TTL 14 días). timingSafeEqual + exp. Fail-closed en prod." },
       { titulo: "Verificación de área de cliente", detalle: "Token aleatorio de 24 bytes, single-use (se borra al leer, también anti-timing), TTL 30 min. Enviado a página intermedia para que el escaneo de enlaces de Gmail/Outlook no lo consuma." },
-      { titulo: "Contraseñas", detalle: "scrypt nativo, sal aleatoria de 16 bytes por contraseña, formato salt:hash, verificación timingSafeEqual. Reglas duras para el bloqueo global (≥14 chars, mayús/minús/dígito/símbolo)." },
+      { titulo: "Contraseñas", detalle: "scrypt nativo, sal aleatoria de 16 bytes por contraseña, formato salt:hash, verificación timingSafeEqual." },
     ],
   },
   {
@@ -353,7 +353,6 @@ export const ENV_GROUPS: EnvGroup[] = [
       { nombre: "ADMIN_TOKEN", para: "Token maestro de /admin (sin él, /api/admin/* → 503)", obligatoria: "Sí", secreta: true },
       { nombre: "ADMIN_SESSION_SECRET", para: "Firma cookies de sesión de agente (fail-closed, ≥32 chars)", obligatoria: "Sí (login agentes)", secreta: true },
       { nombre: "CLIENT_SESSION_SECRET", para: "Firma cookies del área de cliente (fail-closed)", obligatoria: "Sí (área cliente)", secreta: true },
-      { nombre: "SITE_ACCESS_SECRET", para: "Firma la cookie del bloqueo global (lanza si <32 chars cuando el gate está activo)", obligatoria: "Sí si se usa el gate", secreta: true },
       { nombre: "QUOTE_TOKEN_SECRET", para: "HMAC de los enlaces firmados a /comparativa (WhatsApp) e hydrate-quote", obligatoria: "Sí (comparativa por WhatsApp)", secreta: true },
       { nombre: "REFERRAL_TOKEN_SECRET", para: "HMAC del doble opt-in de referidos", obligatoria: "Sí (referidos)", secreta: true },
       { nombre: "PDF_WATERMARK_SECRET", para: "Marca de agua HMAC en PDFs de presupuesto (si falta, marca vacía)", obligatoria: "Opcional", secreta: true },
@@ -426,8 +425,8 @@ export type ChecklistPhase = { fase: string; items: string[] };
 export const MIGRATION_CHECKLIST: ChecklistPhase[] = [
   { fase: "1. Servidor", items: ["Node 20 LTS + npm; clonar repo; npm ci.", "Proceso gestionado (systemd/PM2) para next start; reverse proxy (nginx/Caddy) con TLS y proxy_read_timeout ≥ 65s."] },
   { fase: "2. Almacén (lo primero y más crítico)", items: ["Decidir Upstash gestionado (recomendado) o Redis propio + proxy REST con soporte EVAL.", "EXPORTAR los datos del KV actual e IMPORTARLOS al nuevo (todas las claves lead:*, idx:*, *:index, products:all, etc.).", "Verificar con /admin/integraciones → «Probar conexión» (round-trip real de escritura+lectura)."] },
-  { fase: "3. Variables de entorno", items: ["Almacén + NEXT_PUBLIC_SITE_URL.", "Generar secretos (openssl rand -base64 32): ADMIN_TOKEN, *_SESSION_SECRET, *_TOKEN_SECRET, SITE_ACCESS_SECRET, CRON_SECRET, MANYCHAT_WEBHOOK_SECRET, BLAND_WEBHOOK_SECRET.", "Si ya había sesiones o enlaces firmados en producción, reusar los mismos secretos que en Vercel para no invalidar cookies ni enlaces ya emitidos.", "Integraciones que se quieran activas (CODESCOPIC_*, RESEND, MANYCHAT, RETELL/BLAND, META_CAPI, TURNSTILE, VAPID, TREMENDOUS)."] },
-  { fase: "4. Build y arranque", items: ["npm run typecheck → npm run build → npm run start.", "Confirmar que el middleware corre bien en Node (gate de acceso, cabeceras COOP/CORP en /api/*)."] },
+  { fase: "3. Variables de entorno", items: ["Almacén + NEXT_PUBLIC_SITE_URL.", "Generar secretos (openssl rand -base64 32): ADMIN_TOKEN, *_SESSION_SECRET, *_TOKEN_SECRET, CRON_SECRET, MANYCHAT_WEBHOOK_SECRET, BLAND_WEBHOOK_SECRET.", "Si ya había sesiones o enlaces firmados en producción, reusar los mismos secretos que en Vercel para no invalidar cookies ni enlaces ya emitidos.", "Integraciones que se quieran activas (CODESCOPIC_*, RESEND, MANYCHAT, RETELL/BLAND, META_CAPI, TURNSTILE, VAPID, TREMENDOUS)."] },
+  { fase: "4. Build y arranque", items: ["npm run typecheck → npm run build → npm run start.", "Confirmar que el middleware corre bien en Node (CSRF de mutaciones admin/cliente y cabeceras COOP/CORP en /api/*)."] },
   { fase: "5. Crons del sistema", items: ["Dos entradas (retención 03:00 UTC, referidos 04:00 UTC) con Authorization: Bearer $CRON_SECRET.", "Probar a mano que devuelven { ok: true } y no 401/503."] },
   { fase: "6. DNS / dominio", items: ["Apuntar el dominio real al servidor; TLS válido (el sitio fuerza HSTS preload).", "NEXT_PUBLIC_SITE_URL debe coincidir exactamente con el dominio servido."] },
   { fase: "7. Reapuntar webhooks entrantes", items: ["Retell → /api/retell/webhook; Bland → /api/bland/webhook; ManyChat (External Requests) → /api/manychat/*.", "Meta CAPI: verificar dominio si aplica. Estos endpoints están exentos del gate global y del CSRF por diseño."] },
