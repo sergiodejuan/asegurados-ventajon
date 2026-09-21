@@ -1,6 +1,6 @@
 "use client";
 
-import { BRAND_NAME, CONTACT_HOURS } from "@/lib/brand";
+import { BRAND_NAME, CONTACT_HOURS, DGSFP_KEY, LEGAL_CIF, LEGAL_NAME } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
 import { GEO_LANDING_PAGES } from "@/lib/geoLandingPages";
 import { useSiteTheme } from "@/lib/useTheme";
@@ -17,7 +17,8 @@ export function Footer() {
             <Wordmark logoUrl={theme.logoUrl} />
             <p className="mt-2 text-[13px] leading-relaxed text-slate2 md:max-w-sm">Correduría de seguros. Trabajamos en toda España. Atención {CONTACT_HOURS}.</p>
             <p className="mt-2 text-[12px] leading-relaxed text-slate2 md:max-w-sm">
-              Datos identificativos, inscripción en el registro de la DGSFP y política de privacidad completa en{" "}
+              <span translate="no">{LEGAL_NAME}</span> · CIF <span translate="no">{LEGAL_CIF}</span> ·
+              Clave DGSFP <span translate="no">{DGSFP_KEY}</span>. Política de privacidad completa en{" "}
               <a href="/legal" className="font-semibold text-navy underline">información legal</a>.
             </p>
           </div>
@@ -62,7 +63,7 @@ export function Footer() {
             </ul>
           </nav>
         </div>
-        <p className="mt-8 text-[12px] text-slate2">© {year} {BRAND_NAME}</p>
+        <p className="mt-8 text-[12px] text-slate2">© {year} <span translate="no">{LEGAL_NAME}</span> — {BRAND_NAME}</p>
       </div>
     </footer>
   );

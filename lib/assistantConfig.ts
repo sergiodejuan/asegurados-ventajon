@@ -30,8 +30,18 @@ const EXCLUDED_PREFIXES = [
   "/comparativa",
 ];
 
-export function isAssistantAllowed(pathname: string): boolean {
-  return !EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+// Las páginas de embudo propias de CUALQUIER landing paid (wizard y "que me
+// llamen", ver app/lp/[slug]/tarificador y /llamada) son de por sí un funnel
+// de captura — no queremos que el asistente compita con el CTA principal,
+// sea cual sea el slug. La landing /lp/[slug] en sí NO se excluye aquí: eso
+// lo decide admin desde su editor por landing (hideAssistant).
+const LP_FUNNEL_SUBPATH = /^\/lp\/[^/]+\/(tarificador|llamada)(\/|$)/;
+
+export function isAssistantAllowed(pathname: string, extraExcludedPaths: string[] = []): boolean {
+  if (EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  if (LP_FUNNEL_SUBPATH.test(pathname)) return false;
+  if (extraExcludedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  return true;
 }
 
 const DEFAULT_CONTEXT: AssistantContext = {

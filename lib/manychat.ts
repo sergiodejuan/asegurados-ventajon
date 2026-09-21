@@ -7,22 +7,20 @@ import { quoteNumber } from "./quote";
 // y una etiqueta por origen — así conviven en la misma base que los leads que
 // ya te llegan por Meta Ads, y puedes lanzarles la misma secuencia de
 // WhatsApp o incluirlos en audiencias de Meta sin duplicar trabajo.
-//
 // Variables de entorno (Vercel → Environment Variables):
-//   MANYCHAT_API_TOKEN — token de API del bot (ManyChat → Configuración → API).
-//     Sin ella, la sincronización queda desactivada sin más (el resto del alta
-//     del lead sigue funcionando con normalidad).
-//   MANYCHAT_THANKYOU_FLOW_NS — (opcional) el "flow_ns" de un Flow de ManyChat
-//     que envía la plantilla de WhatsApp de agradecimiento/resumen. Sin esta
-//     variable, simplemente no se dispara ningún mensaje de WhatsApp (el resto
-//     de la sincronización sigue funcionando igual).
-//   MANYCHAT_VERIFICATION_FLOW_NS — (opcional) el "flow_ns" de un Flow que
-//     manda el enlace de un solo uso para entrar al área de cliente (ver
-//     sendManychatVerificationLink más abajo y lib/clientVerification.ts).
-//     Sin esta variable, el botón "reenviar por WhatsApp" del área de
-//     cliente no puede completarse (sigue funcionando por email igual).
-//
-// ⚠️ Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
+// MANYCHAT_API_TOKEN — token de API del bot (ManyChat → Configuración → API).
+// Sin ella, la sincronización queda desactivada sin más (el resto del alta
+// del lead sigue funcionando con normalidad).
+// MANYCHAT_THANKYOU_FLOW_NS — (opcional) el "flow_ns" de un Flow de ManyChat
+// que envía la plantilla de WhatsApp de agradecimiento/resumen. Sin esta
+// variable, simplemente no se dispara ningún mensaje de WhatsApp (el resto
+// de la sincronización sigue funcionando igual).
+// MANYCHAT_VERIFICATION_FLOW_NS — (opcional) el "flow_ns" de un Flow que
+// manda el enlace de un solo uso para entrar al área de cliente (ver
+// sendManychatVerificationLink más abajo y lib/clientVerification.ts).
+// Sin esta variable, el botón "reenviar por WhatsApp" del área de
+// cliente no puede completarse (sigue funcionando por email igual).
+// Antes de activarlo, crea en ManyChat (Configuración → Campos personalizados)
 // los campos de texto: nombre, telefono, producto, email, codigo_postal,
 // precio_aprox, id_presupuesto, servicio_adicional, utm_source, utm_campaign,
 // utm_medium, fuente_web, link_verificacion — la API de ManyChat no crea campos
@@ -33,16 +31,14 @@ import { quoteNumber } from "./quote";
 // número ya existía como suscriptor (típico si venía de Meta Ads), ManyChat
 // no lo actualiza, así que el nombre del tarificador se guarda siempre como
 // este campo personalizado en vez de depender de eso.
-//
-// ⚠️ Para el mensaje de agradecimiento con el resumen: WhatsApp exige que un
+// Para el mensaje de agradecimiento con el resumen: WhatsApp exige que un
 // mensaje que abre conversación (el lead no te ha escrito antes) use una
 // plantilla aprobada por Meta, no texto libre. Los pasos son: 1) crear en
 // ManyChat una plantilla de WhatsApp con placeholders (p.ej. usando los campos
 // producto/precio_aprox/codigo_postal ya sincronizados) y esperar su
 // aprobación por Meta; 2) crear un Flow en ManyChat que envíe esa plantilla;
 // 3) copiar el flow_ns de ese Flow y ponerlo en MANYCHAT_THANKYOU_FLOW_NS.
-//
-// ⚠️ Limitación conocida y confirmada de la API de ManyChat: si el número de
+// Limitación conocida y confirmada de la API de ManyChat: si el número de
 // WhatsApp ya existía como suscriptor antes de pasar por la web (típico si
 // venía de una campaña de Meta Ads), createSubscriber devuelve un error de
 // "ya existe" y no hay ningún endpoint público fiable para recuperar su id a
@@ -150,7 +146,7 @@ async function createSubscriber(toNumber: string, nombre: string): Promise<{ ok:
 // ManyChat responde que ya existe pero no lo habíamos encontrado por
 // "phone" (típico de contactos que llegaron por Meta Ads con solo
 // "whatsapp_phone" relleno), no hay forma fiable de recuperar su id por API
-// — limitación documentada de ManyChat, no un fallo de este código — así
+// limitación documentada de ManyChat, no un fallo de este código — así
 // que se registra el motivo en el log y esa sincronización concreta se
 // salta, sin bloquear el alta del lead en el resto del sistema.
 async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise<{ ok: boolean; subscriberId?: string; error?: string }> {
@@ -171,7 +167,12 @@ async function findOrCreateSubscriber(toNumber: string, nombre: string): Promise
   return created;
 }
 
-async function setCustomField(subscriberId: string, fieldName: string, fieldValue: string): Promise<void> {
+async function setCustomField(subscriberId: string, fieldName: string, fieldValue: string | number): Promise<void> {
+  // ManyChat valida el tipo del campo: a un campo "number" hay que mandarle un
+  // número JSON (no un string), o responde 400 "Value for number custom field
+  // should be integer or float". Por eso field_value acepta string | number y
+  // los campos numéricos (telefono, codigo_postal, precio_aprox) se envían ya
+  // como número desde syncManychatLead.
   const result = await manychatFetch("/fb/subscriber/setCustomFieldByName", {
     subscriber_id: subscriberId,
     field_name: fieldName,
@@ -196,7 +197,7 @@ async function triggerFlow(subscriberId: string, flowNs: string): Promise<{ ok: 
 // Envía un mensaje de texto libre por WhatsApp a un suscriptor ya existente
 // (o lo crea si hace falta) usando el endpoint sendContent de ManyChat —
 // para el botón "Enviar por ManyChat" del seguimiento de presupuestos en
-// admin. ⚠️ Igual que cualquier envío directo de WhatsApp Business, solo
+// admin. Igual que cualquier envío directo de WhatsApp Business, solo
 // funciona dentro de la ventana de 24h desde el último mensaje del cliente:
 // fuera de esa ventana, WhatsApp exige una plantilla aprobada por Meta (ver
 // triggerFlow más arriba) y esta llamada devolverá el error que ManyChat
@@ -224,9 +225,9 @@ export async function sendManychatWhatsAppText(toNumber: string, nombre: string,
 // su último mensaje, no vale texto libre — hace falta una plantilla
 // aprobada por Meta, disparada como Flow. Configuración necesaria en
 // ManyChat antes de que esto funcione:
-//   1. Campo personalizado de texto "link_verificacion".
-//   2. Plantilla de WhatsApp con el placeholder de ese campo, aprobada por Meta.
-//   3. Un Flow que envíe esa plantilla; copia su flow_ns en MANYCHAT_VERIFICATION_FLOW_NS.
+// 1. Campo personalizado de texto "link_verificacion".
+// 2. Plantilla de WhatsApp con el placeholder de ese campo, aprobada por Meta.
+// 3. Un Flow que envíe esa plantilla; copia su flow_ns en MANYCHAT_VERIFICATION_FLOW_NS.
 // Sin MANYCHAT_VERIFICATION_FLOW_NS (o sin MANYCHAT_API_TOKEN), no-op: el
 // botón de "reenviar por WhatsApp" del área de cliente mostrará que no se
 // pudo enviar, sin afectar al resto de la sincronización con ManyChat.
@@ -246,7 +247,8 @@ export async function syncManychatLead(opts: {
   source: string; // p.ej. "tarificador-salud", "quiero-que-me-llamen"
   producto?: string;
   email?: string;
-  codigoPostal?: string;
+  codigoPostal?: string; // etiqueta de zona (p.ej. "Islas Canarias") — NO es el CP
+  codigoPostalReal?: string; // CP real de 5 dígitos, el que va al campo numérico
   precioAprox?: number | null;
   presupuestoId?: string | null;
   servicioAdicional?: string;
@@ -258,13 +260,21 @@ export async function syncManychatLead(opts: {
   if (!created.ok || !created.subscriberId) return { ok: false, error: created.error };
   const id = created.subscriberId;
 
-  const fields: [string, string | undefined][] = [
+  // Campos numéricos de ManyChat (telefono, codigo_postal, precio_aprox) van
+  // como número. El teléfono se manda en 9 dígitos españoles (sin +34, que no
+  // es entero); el CP real de 5 dígitos (no la etiqueta de zona). Aviso: un CP
+  // con cero inicial (Baleares 07xxx) pierde el cero al ser numérico — si
+  // necesitas el CP exacto, cambia ese campo a "Texto" en ManyChat.
+  const telDigits = toE164Spain(opts.toNumber).replace(/\D/g, "").replace(/^34/, "");
+  const telefonoNum = /^[0-9]{9}$/.test(telDigits) ? Number(telDigits) : undefined;
+  const cpNum = opts.codigoPostalReal && /^[0-9]{5}$/.test(opts.codigoPostalReal) ? Number(opts.codigoPostalReal) : undefined;
+  const fields: [string, string | number | undefined][] = [
     ["nombre", opts.nombre],
-    ["telefono", toE164Spain(opts.toNumber)],
+    ["telefono", telefonoNum],
     ["producto", opts.producto],
     ["email", opts.email],
-    ["codigo_postal", opts.codigoPostal],
-    ["precio_aprox", opts.precioAprox != null ? String(Math.round(opts.precioAprox)) : undefined],
+    ["codigo_postal", cpNum],
+    ["precio_aprox", opts.precioAprox != null ? Math.round(opts.precioAprox) : undefined],
     ["id_presupuesto", opts.presupuestoId ? quoteNumber(opts.presupuestoId) : undefined],
     ["servicio_adicional", opts.servicioAdicional],
     ["utm_source", opts.utm?.source],
@@ -279,7 +289,7 @@ export async function syncManychatLead(opts: {
     console.error(`[manychat] precio_aprox no disponible para source=${opts.source} — revisa que haya un producto activo con precio en /admin/productos.`);
   }
   for (const [name, value] of fields) {
-    if (value) await setCustomField(id, name, value);
+    if (value !== undefined && value !== "") await setCustomField(id, name, value);
   }
 
   await addTag(id, `web-${opts.source}`);

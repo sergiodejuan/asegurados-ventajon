@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
-import { BRAND_NAME } from "@/lib/brand";
-import { getTheme } from "@/lib/store";
+import { BRAND_NAME, SITE_URL } from "@/lib/brand";
+import { getTheme, listLandings, getPriceMatchLandingConfig } from "@/lib/store";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, findFont } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
@@ -13,6 +13,9 @@ import { PageTransitionLoader } from "@/components/PageTransitionLoader";
 import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import { GeneralExitIntentModal } from "@/components/GeneralExitIntentModal";
+import { InactivityModal } from "@/components/InactivityModal";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -38,14 +41,18 @@ export const revalidate = 30;
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getTheme();
   return {
-    title: `Seguro de salud — ${BRAND_NAME}`,
+    // Sin esto, los canonical y openGraph.url relativos (ver las páginas de
+    // producto y home) no se resuelven a URL absoluta — necesario para que
+    // buscadores y redes sociales los interpreten bien.
+    metadataBase: new URL(SITE_URL),
+    title: `${BRAND_NAME} | Compara seguros y paga menos`,
     description:
-      "Comparamos tu seguro de salud entre las mejores compañías para que pagues lo justo. Sin trucos, sin letra pequeña.",
+      "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña. Calcula tu precio.",
     robots: { index: true, follow: true },
     openGraph: {
-      title: `Seguro de salud — ${BRAND_NAME}`,
+      title: `${BRAND_NAME} | Compara seguros y paga menos`,
       description:
-        "Comparamos tu seguro de salud entre las mejores compañías para que pagues lo justo.",
+        "Correduría online que compara salud, vida, decesos, hogar y auto entre las mejores aseguradoras de España. Sin coste, sin letra pequeña.",
       locale: "es_ES",
       type: "website",
     },
@@ -65,7 +72,19 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const theme = await getTheme();
+  // Cargamos las configs en paralelo. Las landings paid (ahora una colección,
+  // no un único doc) se leen aquí para saber cuáles tienen hideAssistant
+  // activado — si sí, añadimos su ruta a la lista de rutas donde el widget
+  // flotante no debe aparecer.
+  const [theme, landings, priceMatch] = await Promise.all([
+    getTheme(),
+    listLandings().catch(() => []),
+    getPriceMatchLandingConfig().catch(() => null),
+  ]);
+  const assistantExtraExcluded: string[] = [];
+  for (const l of landings) if (l.hideAssistant) assistantExtraExcluded.push(`/lp/${l.slug}`);
+  if (priceMatch?.hideAssistant) assistantExtraExcluded.push("/precio-mejor-garantizado");
+
   const displayFont = findFont(DISPLAY_FONT_OPTIONS, theme.displayFont);
   const bodyFont = findFont(BODY_FONT_OPTIONS, theme.bodyFont);
   const googleFontFamilies = [displayFont.google, bodyFont.google].filter(Boolean);
@@ -107,10 +126,15 @@ export default async function RootLayout({
           {children}
           <Analytics />
           <PageTransitionLoader />
-          <AssistantWidget />
+          <AssistantWidget extraExcludedPaths={assistantExtraExcluded} />
           <AccessibilityWidget />
           <GeneralExitIntentModal />
+          <InactivityModal />
           <CookieConsentBanner />
+          {/* Analítica de Vercel (solo reporta al desplegar en Vercel; en un
+              servidor propio es inerte, no molesta). */}
+          <VercelAnalytics />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>

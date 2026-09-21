@@ -4,7 +4,6 @@
 // y aplicadas vía atributos data-* en <html> + reglas CSS en globals.css —
 // mismo patrón que el resto de theming del sitio (variables CSS), para no
 // tocar ni un componente existente.
-//
 // El tamaño de texto usa la propiedad CSS "zoom" en <body> en vez de
 // cambiar el font-size raíz: la mayoría de textos del sitio usan clases
 // Tailwind con píxeles fijos (text-[14px]), que no reaccionan a cambios de

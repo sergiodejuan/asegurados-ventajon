@@ -11,6 +11,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { callTriggerRateLimitFail, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { promotionSourceFromUtm } from "@/lib/promotions";
+import { notifyTeamNewLead } from "@/lib/notifyTeam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,9 @@ export async function POST(request: Request) {
   // página normal: se distingue en el source para poder medirlo aparte. Si
   // viene con el UTM de una promoción, esa fuente pesa más (ver /api/lead).
   const source = promotionSourceFromUtm(d.utm) ??
-    (d.origen === "asistente" ? "quiero-que-me-llamen-widget" : "quiero-que-me-llamen");
+    (d.origen === "asistente" ? "quiero-que-me-llamen-widget"
+    : d.origen === "lp-salud" || d.origen === "lp" ? "quiero-que-me-llamen-lp"
+    : "quiero-que-me-llamen");
 
   const consent = buildConsent(request, source, "/quiero-que-me-llamen",
     { privacidad: d.aceptaPrivacidad, contacto: d.autorizaContacto, comercial: d.aceptaComercial },
@@ -48,7 +51,7 @@ export async function POST(request: Request) {
       nombre: d.nombre, telefono: d.telefono, codigoPostal: d.codigoPostal, producto: d.producto,
       diaLlamada: d.diaLlamada, turnoLlamada: d.turnoLlamada, presupuestoId: d.presupuestoId,
       aceptaPrivacidad: d.aceptaPrivacidad, autorizaContacto: d.autorizaContacto, aceptaComercial: d.aceptaComercial,
-      utm: d.utm,
+      utm: d.utm, landingSlug: d.landingSlug,
     },
     source,
     consent
@@ -128,12 +131,19 @@ export async function POST(request: Request) {
     if (!sync.ok) console.error("[call-request] manychat sync error", sync.error);
   }
 
-  // Ver comentario equivalente en app/api/lead/route.ts. Este formulario no
+  // Este formulario no
   // pide email (solo teléfono): si la ficha existente no tiene uno guardado
   // de un envío anterior, sendAreaClienteVerificationEmail no hace nada — no
   // se concede sesión, lo cual es el comportamiento seguro por defecto.
   if (deduped) await sendAreaClienteVerificationEmail(id);
   else setClientSessionCookie(id);
+
+  await notifyTeamNewLead({
+    leadId: id, source, presupuestoId: d.presupuestoId,
+    aceptaComercial: d.aceptaComercial,
+    extraNote: d.detalleConsulta,
+  }).catch((err) => console.error("[call-request] notifyTeam error", err));
+
   return NextResponse.json({ ok: true, id, deduped });
 }
 

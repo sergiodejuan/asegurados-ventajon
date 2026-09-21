@@ -19,6 +19,7 @@ export function VerificarAccesoContent() {
   const searchParams = useSearchParams();
   const theme = useSiteTheme();
   const token = searchParams.get("token") ?? "";
+  const next = searchParams.get("next") ?? "";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,11 @@ export function VerificarAccesoContent() {
         setLoading(false);
         return;
       }
-      router.push("/area-cliente?verificado=1");
+      // Whitelist de prefijo: "next" viene de un query param del propio
+      // enlace de verificación, así que se valida que apunte al área de
+      // cliente antes de redirigir, para no abrir la puerta a un
+      // open-redirect si alguien manipulase el enlace.
+      router.push(next.startsWith("/area-cliente") ? next : "/area-cliente?verificado=1");
     } catch {
       setError("Error de conexión. Inténtalo de nuevo.");
       setLoading(false);

@@ -6,6 +6,7 @@ import { FaqCategoryTabs, type FaqCategory } from "@/components/FaqCategoryTabs"
 import { WhatsApp } from "@/components/icons";
 import { BRAND_NAME, SITE_URL, WHATSAPP_URL_GENERIC } from "@/lib/brand";
 import { PRODUCT_PAGES } from "@/lib/productPages";
+import { safeJsonLd } from "@/lib/safeJsonLd";
 
 const TITLE = `Preguntas frecuentes — ${BRAND_NAME}`;
 const DESCRIPTION =
@@ -129,7 +130,7 @@ export default function PreguntasFrecuentesPage({ searchParams }: { searchParams
   return (
     <>
       {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <Header />
       <main id="contenido">
         <section className="mx-auto max-w-app px-5 pt-8 md:max-w-3xl md:pt-14">

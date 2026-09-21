@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AdminShell, useAdminToken } from "@/components/admin/AdminShell";
-import { DEFAULT_THEME, type SiteTheme } from "@/lib/theme";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { SaveBar } from "@/components/admin/SaveBar";
+import { useThemeSection } from "@/components/admin/useThemeSection";
 
 export default function AdminAnaliticaPage() {
   return (
@@ -13,45 +13,7 @@ export default function AdminAnaliticaPage() {
 }
 
 function AnaliticaAdmin() {
-  const { token } = useAdminToken();
-  const [theme, setTheme] = useState<SiteTheme>(DEFAULT_THEME);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch("/api/admin/theme", { headers: { "x-admin-token": token } });
-      const body = await res.json();
-      if (!res.ok || !body.ok) { setError(body.error ?? "Error al cargar."); setLoading(false); return; }
-      setTheme(body.theme);
-    } catch { setError("Error de conexión."); }
-    setLoading(false);
-  }, [token]);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function save() {
-    setSaving(true); setSaved(false); setError(null);
-    try {
-      const res = await fetch("/api/admin/theme", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-token": token },
-        body: JSON.stringify({ gtmId: theme.gtmId, ga4: theme.ga4, metaPixel: theme.metaPixel }),
-      });
-      const body = await res.json();
-      if (res.ok && body.ok) {
-        setTheme(body.theme);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1800);
-      } else {
-        setError(body.error ?? "No se pudo guardar.");
-      }
-    } catch { setError("Error de conexión."); }
-    setSaving(false);
-  }
+  const { theme, setTheme, loading, saving, saved, error, save } = useThemeSection();
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-6 pb-24">
@@ -166,14 +128,8 @@ function AnaliticaAdmin() {
         </div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-hair bg-white/95 px-5 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-end gap-3">
-          <button onClick={save} disabled={saving || loading}
-            className="flex items-center justify-center rounded-card bg-navy px-6 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-navy-deep disabled:bg-slate2/40">
-            {saving ? "Guardando…" : saved ? "Guardado ✓" : "Guardar cambios"}
-          </button>
-        </div>
-      </div>
+      <SaveBar saving={saving} saved={saved} disabled={loading}
+        onSave={() => save({ gtmId: theme.gtmId, ga4: theme.ga4, metaPixel: theme.metaPixel })} />
     </main>
   );
 }

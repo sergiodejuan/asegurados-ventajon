@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { updateLead } from "@/lib/store";
+import { updateLead, claimOnce } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,16 +35,30 @@ export async function POST(request: Request) {
   const raw = await request.text();
 
   const secret = process.env.BLAND_WEBHOOK_SECRET;
-  if (secret) {
-    const sig = request.headers.get("x-webhook-signature");
-    if (!verifySignature(raw, sig, secret)) {
-      return NextResponse.json({ ok: false, error: "Firma no válida." }, { status: 401 });
-    }
+  // Fail-closed: sin BLAND_WEBHOOK_SECRET rechazamos cualquier evento
+  // entrante para no aceptar inyecciones de actividad no firmadas (X-05).
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "Verificación de firma no configurada (BLAND_WEBHOOK_SECRET)." }, { status: 503 });
+  }
+  const sig = request.headers.get("x-webhook-signature");
+  if (!verifySignature(raw, sig, secret)) {
+    return NextResponse.json({ ok: false, error: "Firma no válida." }, { status: 401 });
   }
 
   let body: BlandEvent;
   try { body = JSON.parse(raw); }
   catch { return NextResponse.json({ ok: false, error: "Cuerpo no válido." }, { status: 400 }); }
+
+  // Idempotencia: Bland puede reintentar el mismo evento si nuestra respuesta
+  // falla o tarda; deduplicamos por call_id + status para no doblar la entrada
+  // de actividad en la ficha del lead. Ventana 15 min > ventana de firma.
+  const callId = body.call_id ?? "";
+  const kind = body.status ?? (body.completed ? "completed" : "unknown");
+  if (callId) {
+    const idemKey = `idem:bland:${kind}:${callId}`;
+    const first = await claimOnce(idemKey, 15 * 60 * 1000).catch(() => true);
+    if (!first) return NextResponse.json({ ok: true, duplicate: true });
+  }
 
   const leadId = body.metadata?.leadId;
   if (typeof leadId === "string") {

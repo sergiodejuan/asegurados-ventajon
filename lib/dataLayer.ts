@@ -3,7 +3,6 @@
 // punto de disparo para toda la web (ya se llama desde CallRequestForm,
 // StepForm, Header, etc.) evita tener que tocar cada componente cuando se
 // añade un nuevo destino de analítica.
-//
 // Funciona aunque ninguno de los tres esté cargado todavía (o el visitante
 // no haya dado su consentimiento): dataLayer.push es seguro siempre, y
 // gtag()/fbq() sencillamente no existen como funciones globales hasta que

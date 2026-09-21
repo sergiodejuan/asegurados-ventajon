@@ -4,7 +4,6 @@
 // Cada una embebe el tarificador completo y una calculadora de ahorro en la
 // misma página (ver components/SeoLandingPage.tsx), sin enlazar a otra URL
 // para completar el proceso.
-//
 // "priceMode" resuelve el precio que se muestra: "fixed" usa el dato de
 // referencia dado por Sergio para Canarias (35 €/mes por asegurado, con
 // todas las coberturas); "dynamic" calcula el precio real más bajo entre
@@ -30,7 +29,7 @@ export type SeoLandingPageData = {
   subheadline: string;
   // Caja de "respuesta rápida" justo bajo el hero: 2-3 frases que responden
   // directamente a la pregunta principal de la página, en el formato que
-  // motores de respuesta (Google SGE, Perplexity, ChatGPT…) suelen citar
+  // motores de respuesta (Google SGE, Perplexity, …) suelen citar
   // literalmente. "{precio}" se sustituye por el precio ya resuelto.
   quickAnswerTemplate: string;
   priceMode: PriceMode;

@@ -1,23 +1,92 @@
-/**
- * Configuración central de marca y contenido.
- *
- * ⚠️ DECISIÓN PENDIENTE (Sergio): el nombre.
- * Memoria de marca: «Asegurados Ventajon» (sin tilde). Estrategia: «Asegurados Ventajón».
- * Por defecto SIN tilde. Cambia solo esta línea si Gabriel confirma la forma acentuada.
- */
+// Configuración central de marca y contenido.
+// Pendiente el nombre: memoria de marca «Asegurados Ventajon» (sin tilde),
+// estrategia «Asegurados Ventajón». Por defecto sin tilde; cambia solo esta
+// línea si se confirma la forma acentuada.
 export const BRAND_NAME = "Asegurados Ventajon";
 
-// Dominio absoluto para JSON-LD (url, breadcrumbs) en las landings SEO.
-// ⚠️ PENDIENTE (Sergio): confirma el dominio de producción definitivo con
-// NEXT_PUBLIC_SITE_URL — mientras tanto usa el dominio de Vercel visto en
-// los despliegues de este PR.
+/* ------------------------- Identidad fiscal y registral ------------------
+ * Datos oficiales de la correduría que titulan el sitio y aparecen en el
+ * aviso legal, el JSON-LD de organización y allí donde la ley obliga a
+ * identificarnos (art. 10 LSSI-CE, RD-ley 3/2020 de distribución de
+ * seguros). BRAND_NAME es la marca comercial; LEGAL_NAME es la razón
+ * social — no se pueden intercambiar en el aviso legal.
+ */
+export const LEGAL_NAME = "Ventajon Asegurados, S.L.";
+export const LEGAL_CIF = "B35064799";
+// Clave DGSFP de correduría. Se consulta en sedeelectronica.dgsfp.mineco.es.
+export const DGSFP_KEY = "J-2921";
+export const LEGAL_ADDRESS = {
+  street: "Autovía Las Palmas-Gando Km 12",
+  postalCode: "35219",
+  city: "Telde",
+  province: "Las Palmas",
+  country: "España",
+};
+export const LEGAL_ADDRESS_ONELINE =
+  `${LEGAL_ADDRESS.street}, ${LEGAL_ADDRESS.postalCode} ${LEGAL_ADDRESS.city}, ${LEGAL_ADDRESS.province}`;
+// CNAE 6622 — Actividades de agentes y corredores de seguros.
+export const LEGAL_CNAE = "6622";
+export const LEGAL_ACTIVITY = "Correduría de seguros";
+
+// Email oficial de atención al cliente. También canaliza las bajas del
+// contacto comercial y las reclamaciones previas al Servicio de
+// Reclamaciones de la DGSFP (ver /legal).
+export const CUSTOMER_SUPPORT_EMAIL = "atencion@ventajon.com";
+
+// Inscripción registral vigente en el Registro Mercantil de Las Palmas
+// (última inscripción 17ª de 15/01/2025 sobre la Hoja GC-5032). Se muestra
+// literal en el aviso legal (art. 10 LSSI-CE).
+export const REGISTRO_MERCANTIL = {
+  provincia: "Las Palmas",
+  tomo: "1331",
+  libro: "0",
+  folio: "103",
+  hoja: "GC-5032",
+  seccion: "8",
+};
+export const REGISTRO_MERCANTIL_ONELINE =
+  `Registro Mercantil de ${REGISTRO_MERCANTIL.provincia}, Tomo ${REGISTRO_MERCANTIL.tomo}, ` +
+  `Libro ${REGISTRO_MERCANTIL.libro}, Folio ${REGISTRO_MERCANTIL.folio}, ` +
+  `Sección ${REGISTRO_MERCANTIL.seccion}, Hoja ${REGISTRO_MERCANTIL.hoja}`;
+
+// Dominio absoluto para JSON-LD (url, breadcrumbs), links firmados que
+// se envían por email/WhatsApp, y cualquier URL absoluta que salga del
+// servidor. Prioridad:
+// 1) NEXT_PUBLIC_SITE_URL — el dominio limpio configurado a mano.
+// 2) VERCEL_PROJECT_PRODUCTION_URL — el alias estable del proyecto en
+// Vercel ("asegurados-ventajon.vercel.app"). Sirve tanto en el
+// deployment de production como en previews.
+// 3) VERCEL_URL — hostname del deployment específico (con hash,
+// dhnk0v9fk...). Es lo que uses en local con `vercel dev`, pero en
+// producción NO queremos que aparezca en enlaces que se envían al
+// usuario — se parece a un phishing y caduca al siguiente push.
+// 4) Fallback duro al alias de este proyecto.
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://asegurados-ventajon.vercel.app");
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://asegurados-ventajon.vercel.app");
 
+// Número de WhatsApp del asesor comercial (una única línea para toda la
+// web pública — Header, menú móvil, landings, quienes-somos, testimonios,
+// preguntas frecuentes, área cliente, etc.). Se sobreescribe con
+// NEXT_PUBLIC_WHATSAPP_NUMBER cuando exista; el fallback es el real de
+// producción para que un despliegue sin variables definidas no acabe
+// dirigiendo tráfico a un número que no es nuestro.
 export const WHATSAPP_NUMBER =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34600000000";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "34637143809";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
+
+// Enlace de WhatsApp que arranca el funnel de ManyChat de tarifa de SALUD.
+// El texto prellenado es el disparador (keyword) que ManyChat detecta para
+// lanzar el flow "Tarifa Salud". El widget de ayuda de la comparativa de
+// salud enruta aquí en vez de al wa.me genérico, para que el usuario caiga
+// directo en el bot. Configurable por env sin tocar código.
+export const WHATSAPP_FUNNEL_SALUD_URL =
+  process.env.NEXT_PUBLIC_WHATSAPP_FUNNEL_SALUD_URL ??
+  "https://wa.me/34637143809?text=Quiero%20seguir%20avanzando%20con%20mi%20comparativa";
 
 // Enlace de WhatsApp con mensaje prellenado para los puntos de contacto
 // genéricos previos a cualquier registro del usuario (header, menú móvil,
@@ -33,21 +102,19 @@ export const WHATSAPP_URL_GENERIC =
 export const CONTACT_HOURS =
   process.env.NEXT_PUBLIC_CONTACT_HOURS ?? "L–V · 9:00–20:00 (hora canaria)";
 
-/* ------------------------- Números desde los que llamamos -----------------
- * Se muestran en la página de gracias para que el usuario los reconozca, los
- * guarde y no tome la llamada por spam.
- * ⚠️ PENDIENTE (Sergio): sustituir por los números REALES de la centralita.
- * Recordatorio: desde octubre 2026 las llamadas comerciales requieren
- * numeración 400 + solicitud previa. Configúralos con las env
- * NEXT_PUBLIC_CALLER_1 / NEXT_PUBLIC_CALLER_2 antes de publicar.
- */
+// Números desde los que llamamos. Se muestran en la página de gracias para
+// que el usuario los reconozca y no confunda la llamada con spam. Pendiente
+// de sustituir por los reales de la centralita — desde octubre de 2026 las
+// llamadas comerciales requieren numeración 400 con solicitud previa.
+// Configúralos con NEXT_PUBLIC_CALLER_1 / NEXT_PUBLIC_CALLER_2 antes de
+// publicar.
 export const CALLER_NUMBERS = [
   { label: "Asesoría Asegurados", number: process.env.NEXT_PUBLIC_CALLER_1 ?? "+34 928 000 000" },
   { label: "Línea alternativa", number: process.env.NEXT_PUBLIC_CALLER_2 ?? "+34 971 000 000" },
 ];
 
 // Enlace directo a "escribir una reseña" del perfil de Google Business.
-// ⚠️ PENDIENTE (Sergio): sin el perfil real todavía. Mientras esta env no
+// Pendiente: sin el perfil real todavía. Mientras esta env no
 // esté configurada, la encuesta de satisfacción (/valoracion) simplemente no
 // muestra el paso de pedir reseña — nunca se inventa una URL.
 export const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ?? "";
@@ -64,27 +131,25 @@ export const RATING_VALUE = "4,7/5";
 // Datos de confianza reales (sin inventar cifras): reutilizados en la home y
 // en los bloques de prueba social del tarificador.
 export const TRUST_STATS = [
-  { value: ECOSYSTEM_MEMBERS, label: "en el ecosistema Ventajon" },
-  { value: String(PARTNERS.length), label: "aseguradoras líderes comparadas" },
-  { value: "0 €", label: "coste de comparar, siempre" },
-  { value: "100 %", label: "online, sin desplazamientos" },
+  { value: "+350.000", label: "personas ya comparan con nosotros" },
+  { value: String(PARTNERS.length), label: "aseguradoras líderes en una sola comparativa" },
+  { value: "0 €", label: "de coste por comparar, siempre" },
+  { value: "100 %", label: "online, sin colas ni oficinas" },
 ];
 
 // El catálogo de compañías/precios de la comparativa vive en lib/catalog.ts
 // (editable desde /admin/productos), no aquí.
 
-/* -------------------------- Banner de promoción ---------------------------
- * Estilo del reclamo de la referencia (recuadro mint + claim + "ver bases").
- * ⚠️ SIN precios ni % de descuento sin validación de Gabriel. Cuando haya una
- * promo aprobada, cámbiala aquí (headline/sub/badge) y punto.
- */
+// Banner de promoción. Recuadro mint + claim + "ver bases".
+// Sin precios ni porcentajes sin validación legal previa. Cuando haya una
+// promo aprobada, se cambia aquí (headline/sub/badge).
 export const PROMO = {
   badge: "Comparativa gratis",
   headline: "Tu seguro de salud, elegido con cabeza",
   sub: "Comparamos entre las mejores compañías para que pagues lo justo.",
   legalNote: "Sujeto a condiciones.",
   // Contenido del modal "Ver condiciones" (no navega, se abre en la misma página).
-  // ⚠️ Texto provisional: pendiente de redacción/validación legal definitiva.
+  // Texto provisional: pendiente de redacción/validación legal definitiva.
   conditions: [
     "La comparativa y el asesoramiento son gratuitos y sin ningún compromiso de contratación.",
     "El precio final depende del perfil de cada persona a asegurar (edad, coberturas, código postal…) y de la compañía elegida.",
@@ -96,10 +161,10 @@ export const PROMO = {
 /* ------------------------- Contenido de la landing ------------------------- */
 
 export const VENTAJAS = [
-  { icon: "shield", t: "De tu lado", d: "Somos tu asesor, no el vendedor de la compañía." },
-  { icon: "compare", t: "Comparamos por ti", d: "Entre las mejores aseguradoras del país." },
-  { icon: "doc", t: "Sin letra pequeña", d: "Te explicamos lo que cubre y lo que no, en claro." },
-  { icon: "pin", t: "Cerca de ti", d: "Trabajamos en toda España, con cercanía especial en Canarias y Baleares." },
+  { icon: "shield", t: "De tu lado", d: "Somos correduría: cobramos igual elijas la compañía que elijas, así que comparamos sin sesgo." },
+  { icon: "compare", t: "Mejor precio por volumen", d: "Comparamos miles de pólizas al mes, y eso nos da condiciones que tú solo no conseguirías." },
+  { icon: "doc", t: "Sin letra pequeña", d: "Te decimos qué cubre y qué no antes de firmar, no después." },
+  { icon: "pin", t: "Cercanía real", d: "Atendemos toda España por teléfono y WhatsApp, con equipo propio en Canarias y Baleares." },
 ];
 
 export const COBERTURAS = {

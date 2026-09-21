@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLlamada, updateLlamada, getLead } from "@/lib/store";
+import { getLlamada, updateLlamada, getLead, claimOnce } from "@/lib/store";
 import { normalizePhone } from "@/lib/schema";
 import { manychatAuthFail } from "@/lib/manychatAuth";
 
@@ -33,6 +33,13 @@ export async function PATCH(
   if (llamada.status === "hecha" || llamada.status === "cancelada") {
     return NextResponse.json({ ok: false, error: "Esta llamada ya no está activa." }, { status: 409 });
   }
+
+  // Idempotencia: si ManyChat reintenta el mismo POST por timeout, no
+  // ejecutamos la acción dos veces (que anotaría un log duplicado en la
+  // ficha). Clave por llamada+acción+fecha; ventana 5 min.
+  const idemKey = `idem:mc:${params.id}:${body.action}:${body.fechaProgramada ?? ""}:${body.turnoLlamada ?? ""}`;
+  const first = await claimOnce(idemKey, 5 * 60 * 1000).catch(() => true);
+  if (!first) return NextResponse.json({ ok: true, duplicate: true });
 
   let result;
   if (body.action === "cancelar") {

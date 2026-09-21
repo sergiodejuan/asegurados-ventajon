@@ -10,7 +10,7 @@ import { TurnstileWidget } from "./TurnstileWidget";
 // Calculadora de ahorro embebida en las landings SEO: primero da una
 // estimación instantánea (sin pedir nada) para que el usuario vea valor de
 // inmediato, y solo al pulsar "Quiero mi comparativa real" pide el teléfono
-// — captura el dato aunque no llegue a completar el tarificador completo de
+// captura el dato aunque no llegue a completar el tarificador completo de
 // más abajo en la misma página.
 export function SavingsCalculator({ slug, pricePerAsegurado }: { slug: string; pricePerAsegurado: number }) {
   const [pagoActual, setPagoActual] = useState("");

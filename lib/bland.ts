@@ -4,16 +4,14 @@ import { toE164Spain } from "./phone";
 // Integración con Bland.ai: cuando un lead completa el tarificador o solicita
 // una llamada (y ya ha dado autorización de contacto), se dispara una llamada
 // saliente automática del agente/pathway configurado en Bland.
-//
 // Variables de entorno necesarias (Vercel → Environment Variables):
-//   BLAND_API_KEY       — clave de API de Bland (Dev Portal → Account Settings → Keys).
-//   BLAND_PATHWAY_ID     — ID del pathway/conversación a usar (Copy ID en el pathway).
-//   BLAND_WEBHOOK_SECRET — (opcional) secreto de firma del webhook, para verificar
-//                           que las llamadas a /api/bland/webhook vienen de Bland.
+// BLAND_API_KEY — clave de API de Bland (Dev Portal → Account Settings → Keys).
+// BLAND_PATHWAY_ID — ID del pathway/conversación a usar (Copy ID en el pathway).
+// BLAND_WEBHOOK_SECRET — (opcional) secreto de firma del webhook, para verificar
+// que las llamadas a /api/bland/webhook vienen de Bland.
 // Sin las dos primeras, la llamada automática queda desactivada sin más (el
 // tarificador y "quiero que me llamen" siguen funcionando con normalidad).
-//
-// ⚠️ Si además tienes Retell configurado (lib/retell.ts), no actives las dos
+// Si además tienes Retell configurado (lib/retell.ts), no actives las dos
 // integraciones a la vez: el mismo lead recibiría dos llamadas de dos agentes
 // distintos. Configura las variables de entorno de un solo proveedor.
 

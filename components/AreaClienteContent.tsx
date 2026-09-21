@@ -94,6 +94,10 @@ export function AreaClienteContent() {
   const [rescheduleQuote, setRescheduleQuote] = useState<QuoteProfile | null>(null);
   const [legalModal, setLegalModal] = useState<LegalKey | null>(null);
   const [showRecoverBox, setShowRecoverBox] = useState(false);
+  // Deep-link ?presupuesto=<id> (enlace seguro enviado desde /admin, ver
+  // lib/clientVerification.ts createPresupuestoAccessLink): salta a la
+  // página que contiene ese presupuesto y lo resalta.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const PRESUPUESTOS_POR_PAGINA = 3;
   const [page, setPage] = useState(1);
@@ -165,6 +169,21 @@ export function AreaClienteContent() {
     setLoggingOut(false);
     setVista("acceso");
   }
+
+  useEffect(() => {
+    if (vista !== "area" || quotes.length === 0) return;
+    const target = searchParams.get("presupuesto");
+    if (!target) return;
+    const idx = quotes.findIndex((q) => q.id === target);
+    if (idx === -1) return;
+    setPage(Math.floor(idx / PRESUPUESTOS_POR_PAGINA) + 1);
+    setHighlightId(target);
+    const t = setTimeout(() => {
+      document.getElementById(`presupuesto-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vista, quotes]);
 
   const totalPages = Math.max(1, Math.ceil(quotes.length / PRESUPUESTOS_POR_PAGINA));
   const currentPage = Math.min(page, totalPages);
@@ -474,7 +493,11 @@ export function AreaClienteContent() {
                 const age = ageFromDob(q.fechaNacimiento);
                 const waText = buildWhatsAppText({ producto: q.producto, quote: q, origen: "área de cliente" });
                 return (
-                  <li key={q.id} className="rounded-[20px] border border-hair bg-white p-5 shadow-soft">
+                  <li
+                    key={q.id}
+                    id={`presupuesto-${q.id}`}
+                    className={`rounded-[20px] border bg-white p-5 shadow-soft transition-colors ${highlightId === q.id ? "border-brand-red ring-2 ring-brand-red/40" : "border-hair"}`}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <span className="inline-flex items-center rounded-pill bg-brand-red/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-red">

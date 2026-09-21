@@ -8,6 +8,7 @@ import { TarificadorExperience } from "./TarificadorExperience";
 import { Check, IconByName } from "./icons";
 import { PartnerBadge } from "./PartnerBadge";
 import { SocialProofBadge } from "./SocialProofBadge";
+import { PriceMatchCrossSellBar } from "./PriceMatchCrossSellBar";
 import { ECOSYSTEM_MEMBERS, PARTNERS, TRUST_STATS } from "@/lib/brand";
 import { getProductPage } from "@/lib/productPages";
 import { SEO_LANDING_PAGES, priceLine, getCombinedFaq, type SeoLandingPageData } from "@/lib/seoLandingPages";
@@ -224,6 +225,11 @@ export async function SeoLandingPage({ page, precio }: { page: SeoLandingPageDat
               <p className="mt-2 text-[14px] leading-relaxed text-slate2">{s.p}</p>
             </div>
           ))}
+        </section>
+
+        {/* CROSS-SELL PRECIO MEJOR */}
+        <section aria-label="Precio mejor garantizado" className="mx-auto mt-14 max-w-app px-5 md:mt-24 md:max-w-5xl lg:max-w-6xl">
+          <PriceMatchCrossSellBar producto="salud" />
         </section>
 
         {/* TAMBIÉN TE PUEDE INTERESAR (enlazado interno, sin estar en el menú) */}

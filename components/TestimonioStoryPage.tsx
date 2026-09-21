@@ -8,6 +8,7 @@ import { WhatsApp } from "./icons";
 import { SITE_URL } from "@/lib/brand";
 import { withTestimonioUtm, type Testimonio, type TestimonioCapitulo } from "@/lib/testimonios";
 import { otherTestimonios } from "@/lib/store";
+import { safeHref } from "@/lib/safeHref";
 
 // Reparte los capítulos del relato en grupos (uno por foto de galería + un
 // grupo final), para intercalar cada foto entre bloques de texto en vez de
@@ -59,7 +60,7 @@ function GalleryPhoto({ src }: { src: string }) {
 // el grid de más historias, igual que hace /promociones.
 export async function TestimonioStoryPage({ testimonio }: { testimonio: Testimonio }) {
   const related = await otherTestimonios(testimonio.id);
-  const ctaHref = withTestimonioUtm(testimonio.ctaHref, testimonio.slug);
+  const ctaHref = withTestimonioUtm(safeHref(testimonio.ctaHref), testimonio.slug);
   const llamadmeHref = withTestimonioUtm(
     `/quiero-que-me-llamen${testimonio.producto ? `?producto=${testimonio.producto}` : ""}`,
     testimonio.slug

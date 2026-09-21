@@ -137,7 +137,207 @@ function InformesAdmin() {
           agente (ver el pie de la barra lateral del panel).
         </p>
       </ReportSection>
+
+      <CodeoscopicSection />
+      <PriceMatchSection />
     </main>
+  );
+}
+
+/* ---------------- Sección Igualación de precio (price-match) --------------- */
+type PriceMatchMetrics = {
+  totalSolicitudes: number;
+  precioMedioOfrecido: number | null;
+  topCompeticion: { compania: string; solicitudes: number; precioMedio: number | null }[];
+  cerrados: number;
+  ratioCierre: number;
+  ultimoSolicitadoAt: string;
+};
+
+function PriceMatchSection() {
+  const { token } = useAdminToken();
+  const [metrics, setMetrics] = useState<PriceMatchMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/informes/price-match", { headers: { "x-admin-token": token } });
+      const body = await res.json();
+      if (!res.ok || !body.ok) { setError(body.error ?? "No se pudo cargar."); setLoading(false); return; }
+      setMetrics(body.metrics);
+    } catch { setError("Error de conexión."); }
+    setLoading(false);
+  }
+
+  const eurMes = (n: number | null) => n == null ? "—" : `${n.toLocaleString("es-ES", { maximumFractionDigits: 0 })} €/mes`;
+
+  return (
+    <ReportSection title="Igualación de precio (rescate comercial)">
+      {!metrics && !loading && (
+        <div>
+          <p className="text-[13px] leading-relaxed text-slate2">
+            Solicitudes recibidas desde /precio-mejor-garantizado y desde el módulo de rescate en la comparativa.
+            Ranking de compañías competidoras y ratio de cierre.
+          </p>
+          <button type="button" onClick={load} className="mt-3 rounded-card border border-hair bg-white px-4 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+            Calcular métricas
+          </button>
+        </div>
+      )}
+      {loading && <p className="text-[13px] text-slate2">Calculando…</p>}
+      {error && <p role="alert" className="text-[13px] font-medium text-brand-red">{error}</p>}
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-navy">{metrics.totalSolicitudes}</p>
+              <p className="text-[11px] font-medium text-slate2">Solicitudes totales</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-navy">{metrics.cerrados}</p>
+              <p className="text-[11px] font-medium text-slate2">Cierres (con elección)</p>
+              <p className="mt-0.5 text-[11px] tnums text-slate2/80">{Math.round(metrics.ratioCierre * 1000) / 10}%</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[20px] font-extrabold tnums text-emerald-700">{eurMes(metrics.precioMedioOfrecido)}</p>
+              <p className="text-[11px] font-medium text-slate2">Precio medio traído por el cliente</p>
+            </div>
+            <div className="rounded-card border border-hair bg-white p-3">
+              <p className="text-[13px] font-semibold tnums text-navy">
+                {metrics.ultimoSolicitadoAt ? new Date(metrics.ultimoSolicitadoAt).toLocaleDateString("es-ES") : "—"}
+              </p>
+              <p className="text-[11px] font-medium text-slate2">Última solicitud</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <h4 className="text-[13px] font-bold text-navy">Compañías competidoras más frecuentes</h4>
+            <div className="mt-2">
+              <BarList
+                items={metrics.topCompeticion.map((c) => ({ label: c.compania, value: c.solicitudes }))}
+                formatValue={(v, i) => {
+                  const c = metrics.topCompeticion[i];
+                  return `${v} solicitud${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                }}
+              />
+            </div>
+          </div>
+          <button type="button" onClick={load} className="mt-4 text-[12px] font-semibold text-navy underline">
+            Recalcular
+          </button>
+        </>
+      )}
+    </ReportSection>
+  );
+}
+
+/* ------------------------ Sección Codeoscopic ---------------------------- */
+// Métricas específicas de la integración Codeoscopic Avant2: cobertura de la
+// integración (cuántos leads tienen cotización real) y ranking de compañías
+// tanto en cotización como en elección final del cliente.
+
+type CodeoscopicMetrics = {
+  totalPresupuestos: number;
+  soloSalud: number;
+  conInsuranceId: number;
+  conSnapshot: number;
+  snapshotCompleto: number;
+  cotizacionesTotales: number;
+  precioMedioMensual: number | null;
+  topCompanias: { compania: string; cotizaciones: number; precioMedio: number | null }[];
+  topElecciones: { compania: string; elecciones: number; precioMedio: number | null }[];
+  ultimoSnapshotAt: string;
+};
+
+function CodeoscopicSection() {
+  const { token } = useAdminToken();
+  const [metrics, setMetrics] = useState<CodeoscopicMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/informes/codeoscopic", { headers: { "x-admin-token": token } });
+      const body = await res.json();
+      if (!res.ok || !body.ok) { setError(body.error ?? "No se pudo cargar."); setLoading(false); return; }
+      setMetrics(body.metrics);
+    } catch { setError("Error de conexión."); }
+    setLoading(false);
+  }
+
+  const pct = (num: number, denom: number) => denom > 0 ? Math.round((num / denom) * 1000) / 10 : 0;
+  const eurMes = (n: number | null) => n == null ? "—" : `${n.toLocaleString("es-ES", { maximumFractionDigits: 0 })} €/mes`;
+
+  return (
+    <ReportSection title="Codeoscopic (motor Avant2)">
+      {!metrics && !loading && (
+        <div>
+          <p className="text-[13px] leading-relaxed text-slate2">
+            Cobertura de la integración con Codeoscopic y ranking de compañías cotizadas y elegidas por el cliente.
+            El cálculo escanea todos los presupuestos y puede tardar unos segundos en bases grandes.
+          </p>
+          <button type="button" onClick={load} className="mt-3 rounded-card border border-hair bg-white px-4 py-2 text-[13px] font-semibold text-navy hover:bg-mist">
+            Calcular métricas
+          </button>
+        </div>
+      )}
+      {loading && <p className="text-[13px] text-slate2">Calculando…</p>}
+      {error && <p role="alert" className="text-[13px] font-medium text-brand-red">{error}</p>}
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <KpiCard label="Leads de salud" value={metrics.soloSalud.toString()} />
+            <KpiCard label="Con cotización Codeoscopic" value={`${metrics.conInsuranceId}`} sub={`${pct(metrics.conInsuranceId, metrics.soloSalud)}%`} />
+            <KpiCard label="Con snapshot cerrado" value={`${metrics.snapshotCompleto}`} sub={`${pct(metrics.snapshotCompleto, metrics.conSnapshot)}% de los que tienen`} />
+            <KpiCard label="Cotizaciones totales" value={metrics.cotizacionesTotales.toString()} sub={`~${eurMes(metrics.precioMedioMensual)} de media`} />
+          </div>
+          {metrics.ultimoSnapshotAt && (
+            <p className="mt-3 text-[11px] text-slate2">Último snapshot registrado: {new Date(metrics.ultimoSnapshotAt).toLocaleString("es-ES")}</p>
+          )}
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div>
+              <h4 className="text-[13px] font-bold text-navy">Compañías con más cotizaciones</h4>
+              <div className="mt-2">
+                <BarList
+                  items={metrics.topCompanias.map((c) => ({ label: c.compania, value: c.cotizaciones }))}
+                  formatValue={(v, i) => {
+                    const c = metrics.topCompanias[i];
+                    return `${v} cotización${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-navy">Compañías más elegidas por el cliente</h4>
+              <div className="mt-2">
+                <BarList
+                  items={metrics.topElecciones.map((c) => ({ label: c.compania, value: c.elecciones }))}
+                  formatValue={(v, i) => {
+                    const c = metrics.topElecciones[i];
+                    return `${v} elección${v === 1 ? "" : "es"} · ${eurMes(c.precioMedio)}`;
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={load} className="mt-4 text-[12px] font-semibold text-navy underline">
+            Recalcular
+          </button>
+        </>
+      )}
+    </ReportSection>
+  );
+}
+
+function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-card border border-hair bg-white p-3">
+      <p className="text-[20px] font-extrabold tnums text-navy">{value}</p>
+      <p className="text-[11px] font-medium text-slate2">{label}</p>
+      {sub && <p className="mt-0.5 text-[11px] tnums text-slate2/80">{sub}</p>}
+    </div>
   );
 }
 
@@ -159,7 +359,7 @@ function FunnelChart({ stages }: { stages: { key: string; label: string; count: 
     <div className="flex flex-col gap-2.5">
       {stages.map((s) => {
         const pct = Math.round((s.count / max) * 100);
-        const barColor = s.key === "ganado" ? "bg-emerald-500" : s.key === "perdido" ? "bg-brand-red" : "bg-navy";
+        const barColor = s.key === "ganado" ? "bg-emerald-500" : s.key === "perdido" ? "bg-brand-red" : s.key === "caducado" ? "bg-slate-300" : "bg-navy";
         return (
           <div key={s.key} className="flex items-center gap-3">
             <span className="w-28 shrink-0 text-[12px] font-medium text-slate2">{s.label}</span>

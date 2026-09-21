@@ -116,19 +116,18 @@ export function LeadMagnetForm() {
         />
       </div>
 
-      <div className="mt-5 flex flex-col gap-3">
+      {/* Un solo check agrupa la política de privacidad y los consejos por
+          email; al marcarlo se activan los dos flags, coherente con el resto
+          de tarificadores. Nota legal en EssentialConsent.tsx. */}
+      <div className="mt-5">
         <label htmlFor="lm-privacidad" className="flex cursor-pointer items-start gap-3">
-          <input id="lm-privacidad" type="checkbox" checked={aceptaPrivacidad} onChange={(e) => setAceptaPrivacidad(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
+          <input
+            id="lm-privacidad" type="checkbox" checked={aceptaPrivacidad}
+            onChange={(e) => { setAceptaPrivacidad(e.target.checked); setAceptaComercial(e.target.checked); }}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy"
+          />
           <span className="text-[13px] leading-relaxed text-slate2">
-            He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a>.
-          </span>
-        </label>
-        <label htmlFor="lm-comercial" className="flex cursor-pointer items-start gap-3">
-          <input id="lm-comercial" type="checkbox" checked={aceptaComercial} onChange={(e) => setAceptaComercial(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-navy" />
-          <span className="text-[13px] leading-relaxed text-slate2">
-            Quiero recibir consejos y novedades de {BRAND_NAME} por email (opcional).
+            He leído y acepto la <a href="/legal" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy underline">política de privacidad</a> y quiero recibir consejos y novedades de {BRAND_NAME} por email.
           </span>
         </label>
       </div>
