@@ -96,6 +96,10 @@ const NAV: NavNode[] = [
           leaf("/admin/configuracion/avisos", "Avisos al equipo", "avisos", "configuracion"),
           leaf("/admin/configuracion/plantillas-email", "Plantillas de email", "plantillas-email", "configuracion"),
           leaf("/admin/rgpd", "RGPD", "rgpd", "rgpd"),
+          // Módulo "desarrollador" a propósito (no "configuracion"): acción de
+          // alto impacto que deja fuera a cualquier visitante, reservada a
+          // Administrador o a quien tenga el permiso granular de desarrollo.
+          leaf("/admin/configuracion/bloqueo-web", "Bloqueo de la web", "bloqueo-web", "desarrollador"),
         ],
       },
       {
@@ -154,7 +158,7 @@ export type AdminActiveKey =
   | "diseno" | "diseno-colores" | "diseno-tipografia" | "diseno-logos" | "diseno-portadas"
   | "diseno-aseguradoras" | "diseno-loader" | "diseno-home-hero" | "diseno-widget-auto"
   | "integraciones" | "integraciones-codescopic" | "integraciones-tremendous" | "integraciones-api" | "integraciones-webhooks"
-  | "cookies" | "analitica" | "accesibilidad" | "avisos" | "plantillas-email" | "rgpd" | "agentes" | "permisos" | "registro";
+  | "cookies" | "analitica" | "accesibilidad" | "avisos" | "plantillas-email" | "rgpd" | "bloqueo-web" | "agentes" | "permisos" | "registro";
 
 // Filtro de permisos recursivo: una hoja se ve si el agente tiene su módulo;
 // un grupo se ve solo si le queda al menos una hoja visible dentro.
